@@ -161,98 +161,108 @@ with st.sidebar:
         pass
 
 page = st.navigation(
-    [
-        st.Page(
-            "app_pages/ajans.py",
-            title="İşlem ajansı",
-            icon=":material/psychology:",
-            help="Rejime uyarlanmış çoklu zaman dilimi uyumu ile tam işlem planı ve ön kontrol üretir.",
-        ),
-        st.Page(
-            "app_pages/anlik.py",
-            title="Anlık sinyal",
-            icon=":material/flash_on:",
-            help="Canlı 1 dakikalık mumlardan 5m/15m tetikleyici koşullarıyla anlık AL/SAT sinyali üretir.",
-        ),
-        st.Page(
-            "app_pages/terminal.py",
-            title="Sinyal terminali",
-            icon=":material/monitoring:",
-            help="İzlenen hisseleri 15 saniyede bir değerlendirir; karar değişiminde anında bildirim gönderir.",
-        ),
-        st.Page(
-            "app_pages/tarayici.py",
-            title="BIST tarayıcı",
-            icon=":material/radar:",
-            help="BIST'te kayıtlı 804 hissenin tamamını teknik koşullarla tarar.",
-        ),
-        st.Page(
-            "app_pages/bot.py",
-            title="İşlem botu",
-            icon=":material/smart_toy:",
-            help="BIST hissesini yazın; canlı fiyat, KAP ve teknik sinyallerle anında AL/BEKLE/SAT kararı verir.",
-        ),
-        st.Page(
-            "app_pages/canli.py",
-            title="Canlı işlem",
-            icon=":material/bolt:",
-            help="Gerçek BIST fiyatları, KAP haberleri ve teknik sinyallerle anlık AL/BEKLE/SAT kararı üretir.",
-        ),
-        st.Page(
-            "app_pages/hesabim.py",
-            title="Hesabım",
-            icon=":material/person:",
-            help="Kayıtlı ayarlarınızı, kurgusal portföyünüzü ve karar geçmişinizi gösterir; verilerinizi sıfırlar.",
-        ),
-        st.Page(
-            "app_pages/performans.py",
-            title="Sinyal performansı",
-            icon=":material/query_stats:",
-            help="Kapanan her kurgusal sinyali R çarpanıyla kaydeden şeffaf sonuç defteri, kümülatif eğri ve performans KPI'ları.",
-        ),
-        st.Page(
-            "app_pages/risk.py",
-            title="Akıllı risk merkezi",
-            icon=":material/shield:",
-            help="Piyasa rejimi, Kelly pozisyon boyutu, Monte Carlo zarar olasılığı ve portföy riskini analiz eder.",
-        ),
-        st.Page(
-            "app_pages/laboratuvar.py",
-            title="Strateji laboratuvarı",
-            icon=":material/science:",
-            help="Walk-forward doğrulama, parametre duyarlılığı ve işlem koruma katmanını gösterir.",
-        ),
-        st.Page(
-            "app_pages/denetim.py",
-            title="Denetim ve doğrulama",
-            icon=":material/fact_check:",
-            help="Hata kaynaklarını, istatistiksel güveni ve gerçek para öncesi zorunlu kontrolleri gösterir.",
-        ),
-        st.Page(
-            "app_pages/piyasa.py",
-            title="Piyasa analizi",
-            icon=":material/dashboard:",
-            help="İzleme listesini tarar, AL/SAT sinyallerini ve güven skorlarını gösterir.",
-        ),
-        st.Page(
-            "app_pages/hisse.py",
-            title="Hisse detayı",
-            icon=":material/analytics:",
-            help="Tek hissenin grafiklerini, gösterge gerekçelerini ve akıllı analist yorumunu gösterir.",
-        ),
-        st.Page(
-            "app_pages/portfoy.py",
-            title="Portföy ve test",
-            icon=":material/account_balance_wallet:",
-            help="Risk profiline göre dağılım önerisi ve backtest getiri karşılaştırması sunar.",
-        ),
-        st.Page(
-            "app_pages/ayarlar.py",
-            title="Ayarlar",
-            icon=":material/settings:",
-            help="İzleme listesi, eşikler, gösterge ağırlıkları ve risk parametrelerini düzenler.",
-        ),
-    ],
+    {
+        "": [
+            st.Page(
+                "app_pages/akilli_panel.py",
+                title="Akıllı Panel",
+                icon=":material/auto_awesome:",
+                help="Sade 3 adımda piyasa durumu, tek net karar ve kurgusal portföy; rejime göre yöntem önerisi.",
+            ),
+            st.Page(
+                "app_pages/ajans.py",
+                title="İşlem ajansı",
+                icon=":material/psychology:",
+                help="Rejime uyarlanmış çoklu zaman dilimi uyumu ile tam işlem planı ve ön kontrol üretir.",
+            ),
+            st.Page(
+                "app_pages/anlik.py",
+                title="Anlık sinyal",
+                icon=":material/flash_on:",
+                help="Canlı 1 dakikalık mumlardan 5m/15m tetikleyici koşullarıyla anlık AL/SAT sinyali üretir.",
+            ),
+            st.Page(
+                "app_pages/terminal.py",
+                title="Sinyal terminali",
+                icon=":material/monitoring:",
+                help="İzlenen hisseleri 15 saniyede bir değerlendirir; karar değişiminde anında bildirim gönderir.",
+            ),
+            st.Page(
+                "app_pages/hesabim.py",
+                title="Hesabım",
+                icon=":material/person:",
+                help="Kurgusal portföyünüzü, karar geçmişinizi ve verilerinizi yönetir.",
+            ),
+            st.Page(
+                "app_pages/performans.py",
+                title="Sinyal performansı",
+                icon=":material/query_stats:",
+                help="Kapanan her kurgusal sinyali R çarpanıyla kaydeden şeffaf sonuç defteri ve performans KPI'ları.",
+            ),
+            st.Page(
+                "app_pages/ayarlar.py",
+                title="Ayarlar",
+                icon=":material/settings:",
+                help="İzleme listesi, eşikler, gösterge ağırlıkları ve risk parametrelerini düzenler.",
+            ),
+        ],
+        "Gelişmiş analizler": [
+            st.Page(
+                "app_pages/tarayici.py",
+                title="BIST tarayıcı",
+                icon=":material/radar:",
+                help="BIST'te kayıtlı 804 hissenin tamamını teknik koşullarla tarar.",
+            ),
+            st.Page(
+                "app_pages/bot.py",
+                title="İşlem botu",
+                icon=":material/smart_toy:",
+                help="BIST hissesini yazın; canlı fiyat, KAP ve teknik sinyallerle anında AL/BEKLE/SAT kararı verir.",
+            ),
+            st.Page(
+                "app_pages/canli.py",
+                title="Canlı işlem",
+                icon=":material/bolt:",
+                help="Gerçek BIST fiyatları, KAP haberleri ve teknik sinyallerle anlık AL/BEKLE/SAT kararı üretir.",
+            ),
+            st.Page(
+                "app_pages/risk.py",
+                title="Akıllı risk merkezi",
+                icon=":material/shield:",
+                help="Piyasa rejimi, Kelly pozisyon boyutu, Monte Carlo zarar olasılığı ve portföy riskini analiz eder.",
+            ),
+            st.Page(
+                "app_pages/laboratuvar.py",
+                title="Strateji laboratuvarı",
+                icon=":material/science:",
+                help="Walk-forward doğrulama, parametre duyarlılığı ve işlem koruma katmanını gösterir.",
+            ),
+            st.Page(
+                "app_pages/denetim.py",
+                title="Denetim ve doğrulama",
+                icon=":material/fact_check:",
+                help="Hata kaynaklarını, istatistiksel güveni ve gerçek para öncesi zorunlu kontrolleri gösterir.",
+            ),
+            st.Page(
+                "app_pages/piyasa.py",
+                title="Piyasa analizi",
+                icon=":material/dashboard:",
+                help="İzleme listesini tarar, AL/SAT sinyallerini ve güven skorlarını gösterir.",
+            ),
+            st.Page(
+                "app_pages/hisse.py",
+                title="Hisse detayı",
+                icon=":material/analytics:",
+                help="Tek hissenin grafiklerini, gösterge gerekçelerini ve akıllı analist yorumunu gösterir.",
+            ),
+            st.Page(
+                "app_pages/portfoy.py",
+                title="Portföy ve test",
+                icon=":material/account_balance_wallet:",
+                help="Risk profiline göre dağılım önerisi ve backtest getiri karşılaştırması sunar.",
+            ),
+        ],
+    },
     position="top",
 )
 page.run()

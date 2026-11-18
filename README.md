@@ -8,6 +8,8 @@ HSC Borsa Analiz; bir komut satırı sinyal botundan evrilen, tarayıcıdan kull
 
 ## Öne çıkanlar
 
+- **Akıllı Panel:** Açılışta sade 3 adım — piyasa durumu, tek net karar (AL/BEKLE/SAT + sade gerekçe), kurgusal portföy. BIST 100 rejimine göre *hangi yöntemin kullanılacağını* önerir. Menüde ana araçlar öne çıkar, teknik sayfalar "Gelişmiş analizler" grubuna alınır; hiçbiri silinmez.
+- **Sade dil sözlüğü:** RSI, MACD, Monte Carlo, R çarpanı gibi 20 teknik terimin panelde tek tıkla açıklaması
 - **Anlık işlem sinyali:** 1 dakikalık canlı mumlardan 5m/15m EMA9/20, VWAP, RSI7 ve hacim patlaması tetikleyicileri; seans ve KAP acil-duyuru filtreleri
 - **İşlem ajansı:** Rejime göre ağırlıklandırılmış 9 zaman dilimi uyumu, tam işlem planı (giriş / ATR stop / 1.5R-2.5R-4R hedefler / Kelly+volatilite boyutu / ufuk / geçersizleme)
 - **Akıllı karar motoru:** AL / BEKLE / SAT trafik lambası, faktör katkı grafiği, gerekçeler
@@ -29,6 +31,7 @@ HSC Borsa Analiz; bir komut satırı sinyal botundan evrilen, tarayıcıdan kull
 
 | Sayfa | Açıklama |
 |---|---|
+| **Akıllı Panel** | Sade giriş ekranı: rejim yönlendirici, tek karar kartı, portföy özeti |
 | Anlık sinyal | Canlı 1 dakikalık mumlardan tetikleyici tabanlı AL/SAT |
 | İşlem ajansı | Tam işlem planı, ön kontroller, güven kalibrasyonu |
 | Sinyal terminali | 8 hisseye kadar 15 sn'lik canlı sinyal matrisi ve değişim bildirimleri |
@@ -78,15 +81,16 @@ Ardından `.streamlit/secrets.toml` içine kendi anahtarlarınızı girin veya u
 ## Nasıl çalışır? — İlk kullanım akışı
 
 1. **Giriş:** Uygulama açılınca **Kayıt ol** ile kullanıcı adı/şifre oluşturun. Verileriniz (ayarlar, kurgusal portföy, sinyal geçmişi) bu kullanıcıya özel saklanır.
-2. **Hisse seçimi:** **Ayarlar → İzleme listesi** veya **BIST tarayıcı** sayfasından ilgilendiğiniz hisseleri seçin. BIST'te kayıtlı 804 hisse aranabilir.
-3. **Sinyal alma — üç yol:**
+2. **Akıllı Panel:** Açılış sayfasında önce piyasa durumunu görün; size önerilen yöntemi ve "Bugün ne yapmalı?" önerisini okuyun. Hisse seçip tek net karar kartını inceleyin. Detay isterseniz **Gelişmiş analizler** grubundaki araçları kullanın.
+3. **Hisse seçimi:** **Ayarlar → İzleme listesi** veya **BIST tarayıcı** sayfasından ilgilendiğiniz hisseleri seçin. BIST'te kayıtlı 804 hisse aranabilir.
+4. **Sinyal alma — üç yol:**
    - **Anlık sinyal:** seans içinde 1 dakikalık canlı mumlardan EMA9/20 + VWAP + RSI7 + hacim tetikleyicileriyle anlık AL/SAT,
    - **İşlem ajansı:** bir hisse için tam işlem planı (giriş, stop, hedefler, boyut, ufuk, geçersizleme),
    - **İşlem botu:** hisse adı veya `THYAO, GARAN, ASELS` gibi çoklu sembollerle sohbet tarzı analiz.
-4. **Kararı okuma:** Trafik lambası **yeşil = AL, sarı = BEKLE, kırmızı = SAT**. Puan, güven skoru ve "neden" gerekçeleri aynı ekrandadır.
-5. **Kurgusal işlem:** AL/SAT sinyalinde **Kurgusal pozisyon aç** ile paper portföye ekleyin; **Hesabım** sayfasında stop/hedef/sinyal değişimine göre SAT önerilerini ve 15 dakikalık net K/Z tablosunu izleyin.
-6. **Sonuçları görün:** Pozisyonu kapattığınızda sonuç otomatik olarak **Sinyal performansı** defterine R çarpanıyla işlenir; kazanma oranı, kümülatif R eğrisi ve drawdown burada güncellenir.
-7. **Bildirim (opsiyonel):** Ayarlar'dan ntfy/Telegram/e-posta kanalını açın; **karar değiştiğinde** tek seferlik bildirim gider.
+5. **Kararı okuma:** Trafik lambası **yeşil = AL, sarı = BEKLE, kırmızı = SAT**. Puan, güven skoru ve "neden" gerekçeleri aynı ekrandadır.
+6. **Kurgusal işlem:** AL/SAT sinyalinde **Kurgusal pozisyon aç** ile paper portföye ekleyin; **Hesabım** sayfasında stop/hedef/sinyal değişimine göre SAT önerilerini ve 15 dakikalık net K/Z tablosunu izleyin.
+7. **Sonuçları görün:** Pozisyonu kapattığınızda sonuç otomatik olarak **Sinyal performansı** defterine R çarpanıyla işlenir; kazanma oranı, kümülatif R eğrisi ve drawdown burada güncellenir.
+8. **Bildirim (opsiyonel):** Ayarlar'dan ntfy/Telegram/e-posta kanalını açın; **karar değiştiğinde** tek seferlik bildirim gider.
 
 **Seans:** BIST 10:00–18:00 (hafta içi). Piyasa kapalıyken sinyaller bilgilendirmedir, kurgusal işlem düğmeleri devre dışıdır.
 
@@ -120,6 +124,16 @@ Kapanan her kurgusal pozisyon otomatik olarak `users/<kullanici>/performance.jso
 
 > Bu defter kurgusal sinyallerin kaydıdır; spread, komisyon, swap ve kayma dahil **değildir**. Geçmiş performans gelecek sonuçların güvenilir göstergesi değildir. Yüksek kazanma oranı tek başına yeterli değildir; kâr faktörü ve beklentiyle birlikte okunmalıdır.
 
+## Akıllı Panel ve sadeleştirilmiş menü
+
+Açılış sayfası **Akıllı Panel**'dir. Amaç teknik karmaşıklığı kullanıcıdan gizlemek değil, önce doğru soruyu sormaktır:
+
+1. **Piyasa durumu:** BIST 100 rejimi (yükseliş / düşüş / yatay / oynak) sade dille gösterilir ve *hangi yöntemin uygun olduğu* önerilir. Örn. oynak piyasada pozisyon küçültüp kısa vadeli tetikleyicilere yönlendirir, düşüşte yeni alım yerine risk yönetimini önerir.
+2. **Tek net karar:** Seçilen hisse için AL / BEKLE / SAT, güven skoru, 2 cümlelik sade gerekçe ve giriş/stop/hedef seviyeleri tek kartta toplanır. "Bugün ne yapmalı?" önerisi izleme listesinin tamamını tarayıp tek aday çıkarır; aday yoksa açıkça **BEKLE** der.
+3. **Kurgusal portföy:** Açık pozisyon, açık K/Z, kapanan sinyal ve net R birlikte görünür.
+
+Üst menüde sadece 7 ana araç görünür; tarayıcı, bot, risk merkezi, laboratuvar, denetim, piyasa analizi, hisse detayı ve portföy testi **"Gelişmiş analizler"** başlıklı açılır grupta toplanır. **Hiçbir sayfa kaldırılmadı.** Panelin altındaki **"Teknik terimler sade dille"** bölümü 20 terimi günlük dille açıklar.
+
 ## Sık sorulan sorular ve sorun giderme
 
 | Soru | Cevap |
@@ -130,6 +144,8 @@ Kapanan her kurgusal pozisyon otomatik olarak `users/<kullanici>/performance.jso
 | Bildirim gelmiyor | ntfy için konuya abone olunduğundan ve Ayarlar'da kanalın açık olduğundan emin olun. Bildirim yalnızca karar değiştiğinde gönderilir. |
 | API anahtarı şart mı? | Hayır. Tüm servisler opsiyoneldir; anahtarsız da çalışır. |
 | Gerçek emir veriliyor mu? | Hayır. Sistem yalnızca kurgusal (paper) işlem yapar, aracı kuruma bağlanmaz. |
+| Gelişmiş analizlere nasıl ulaşırım? | Üst menüdeki **Gelişmiş analizler** grubunu açın veya Akıllı Panel'in altındaki "Gelişmiş analizler — tüm araçlar" bölümünü kullanın. |
+| Teknik terimleri anlamıyorum | Akıllı Panel'in en altındaki **"Teknik terimler sade dille"** bölümüne bakın; RSI'dan Monte Carlo'ya 20 terim günlük dille açıklanır. |
 | R çarpanı nedir? | Kâr/zararın alınan riske (stop mesafesine) oranı. Detaylı anlatım **Sinyal performansı** sayfasındaki "R çarpanı nasıl hesaplanıyor?" bölümünde. |
 | Sonuç defteri nerede saklanıyor? | `users/<kullanici>/performance.jsonl`. Hesabı silince veya veriler sıfırlanınca kaldırılır. |
 | Şifremi unuttum | Yerel hesap sistemi olduğu için e-posta ile sıfırlama yok; hatırladığınız bir şifreyle kayıt olun. |
@@ -139,8 +155,8 @@ Kapanan her kurgusal pozisyon otomatik olarak `users/<kullanici>/performance.jso
 
 ```
 borsa_bot/     # Sinyal, gösterge, backtest, veri, koruma motoru
-ui/            # Streamlit katmanı: ajan, terminal, intraday, risk, performans defteri, doğrulama
-app_pages/     # 15 sayfa
+ui/            # Streamlit katmanı: akıllı rehber, sade dil sözlüğü, ajan, terminal, intraday, risk, performans defteri, doğrulama
+app_pages/     # 16 sayfa (Akıllı Panel + 15 analiz aracı)
 docs/          # Denetim raporu, araç planı, görseller
 assets/        # Logo
 ```
@@ -148,7 +164,7 @@ assets/        # Logo
 ## Test ve doğrulama
 
 - `python -m compileall` ile tüm modüller derlenir
-- AppTest ile giriş + 15 sayfa + etkileşimler (buton, seçim, kayıt/sıfırlama, kurgusal işlem) doğrulanır
+- AppTest ile giriş + 16 sayfa + etkileşimler (buton, seçim, kayıt/sıfırlama, kurgusal işlem) doğrulanır
 - Agent API ile çalışan uygulama üzerinden tüm sayfalar `ready` durumunda doğrulanır
 - Denetim raporu: `docs/AUDIT_REPORT.md`
 
