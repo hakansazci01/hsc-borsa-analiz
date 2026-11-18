@@ -205,6 +205,12 @@ page = st.navigation(
             help="Kayıtlı ayarlarınızı, kurgusal portföyünüzü ve karar geçmişinizi gösterir; verilerinizi sıfırlar.",
         ),
         st.Page(
+            "app_pages/performans.py",
+            title="Sinyal performansı",
+            icon=":material/query_stats:",
+            help="Kapanan her kurgusal sinyali R çarpanıyla kaydeden şeffaf sonuç defteri, kümülatif eğri ve performans KPI'ları.",
+        ),
+        st.Page(
             "app_pages/risk.py",
             title="Akıllı risk merkezi",
             icon=":material/shield:",

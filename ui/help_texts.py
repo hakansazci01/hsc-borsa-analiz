@@ -126,6 +126,18 @@ TOOLTIPS: dict[str, str] = {
     "equity_curve": "Backtest boyunca kurgusal sermayenin değişimi. Düşüşler işlem stratejisinin riskini gösterir.",
     "win_rate": "Kazanan işlemlerin tüm kapanmış işlemlere oranı. Tek başına yeterli değildir; kazanç/kayıp oranıyla birlikte okunmalıdır.",
     "max_drawdown": "Zirveden dibe görülen en büyük yüzde düşüş. Stratejinin dayanıklılığını gösterir.",
+    "r_multiple": (
+        "R çarpanı, kâr/zararın alınan riske (stop mesafesine) oranıdır. "
+        "Giriş 100 ₺, stop 95 ₺, çıkış 110 ₺ ise sonuç +2R'dır. Farklı fiyat ve "
+        "oynaklıktaki hisseleri adil karşılaştırmak için kullanılır."
+    ),
+    "net_r": "Kapanan tüm sinyallerin R çarpanlarının toplamı. Pozitif değer toplam kâr, negatif değer toplam zarar anlamına gelir.",
+    "expectancy": "Her sinyalde ortalama kaç R kazanıldığı. Kazanma oranı ve kazanma/kayıp oranını birleştirir; stratejinin uzun vadeli ümidini gösterir.",
+    "signal_ledger": (
+        "Kapanan her kurgusal sinyalin giriş, stop, hedef, çıkış, R çarpanı ve gerekçesiyle "
+        "kaydedildiği şeffaf defter. Kazananlar ve kaybedenler aynı yöntemle hesaplanır; "
+        "sonuçlar sonradan seçilmez. Maliyetler (spread/komisyon/kayma) dahil değildir."
+    ),
     "recommendation": "O zaman dilimindeki teknik göstergelerin AL/SAT oyları. Çoklu dilimler birbirini onaylarsa sinyal güçlenir.",
     "news": "KAP ve şirket duyuruları. Olumlu/olumsuz etiketi başlıktaki ifadelerin sözlük analizinden gelir.",
     "trades": "Backtest sırasında giriş ve çıkışların listesi. Gerçek emir değildir, simülasyondur.",

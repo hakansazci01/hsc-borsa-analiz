@@ -64,7 +64,10 @@ def open_position(
     return position
 
 
-def close_position(username: str, position_id: str, exit_price: float, reason: str) -> dict[str, Any] | None:
+def close_position(
+    username: str, position_id: str, exit_price: float, reason: str,
+    settings: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
     positions = load_positions(username)
     target = next((p for p in positions if p.get("id") == position_id), None)
     if not target:
@@ -82,6 +85,16 @@ def close_position(username: str, position_id: str, exit_price: float, reason: s
         "entry_signal": target.get("reason", ""),
     }
     auth.append_history(username, record)
+
+    # Şeffaf performans defteri: kapanan her sinyal R çarpanıyla kaydedilir.
+    # Kayıt hatası işlem kapatmayı engellemez.
+    try:
+        from ui.performance import record_close
+
+        effective = settings or (st.session_state.get("settings", {}) if st.session_state else {})
+        record_close(username, target, exit_price, reason, settings=effective)
+    except Exception:
+        pass
     return record
 
 

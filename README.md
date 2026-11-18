@@ -16,6 +16,7 @@ HSC Borsa Analiz; bir komut satırı sinyal botundan evrilen, tarayıcıdan kull
 - **Bilimsel doğrulama:** Deflated Sharpe Ratio, PBO/CSCV, permütasyon testi, purge+embargo'lu walk-forward, Brier kalibrasyonu
 - **Bildirimler:** ntfy.sh (hesapsız), Telegram ve e-posta; yalnızca karar **değiştiğinde** tek seferlik bildirim
 - **Kullanıcı hesapları:** PBKDF2 hash'li şifre, kullanıcıya özel ayarlar / kurgusal portföy / sinyal geçmişi
+- **Şeffaf sinyal performans defteri:** Kapanan her kurgusal sinyal giriş / stop / hedef / çıkış ve **R çarpanı**yla kaydedilir; kazananlar *ve* kaybedenler aynı tabloda, kümülatif R eğrisi, drawdown, kazanma oranı, kâr faktörü ve beklentiyle birlikte gösterilir
 - **Risk merkezi:** Rejim tespiti, Kelly boyutu, Monte Carlo zarar olasılığı, korelasyon ve çeşitlendirme
 
 ## Ekran görüntüleri
@@ -35,6 +36,7 @@ HSC Borsa Analiz; bir komut satırı sinyal botundan evrilen, tarayıcıdan kull
 | İşlem botu | Sohbet tarzı analiz, çoklu hisse, AI yorumu, manuel emir taslağı |
 | Canlı işlem | Anlık kotasyon, KAP haberleri, gösterge panelleri |
 | Hesabım | Kurgusal portföy, 15 dk net K/Z tablosu, veri sıfırlama |
+| Sinyal performansı | Şeffaf sonuç defteri, R çarpanı, kümülatif eğri, kazanma/kâr faktörü/beklenti |
 | Akıllı risk merkezi | Rejim, Kelly, Monte Carlo, portföy riski |
 | Strateji laboratuvarı | Walk-forward, parametre duyarlılığı, bilimsel doğrulama |
 | Denetim ve doğrulama | Yapılandırma doktoru, API rehberi, gerçek para kontrol listesi |
@@ -83,7 +85,8 @@ Ardından `.streamlit/secrets.toml` içine kendi anahtarlarınızı girin veya u
    - **İşlem botu:** hisse adı veya `THYAO, GARAN, ASELS` gibi çoklu sembollerle sohbet tarzı analiz.
 4. **Kararı okuma:** Trafik lambası **yeşil = AL, sarı = BEKLE, kırmızı = SAT**. Puan, güven skoru ve "neden" gerekçeleri aynı ekrandadır.
 5. **Kurgusal işlem:** AL/SAT sinyalinde **Kurgusal pozisyon aç** ile paper portföye ekleyin; **Hesabım** sayfasında stop/hedef/sinyal değişimine göre SAT önerilerini ve 15 dakikalık net K/Z tablosunu izleyin.
-6. **Bildirim (opsiyonel):** Ayarlar'dan ntfy/Telegram/e-posta kanalını açın; **karar değiştiğinde** tek seferlik bildirim gider.
+6. **Sonuçları görün:** Pozisyonu kapattığınızda sonuç otomatik olarak **Sinyal performansı** defterine R çarpanıyla işlenir; kazanma oranı, kümülatif R eğrisi ve drawdown burada güncellenir.
+7. **Bildirim (opsiyonel):** Ayarlar'dan ntfy/Telegram/e-posta kanalını açın; **karar değiştiğinde** tek seferlik bildirim gider.
 
 **Seans:** BIST 10:00–18:00 (hafta içi). Piyasa kapalıyken sinyaller bilgilendirmedir, kurgusal işlem düğmeleri devre dışıdır.
 
@@ -102,6 +105,21 @@ flowchart LR
     G --> J
 ```
 
+## Şeffaf sinyal performans defteri
+
+Kapanan her kurgusal pozisyon otomatik olarak `users/<kullanici>/performance.jsonl` dosyasına işlenir. Kayıtta giriş, stop, hedef, çıkış, R çarpanı, yüzde K/Z, güven ve hem giriş hem çıkış gerekçesi bulunur. **Kazananlar ve kaybedenler aynı yöntemle hesaplanır**; sonradan seçilmiş veya gizlenmiş sonuç yoktur.
+
+**R çarpanı**, kâr/zararın alınan riske (stop mesafesine) oranıdır: giriş 100 ₺, stop 95 ₺, çıkış 110 ₺ ise sonuç **+2R**'dır. Farklı fiyat ve oynaklıktaki hisseleri adil karşılaştırmak için kullanılır. Stop mesafesi yoksa ayarlardaki zarar-durdurma yüzdesi kullanılır ve hangi yöntemin uygulandığı kayıtta belirtilir.
+
+**Sinyal performansı** sayfasında şunlar gösterilir:
+
+- Özet KPI'lar: kapanan sinyal sayısı, kazanma oranı, net R, ortalama R, kâr faktörü, maksimum düşüş (R)
+- Kümülatif R eğrisi ve zirveden düşüş (drawdown) grafiği
+- Tüm kapanan sinyallerin tablosu (kayıplar dahil), CSV olarak indirilebilir
+- Hisse ve yön bazında performans dökümü
+
+> Bu defter kurgusal sinyallerin kaydıdır; spread, komisyon, swap ve kayma dahil **değildir**. Geçmiş performans gelecek sonuçların güvenilir göstergesi değildir. Yüksek kazanma oranı tek başına yeterli değildir; kâr faktörü ve beklentiyle birlikte okunmalıdır.
+
 ## Sık sorulan sorular ve sorun giderme
 
 | Soru | Cevap |
@@ -112,6 +130,8 @@ flowchart LR
 | Bildirim gelmiyor | ntfy için konuya abone olunduğundan ve Ayarlar'da kanalın açık olduğundan emin olun. Bildirim yalnızca karar değiştiğinde gönderilir. |
 | API anahtarı şart mı? | Hayır. Tüm servisler opsiyoneldir; anahtarsız da çalışır. |
 | Gerçek emir veriliyor mu? | Hayır. Sistem yalnızca kurgusal (paper) işlem yapar, aracı kuruma bağlanmaz. |
+| R çarpanı nedir? | Kâr/zararın alınan riske (stop mesafesine) oranı. Detaylı anlatım **Sinyal performansı** sayfasındaki "R çarpanı nasıl hesaplanıyor?" bölümünde. |
+| Sonuç defteri nerede saklanıyor? | `users/<kullanici>/performance.jsonl`. Hesabı silince veya veriler sıfırlanınca kaldırılır. |
 | Şifremi unuttum | Yerel hesap sistemi olduğu için e-posta ile sıfırlama yok; hatırladığınız bir şifreyle kayıt olun. |
 | Verilerimi sıfırlamak | **Hesabım → Verilerimi sıfırla** ayar/portföy/geçmişi temizler; **Hesabı sil** tüm hesabı kaldırır. |
 
@@ -119,8 +139,8 @@ flowchart LR
 
 ```
 borsa_bot/     # Sinyal, gösterge, backtest, veri, koruma motoru
-ui/            # Streamlit katmanı: ajan, terminal, intraday, risk, doğrulama
-app_pages/     # 14 sayfa
+ui/            # Streamlit katmanı: ajan, terminal, intraday, risk, performans defteri, doğrulama
+app_pages/     # 15 sayfa
 docs/          # Denetim raporu, araç planı, görseller
 assets/        # Logo
 ```
@@ -128,7 +148,7 @@ assets/        # Logo
 ## Test ve doğrulama
 
 - `python -m compileall` ile tüm modüller derlenir
-- AppTest ile giriş + 14 sayfa + etkileşimler (buton, seçim, kayıt/sıfırlama, kurgusal işlem) doğrulanır
+- AppTest ile giriş + 15 sayfa + etkileşimler (buton, seçim, kayıt/sıfırlama, kurgusal işlem) doğrulanır
 - Agent API ile çalışan uygulama üzerinden tüm sayfalar `ready` durumunda doğrulanır
 - Denetim raporu: `docs/AUDIT_REPORT.md`
 

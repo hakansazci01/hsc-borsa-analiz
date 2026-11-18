@@ -38,6 +38,13 @@ def build_ticket(
     risk_amount = qty * risk_per_share
     risk_pct = (risk_amount / capital * 100) if capital else 0.0
 
+    # Kademeli hedefler (TP1 / TP2 / TP3): stop mesafesi 1R kabul edilir.
+    # Arrowsticks'in TP + TP2 sunumunun risk odaklı karşılığıdır; emir gönderilmez.
+    direction_sign = 1 if side == "AL" else -1
+    t1 = price + direction_sign * 1.5 * risk_per_share
+    t2 = price + direction_sign * 2.5 * risk_per_share
+    t3 = price + direction_sign * 4.0 * risk_per_share
+
     from ui.market_session import status as session_status
 
     market = session_status()
@@ -75,6 +82,10 @@ def build_ticket(
         f"Tahmini tutar: {amount:,.2f} ₺",
         f"Stop        : {stop if stop else '—'}",
         f"Hedef       : {target if target else '—'}",
+        f"Kademeli hedefler (1R = stop mesafesi):",
+        f"  TP1 (1.5R) : {t1:,.2f} ₺",
+        f"  TP2 (2.5R) : {t2:,.2f} ₺",
+        f"  TP3 (4.0R) : {t3:,.2f} ₺",
         f" Risk       : {risk_pct:.2f}% sermaye / {risk_amount:,.2f} ₺",
         f"Profil      : {profile}",
         f"Güven       : %{confidence}",
@@ -94,6 +105,10 @@ def build_ticket(
         "amount": amount,
         "stop": stop,
         "target": target,
+        "t1": round(t1, 4),
+        "t2": round(t2, 4),
+        "t3": round(t3, 4),
+        "risk_per_share": round(risk_per_share, 4),
         "risk_pct": round(risk_pct, 2),
         "confidence": confidence,
         "session": session,
@@ -121,12 +136,24 @@ def render_ticket(ticket: dict[str, Any]) -> None:
 
     st.code(ticket["text"], language="text")
 
+    with st.expander("Kademeli kâr hedefleri (TP1 / TP2 / TP3)", icon=":material/flag:"):
+        st.caption(
+            "Stop mesafesi 1R kabul edilerek hesaplanır. Bu seviyeler referanstır; "
+            "pozisyonu kademeli kapatıp kapatmamak tamamen sizin kararınızdır."
+        )
+        st.markdown(
+            f"- **TP1 · 1.5R:** {ticket['t1']:,.2f} ₺  \n"
+            f"- **TP2 · 2.5R:** {ticket['t2']:,.2f} ₺  \n"
+            f"- **TP3 · 4.0R:** {ticket['t3']:,.2f} ₺"
+        )
+
     import pandas as pd
 
     csv = pd.DataFrame([{
         "Sembol": ticket["symbol"], "Karar": ticket["side"], "Fiyat": ticket["price"],
         "Adet": ticket["qty"], "Tutar": ticket["amount"], "Stop": ticket["stop"],
-        "Hedef": ticket["target"], "Risk %": ticket["risk_pct"],
+        "Hedef": ticket["target"], "TP1 (1.5R)": ticket["t1"], "TP2 (2.5R)": ticket["t2"],
+        "TP3 (4R)": ticket["t3"], "Risk %": ticket["risk_pct"],
         "Güven": ticket["confidence"], "Kotasyon": ticket["quote_time"],
     }]).to_csv(index=False).encode("utf-8-sig")
 

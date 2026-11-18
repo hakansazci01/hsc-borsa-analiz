@@ -182,7 +182,7 @@ with st.container(border=True):
 
     c1, c2 = st.columns(2)
     with c1:
-        confirm_reset = st.checkbox("Ayarlarımı, portföyümü ve geçmişimi sıfırlamayı onaylıyorum", key="confirm_reset_data")
+        confirm_reset = st.checkbox("Ayarlarımı, portföyümü, geçmişimi ve performans defterimi sıfırlamayı onaylıyorum", key="confirm_reset_data")
         if st.button(
             "Verilerimi sıfırla", icon=":material/restart_alt:", key="reset_my_data",
             disabled=not confirm_reset,
