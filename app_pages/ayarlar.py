@@ -249,7 +249,7 @@ if st.button(
     st.success("Telegram bilgileri kaydedildi (değerler gösterilmez).", icon=":material/check:")
 
 if st.button("Telegram test bildirimi", icon=":material/send:", key="test_telegram", help=h("telegram")):
-    ok, msg = send_telegram("HKC Borsa Analiz test bildirimi ✅", settings)
+    ok, msg = send_telegram("HSC Borsa Analiz test bildirimi ✅", settings)
     (st.success if ok else st.error)(msg, icon=":material/check:" if ok else ":material/error:")
 
 # ---- ntfy (Telegram alternatifi) ----
@@ -282,7 +282,7 @@ with st.expander("Alternatif 1: ntfy.sh push bildirimi (hesapsız)", icon=":mate
         save_secrets_section("alerts", {"ntfy_topic": ntfy_topic})
         st.success("ntfy konusu kaydedildi.", icon=":material/check:")
     if st.button("ntfy test bildirimi", icon=":material/send:", key="test_ntfy"):
-        ok, msg = send_ntfy("HKC Borsa Analiz ntfy test ✅", ntfy_topic)
+        ok, msg = send_ntfy("HSC Borsa Analiz ntfy test ✅", ntfy_topic)
         (st.success if ok else st.error)(msg, icon=":material/check:" if ok else ":material/error:")
 
 # ---- E-posta ----
@@ -305,7 +305,7 @@ with st.expander("Alternatif 2: e-posta bildirimi (Gmail)", icon=":material/mail
         })
         st.success("E-posta ayarları kaydedildi.", icon=":material/check:")
     if st.button("E-posta test bildirimi", icon=":material/send:", key="test_mail"):
-        ok, msg = send_email("HKC Borsa Analiz e-posta testi ✅", settings)
+        ok, msg = send_email("HSC Borsa Analiz e-posta testi ✅", settings)
         (st.success if ok else st.error)(msg, icon=":material/check:" if ok else ":material/error:")
 
 st.container(height=1, border=False)

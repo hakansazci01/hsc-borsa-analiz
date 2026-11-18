@@ -13,7 +13,7 @@ if not exist ".venv\Scripts\streamlit.exe" (
 )
 
 echo ============================================================
-echo   HKC BORSA ANALIZ - Akilli Sinyal Paneli
+echo   HSC BORSA ANALIZ - Akilli Sinyal Paneli
 echo ============================================================
 echo   Tarayici otomatik acilmazsa: http://localhost:8501
 echo   Kapatmak icin bu pencerede Ctrl+C tuslarina basin.

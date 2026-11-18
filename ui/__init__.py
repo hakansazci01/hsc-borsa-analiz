@@ -1,1 +1,1 @@
-"""HKC Borsa Analiz arayüz katmanı (Streamlit)."""
+"""HSC Borsa Analiz arayüz katmanı (Streamlit)."""

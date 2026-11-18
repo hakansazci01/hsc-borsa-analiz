@@ -1,8 +1,8 @@
-# HKC Borsa Analiz
+# HSC Borsa Analiz
 
 > Borsa İstanbul (BIST) hisseleri için gerçek veriyle çalışan, açıklanabilir ve risk odaklı alım/satım karar destek paneli.
 
-HKC Borsa Analiz; bir komut satırı sinyal botundan evrilen, tarayıcıdan kullanılan bir **Streamlit** uygulamasıdır. Canlı fiyat (WebSocket), KAP bildirimleri, teknik göstergeler, piyasa rejimi ve istatistiksel doğrulama araçlarını tek çatı altında toplar.
+HSC Borsa Analiz; bir komut satırı sinyal botundan evrilen, tarayıcıdan kullanılan bir **Streamlit** uygulamasıdır. Canlı fiyat (WebSocket), KAP bildirimleri, teknik göstergeler, piyasa rejimi ve istatistiksel doğrulama araçlarını tek çatı altında toplar.
 
 ![Logo](docs/screenshots/logo.png)
 

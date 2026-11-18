@@ -99,7 +99,7 @@ def new_topic() -> str:
     return "borsa-" + "".join(secrets.choice(alphabet) for _ in range(12))
 
 
-def send_ntfy(text: str, topic: str, title: str = "HKC Borsa Analiz") -> tuple[bool, str]:
+def send_ntfy(text: str, topic: str, title: str = "HSC Borsa Analiz") -> tuple[bool, str]:
     topic = (topic or "").strip()
     if not topic:
         return False, "ntfy konusu tanımlı değil."
@@ -128,7 +128,7 @@ def send_email(text: str, settings: dict[str, Any] | None = None) -> tuple[bool,
         return False, "E-posta ayarları eksik (kullanıcı, uygulama şifresi veya alıcı)."
     try:
         msg = EmailMessage()
-        msg["Subject"] = "HKC Borsa Analiz bildirimi"
+        msg["Subject"] = "HSC Borsa Analiz bildirimi"
         msg["From"] = user
         msg["To"] = to
         msg.set_content(text)

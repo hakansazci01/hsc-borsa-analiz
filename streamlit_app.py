@@ -1,5 +1,5 @@
 """
-HKC Borsa Analiz — akıllı hisse sinyal paneli.
+HSC Borsa Analiz — akıllı hisse sinyal paneli.
 
 Çalıştırmak için:  streamlit run streamlit_app.py
 """
@@ -9,7 +9,7 @@ from __future__ import annotations
 import streamlit as st
 
 st.set_page_config(
-    page_title="HKC Borsa Analiz",
+    page_title="HSC Borsa Analiz",
     page_icon=":material/show_chart:",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -45,7 +45,7 @@ def _logout() -> None:
 
 
 def _render_auth() -> None:
-    st.title("HKC borsa analiz", icon=":material/show_chart:")
+    st.title("HSC borsa analiz", icon=":material/show_chart:")
     st.caption(
         "Kişisel ayarlarınız, kurgusal portföyünüz ve karar geçmişiniz kullanıcı adınıza saklanır. "
         "Şifreler tuzlu PBKDF2 ile hash'lenir; düz metin tutulmaz."
@@ -140,7 +140,7 @@ _global_scheduler_fragment()
 _global_pnl_fragment()
 
 st.logo("assets/logo.png", size="small", icon_image="assets/logo.png")
-st.title("HKC borsa analiz", icon=":material/show_chart:")
+st.title("HSC borsa analiz", icon=":material/show_chart:")
 st.caption(
     f"**{user}** olarak giriş yapıldı · Teknik analiz, geriye dönük test ve akıllı sinyal yorumlaması. "
     "Yatırım tavsiyesi değildir."

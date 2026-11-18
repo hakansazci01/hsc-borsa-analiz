@@ -1,4 +1,4 @@
-# HKC Borsa Analiz — Detaylı Denetim Raporu
+# HSC Borsa Analiz — Detaylı Denetim Raporu
 
 Tarih: 18.11.2026
 Kapsam: `borsa_bot/` (11 modül), `ui/` (17 modül), `app_pages/` (8 sayfa), `streamlit_app.py`, `config.yaml`.
