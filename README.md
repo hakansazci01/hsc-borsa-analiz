@@ -54,9 +54,16 @@ pip install -r requirements.txt
 streamlit run streamlit_app.py
 ```
 
-Windows için `calistir.bat` dosyasına çift tıklamak yeterlidir. Tarayıcı açılmazsa `http://localhost:8501` adresine gidin.
+### Windows - tek tıkla başlatma
 
-İlk açılışta **Kayıt ol** sekmesinden bir kullanıcı oluşturun. Şifreler PBKDF2-HMAC-SHA256 ile tuzlanarak saklanır; düz metin tutulmaz.
+1. Python 3.10+ kurulu olmalı (kurulumda **Add Python to PATH** işaretli olmalı): https://www.python.org/downloads/
+2. Depoyu indirip `calistir.bat` dosyasına **çift tıklayın**
+
+İlk çalıştırmada.bat sanal ortamı ve gerekli paketleri otomatik yükler (internet gerekir). İkinci çalıştırmada doğrudan açılır. Tarayıcı otomatik açılmazsa `http://localhost:8501` adresine gidin.
+
+> Mac/Linux için elle kurulum gerekir: `python3 -m venv .venv`, `source .venv/bin/activate`, `pip install -r requirements.txt`, `streamlit run streamlit_app.py`.
+
+İlk açılışta **Kayıt ol** sekmesinden bir kullanıcı oluşturun. Şifreler PBKDF2-HMAC-SHA256 ile tuzlanarak saklanır; düz metin tutulmaz. Harici API anahtarı **gerekmez**; canlı veri için internet bağlantısı gerekir.
 
 ### API anahtarları (opsiyonel)
 
