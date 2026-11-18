@@ -28,7 +28,7 @@ HSC Borsa Analiz; bir komut satırı sinyal botundan evrilen, tarayıcıdan kull
 
 | Sayfa | Açıklama |
 |---|---|
-| Anlık sinyal | Canlı 1d mumlardan tetikleyici tabanlı AL/SAT |
+| Anlık sinyal | Canlı 1 dakikalık mumlardan tetikleyici tabanlı AL/SAT |
 | İşlem ajansı | Tam işlem planı, ön kontroller, güven kalibrasyonu |
 | Sinyal terminali | 8 hisseye kadar 15 sn'lik canlı sinyal matrisi ve değişim bildirimleri |
 | BIST tarayıcı | 804 hissenin teknik filtrelerle taranması |
@@ -72,6 +72,48 @@ copy .streamlit\secrets.toml.example .streamlit\secrets.toml
 ```
 
 Ardından `.streamlit/secrets.toml` içine kendi anahtarlarınızı girin veya uygulamadaki **Ayarlar → Bildirim kanalları / API rehberi** bölümünü kullanın. **Anahtarlar hiçbir zaman depoya eklenmemelidir.** Tüm servisler opsiyoneldir; anahtar olmadan uygulama çalışır.
+
+## Nasıl çalışır? — İlk kullanım akışı
+
+1. **Giriş:** Uygulama açılınca **Kayıt ol** ile kullanıcı adı/şifre oluşturun. Verileriniz (ayarlar, kurgusal portföy, sinyal geçmişi) bu kullanıcıya özel saklanır.
+2. **Hisse seçimi:** **Ayarlar → İzleme listesi** veya **BIST tarayıcı** sayfasından ilgilendiğiniz hisseleri seçin. BIST'te kayıtlı 804 hisse aranabilir.
+3. **Sinyal alma — üç yol:**
+   - **Anlık sinyal:** seans içinde 1 dakikalık canlı mumlardan EMA9/20 + VWAP + RSI7 + hacim tetikleyicileriyle anlık AL/SAT,
+   - **İşlem ajansı:** bir hisse için tam işlem planı (giriş, stop, hedefler, boyut, ufuk, geçersizleme),
+   - **İşlem botu:** hisse adı veya `THYAO, GARAN, ASELS` gibi çoklu sembollerle sohbet tarzı analiz.
+4. **Kararı okuma:** Trafik lambası **yeşil = AL, sarı = BEKLE, kırmızı = SAT**. Puan, güven skoru ve "neden" gerekçeleri aynı ekrandadır.
+5. **Kurgusal işlem:** AL/SAT sinyalinde **Kurgusal pozisyon aç** ile paper portföye ekleyin; **Hesabım** sayfasında stop/hedef/sinyal değişimine göre SAT önerilerini ve 15 dakikalık net K/Z tablosunu izleyin.
+6. **Bildirim (opsiyonel):** Ayarlar'dan ntfy/Telegram/e-posta kanalını açın; **karar değiştiğinde** tek seferlik bildirim gider.
+
+**Seans:** BIST 10:00–18:00 (hafta içi). Piyasa kapalıyken sinyaller bilgilendirmedir, kurgusal işlem düğmeleri devre dışıdır.
+
+```mermaid
+flowchart LR
+    A[TradingView WebSocket<br/>Canlı fiyat + 1 dk mum] --> D[Sinyal Motoru]
+    B[KAP / EconomicCalendar] --> D
+    C[yfinance / borsapy<br/>Günlük OHLCV] --> D
+    D --> E[Karar: AL / BEKLE / SAT]
+    D --> F[Güven + Gerekçeler]
+    E --> G[Streamlit Sayfaları]
+    E --> H[Risk Motoru<br/>Kelly / Monte Carlo / Rejim]
+    E --> I[Bildirimler<br/>ntfy / Telegram / E-posta]
+    H --> G
+    I --> J[Kullanıcı]
+    G --> J
+```
+
+## Sık sorulan sorular ve sorun giderme
+
+| Soru | Cevap |
+|---|---|
+| Uygulama açılmıyor | Python 3.10+ kurulu ve PATH'de mi? `calistir.bat` sanal ortamı/paketleri otomatik kurar; internet gerekir. |
+| Tarayıcı açılmadı | `http://localhost:8501` adresine gidin. Port doluysa `streamlit run streamlit_app.py --server.port 8502`. |
+| Fiyat/sinyal gelmiyor | Internet bağlantısını ve seans durumunu kontrol edin. Ücretsiz veri ~15 dk gecikmelidir. |
+| Bildirim gelmiyor | ntfy için konuya abone olunduğundan ve Ayarlar'da kanalın açık olduğundan emin olun. Bildirim yalnızca karar değiştiğinde gönderilir. |
+| API anahtarı şart mı? | Hayır. Tüm servisler opsiyoneldir; anahtarsız da çalışır. |
+| Gerçek emir veriliyor mu? | Hayır. Sistem yalnızca kurgusal (paper) işlem yapar, aracı kuruma bağlanmaz. |
+| Şifremi unuttum | Yerel hesap sistemi olduğu için e-posta ile sıfırlama yok; hatırladığınız bir şifreyle kayıt olun. |
+| Verilerimi sıfırlamak | **Hesabım → Verilerimi sıfırla** ayar/portföy/geçmişi temizler; **Hesabı sil** tüm hesabı kaldırır. |
 
 ## Yapı
 
