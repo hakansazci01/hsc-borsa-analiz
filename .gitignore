@@ -1,0 +1,22 @@
+# Gizli anahtarlar ve kullanıcı verileri - asla commit edilmez
+.streamlit/secrets.toml
+.env
+user_settings.json
+users/
+results/bist_companies.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Sanal ortam
+.venv/
+venv/
+
+# Yerel ciktilar / arac dosyalari
+.cache/
+.kilo/
+charts/
+results/*.png
+*.log

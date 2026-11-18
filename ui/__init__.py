@@ -1,0 +1,1 @@
+"""HKC Borsa Analiz arayüz katmanı (Streamlit)."""
