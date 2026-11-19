@@ -36,6 +36,6 @@ jobs:
 
       - name: Gizli anahtar taraması
         run: |
-          if git grep -n -E 'dbr28|AQ\.Ab8|T23OT_|signkey-prod|PKMC2' -- ':!*.example'; then
+          if git grep -n -E 'dbr28|AQ\.Ab8|T23OT_|signkey-prod|PKMC2' -- ':!*.example' ':!.github/workflows/ci.yml'; then
             echo "Gizli anahtar görünüyor!"; exit 1
           fi
