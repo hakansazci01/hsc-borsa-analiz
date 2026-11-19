@@ -6,6 +6,7 @@ import re
 
 import streamlit as st
 
+from ui import assistant
 from ui.ai_analyst import build_digest, gemini_commentary
 from ui.batch_analysis import analyze_batch, batch_text, render_batch
 from ui.bist_universe import load_companies
@@ -14,7 +15,7 @@ from ui.help_texts import h
 from ui.live_data import get_live_snapshot
 from ui.market_session import status as session_status
 from ui.order_ticket import build_ticket, render_ticket
-from ui.paper import open_position
+from ui.paper import evaluate as paper_evaluate, open_position
 from ui.risk_engine import adjust_decision_for_regime, detect_regime
 from ui.signal_display import render_signal_panel
 from ui.trade_engine import build_decision
@@ -28,9 +29,10 @@ if "bot_messages" not in st.session_state:
 
 st.subheader("BIST işlem botu", divider="gray")
 st.caption(
-    "Bir BIST hissesi yazın (örn. **THYAO**, **GARAN**, **Aselsan**). Bot; canlı fiyatı, "
-    "KAP bildirimlerini, 9 zaman dilimini ve piyasa rejimini kullanıp **AL / BEKLE / SAT** "
-    "kararını ve gerekçesini anında döndürür. Ücretsiz akış ~15 dk gecikmelidir; emir gönderilmez."
+    "Bir BIST hissesi yazın (örn. **THYAO**, **GARAN**, **Aselsan**) veya sorun: "
+    "*'Portföyümü incele', 'Neden bu sinyal?', 'Riskim ne?', 'Verinin kaynağı nedir?'*. "
+    "Bot gecikmeli veriyle **AL / BEKLE / SAT** sinyalini iki yönlü gerekçesiyle açıklar; "
+    "kesinlik, canlı fiyat ve gerçek emir **vermez**."
 )
 real_money_warning(compact=True)
 
@@ -99,6 +101,169 @@ SUGGESTIONS = {
     ":material/local_shipping: THYAO almalı mıyım?": "THYAO almalı mıyım?",
     ":material/groups: THYAO, GARAN, ASELS karşılaştır": "THYAO, GARAN, ASELS",
 }
+
+DISCLAIMER_FOOTER = (
+    "Bu bir karar destek yorumudur; **yatırım tavsiyesi değildir**. "
+    "Gerçek emir gönderilmez, kurgusal işlem yapılır."
+)
+
+
+def _answer_footer(intent: str = "general", symbol: str | None = None) -> None:
+    """Her yanıtın altına aynı uyarıyı ve bağlamlı takip önerilerini koyar."""
+    st.caption(DISCLAIMER_FOOTER)
+    keys = assistant.suggestions(intent, symbol)[:3]
+    if keys:
+        cols = st.columns(len(keys), gap="small")
+        for col, text in zip(cols, keys):
+            with col:
+                if st.button(
+                    text,
+                    key=f"bot_follow_{abs(hash(text)) % 100000}_{len(st.session_state.bot_messages)}",
+                    use_container_width=True,
+                ):
+                    st.session_state.bot_next_prompt = text
+                    st.rerun()
+
+
+def _render_answer(answer: str, intent: str = "general", symbol: str | None = None) -> None:
+    """Yanıtı tutarlı bir kart olarak gösterir ve bağlamlı takip önerileri sunar."""
+    with st.chat_message("assistant", avatar=":material/smart_toy:"):
+        st.markdown(answer)
+        _answer_footer(intent, symbol)
+    st.session_state.bot_messages.append({"role": "assistant", "content": answer})
+
+
+def _intent_answer(intent: str, prompt: str) -> str:
+    """Hisse sembolü olmayan, insan odaklı sorulara deterministik yanıt üretir."""
+    from ui import performance, smart_guide
+
+    user = st.session_state.user
+    last = st.session_state.get("bot_last")
+
+    if intent == "capabilities":
+        return (
+            assistant.LIMITS_TEXT
+            + "\n\nŞunları yapabilirim:\n"
+            + "- **AL / BEKLE / SAT** sinyalini gerekçesiyle açıklamak\n"
+            + "- Kurgusal portföyündeki **yoğunlaşma ve riski** özetlemek\n"
+            + "- Piyasa **rejimini** ve BIST 100'a göre durumu anlatmak\n"
+            + "- Verinin **kaynağını ve yaşını** göstermek\n"
+            + "- Teknik terimleri sade dille açıklamak\n\n"
+            + "Yapamayacağım şeyler: canlı fiyat, yön garantisi, gerçek emir ve yatırım tavsiyesi."
+        )
+
+    if intent == "portfolio":
+        positions = paper_evaluate(user, settings)
+        if not positions:
+            return (
+                "Kurgusal portföyünde açık pozisyon yok. Bir sinyale dayanarak "
+                "**Kurgusal pozisyon aç** düğmesiyle örnek bir pozisyon oluşturabilirsin; "
+                "sonra buradan riskini ve yoğunlaşmanı birlikte inceleyebilirim."
+            )
+        total = sum(float(p.get("pnl_amount", 0) or 0) for p in positions)
+        sells = [p for p in positions if p.get("action") == "SAT"]
+        concentration: dict[str, float] = {}
+        for p in positions:
+            symbol_key = str(p.get("symbol", "—"))
+            concentration[symbol_key] = concentration.get(symbol_key, 0.0) + abs(float(p.get("pnl_amount", 0) or 0))
+        top = sorted(concentration.items(), key=lambda kv: kv[1], reverse=True)[:3]
+        summary = performance.summarize(performance.read_records(user))
+        return (
+            f"**Kurgusal portföyün:** {len(positions)} açık pozisyon, "
+            f"açık K/Z **{total:+,.0f} ₺**. "
+            + (f"**{len(sells)}** pozisyon için SAT önerisi var. " if sells else "SAT önerisi yok. ")
+            + ("En çok hareket eden hisseler: "
+               + ", ".join(f"{s} ({v:,.0f} ₺)" for s, v in top) + ". " if top else "")
+            + (f"Kapanan {summary['total']} sinyalin net R'i {summary['net_r']:+.2f}R. "
+               if summary else "")
+            + "\n\nBu bir **portföy özetidir**, işlem önerisi değildir. "
+            "Yoğunlaşma tek bir hisse veya sektörde riski artırır."
+        )
+
+    if intent == "why":
+        if not last:
+            return "Önce bir hisse analiz et; sonra 'neden bu sinyal?' diye sorabilirim."
+        decision = last["decision"]
+        snap = last["snap"]
+        regime = last.get("regime") or {}
+        action = str(decision.get("decision", "BEKLE"))
+        rec = {"action": action, "confidence": decision.get("confidence", 0)}
+        info = {
+            "signal": "BUY" if action == "AL" else "SELL" if action == "SAT" else "NEUTRAL",
+            "score": decision.get("score"),
+            "rsi": (snap.get("info") or {}).get("rsi"),
+        }
+        return assistant.two_sided_rationale(rec, info, {}, regime)
+
+    if intent == "risk":
+        risk = settings.get("risk", {})
+        if not last:
+            return (
+                "Riskini değerlendirmek için önce bir hisse analiz etmelisin. "
+                f"Genel ayarların: zarar durdurma **%{float(risk.get('stop_loss_pct', 0.05)) * 100:.0f}**, "
+                f"işlem başına sermaye **%{float(risk.get('position_size_pct', 0.10)) * 100:.0f}**. "
+                "Bunlar kurgusal risk ayarlarıdır, garanti değildir."
+            )
+        decision = last["decision"]
+        return (
+            f"**{last['symbol']} için risk çerçevesi:** "
+            f"giriş {decision.get('price', 0):,.2f} ₺, "
+            f"stop {decision.get('stop') or '—'}, hedef {decision.get('target') or '—'}. "
+            f"Stop mesafesi, işlem başına sermayenin %{float(risk.get('position_size_pct', 0.10)) * 100:.0f}'i "
+            "ile sınırlı tutuluyor. Unutma: **stop her zaman tam fiyattan gerçekleşmez**; "
+            "gecikmeli veri ve boşluklar (gap) bu riski artırır."
+        )
+
+    if intent == "suitability":
+        profile = settings.get("profile", "Dengeli")
+        positions = paper_evaluate(user, settings)
+        return (
+            f"Risk profilin **{profile}**. Bu bir tavsiye değil, **uyumluluk kontrolüdür**: "
+            f"Kurgusal portföyünde {len(positions)} açık pozisyon var. "
+            "Tek bir hisseye/portföyün büyük kısmına yoğunlaşmak, belirttiğin profille "
+            "uyumsuz olabilir. Profilini Ayarlar sayfasından değiştirebilirsin."
+        )
+
+    if intent == "changes":
+        regime = smart_guide.market_regime()
+        pick = smart_guide.top_pick(settings, regime)
+        text = f"Piyasa rejimi: **{regime.get('regime', 'Yatay')}** (güven %{int(regime.get('confidence', 0) or 0)}). "
+        if isinstance(pick, dict) and pick.get("plain"):
+            text += pick["plain"]
+        else:
+            text += "İzleme listenizde bugün güven eşiğini geçen net bir alım adayı yok; BEKLE uygun."
+        return text + "\n\nBu bilgi gecikmeli veriye dayanır; KAP'tan teyit etmeden işlem kararı verme."
+
+    if intent == "benchmark":
+        from ui.benchmark import bist100_benchmark
+
+        bench = bist100_benchmark()
+        if not bench:
+            return "BIST 100 karşılaştırma verisi şu an alınamadı; veri geldiğinde tekrar sor."
+        return (
+            f"BIST 100, son dönemde **{float(bench.get('total_return_pct', 0)):+.1f}%** "
+            f"değerlendi (kaynak: borsapy endeks, gecikmeli). "
+            "Bir hissenin yükselmesi bazen tüm piyasanın yükselmesinden kaynaklanır; "
+            "kararı değerlendirirken bu farkı (alfa) göz önünde bulundur."
+        )
+
+    if intent == "provenance":
+        if not last:
+            return "Önce bir hisse analiz et; kaynak ve veri yaşı bilgisini birlikte göstereyim."
+        snap = last["snap"]
+        info = snap.get("info") or {}
+        return (
+            f"**Kaynak:** {snap.get('quote_source', '—')} · "
+            f"**Kotasyon zamanı:** {info.get('quote_time') or 'belirtilmemiş'} · "
+            f"**Seans:** {info.get('session') or '—'}. "
+            "Ücretsiz veri akışı ~15 dakika gecikmeli olabilir; kesin fiyat için "
+            "KAP veya aracı kurum ekranına bakmalısın."
+        )
+
+    return (
+        "Sorunu hisse analizi, portföy, risk, gerekçe veya veri kaynağı olarak yönlendirebilirim. "
+        "Örnek: 'Portföyümü incele', 'THYAO neden AL?', 'Verinin kaynağı nedir?'"
+    )
 
 
 def _tr_lower(text: str) -> str:
@@ -174,7 +339,11 @@ def _analyze(symbol: str) -> str:
     try:
         snap = get_live_snapshot(symbol)
     except Exception as exc:
-        return f"⚠️ **{symbol}** için veri alınamadı: {exc}"
+        return (
+            f"⚠️ **{symbol}** için güncel veri alınamadı. İnternet bağlantısını ve "
+            "seans durumunu kontrol edip birazdan tekrar deneyin. "
+            "Bu sırada yorum üretmiyorum; eksik veriyle tahmin yapmak yanıltıcı olur."
+        )
 
     decision = build_decision(snap, "Dengeli", settings["risk"], 0.25)
     try:
@@ -242,8 +411,11 @@ for message in st.session_state.bot_messages:
 
 st.caption(":material/info: " + h("bot_chat"))
 prompt = st.chat_input(
-    "Hisse sembolü veya şirket adı yazın...", submit_mode="disable", key="bot_chat"
+    "Hisse, portföy, risk veya 'neden?' yazın...", submit_mode="disable", key="bot_chat"
 )
+chip_prompt = st.session_state.pop("bot_next_prompt", None)
+if chip_prompt:
+    prompt = chip_prompt
 
 if not st.session_state.bot_messages:
     picked = st.pills(
@@ -253,23 +425,44 @@ if not st.session_state.bot_messages:
     if picked:
         prompt = SUGGESTIONS[picked]
 
+with st.container(horizontal=True, horizontal_alignment="right"):
+    if st.button("Sohbeti temizle", icon=":material/delete_sweep:", key="bot_clear_chat"):
+        st.session_state.bot_messages = []
+        st.session_state.bot_last = None
+        st.session_state.bot_batch = []
+        st.rerun()
+
 if prompt:
     st.session_state.bot_messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
+    guard = assistant.guard_check(prompt)
+    intent = assistant.detect_intent(prompt)
     exact, ambiguous = _detect_symbols(prompt)
+
+    # Güvenlik/kısıt yanıtları: emir, kesinlik, canlı fiyat, tahmin, onay bekleyen sorular
+    if guard:
+        _render_answer(guard, "general")
+        st.stop()
+
+    # Hisse sembolü içermeyen, insan odaklı sorular
+    if not exact and intent in (
+        "capabilities", "portfolio", "why", "risk", "suitability",
+        "changes", "benchmark", "provenance",
+    ):
+        _render_answer(_intent_answer(intent, prompt), intent)
+        st.stop()
 
     # Yalnızca şirket adı yazıldıysa önce kullanıcıya onaylat (belirsizlik giderimi)
     if not exact and ambiguous:
         st.session_state.pending_symbols = ambiguous
+        st.session_state.bot_last = None
         answer = (
             "Şirket adından birden fazla olası hisse buldum. Lütfen yukarıdaki "
             "**Seçim onayı** panelinden doğru sembolleri onaylayın veya düzeltin."
         )
-        with st.chat_message("assistant", avatar=":material/smart_toy:"):
-            st.markdown(answer)
-        st.session_state.bot_messages.append({"role": "assistant", "content": answer})
+        _render_answer(answer, "general")
         st.rerun()
 
     if len(exact) > 1:
@@ -286,6 +479,7 @@ if prompt:
                     f"Not: Şirket adından **{', '.join(ambiguous)}** da algılandı; "
                     "onay panelinden ekleyebilirsiniz."
                 )
+            _answer_footer("why", exact[0])
         st.session_state.bot_messages.append({"role": "assistant", "content": answer})
         st.rerun()
 
@@ -295,6 +489,17 @@ if prompt:
             with st.status(":shimmer[Canlı veriler toplanıyor...]", type="compact") as status:
                 st.caption("WebSocket fiyatı → KAP haberleri → teknik sinyaller → rejim + risk")
                 answer = _analyze(symbol)
+                if intent == "why" and st.session_state.get("bot_last"):
+                    _last = st.session_state.bot_last
+                    _d = _last["decision"]
+                    _action = str(_d.get("decision", "BEKLE"))
+                    _rec = {"action": _action, "confidence": _d.get("confidence", 0)}
+                    _info = {
+                        "signal": "BUY" if _action == "AL" else "SELL" if _action == "SAT" else "NEUTRAL",
+                        "score": _d.get("score"),
+                        "rsi": (_last["snap"].get("info") or {}).get("rsi"),
+                    }
+                    answer = assistant.two_sided_rationale(_rec, _info, {}, _last.get("regime") or {})
                 status.update(label="Analiz tamamlandı", state="complete")
             st.markdown(answer)
         else:
@@ -305,6 +510,7 @@ if prompt:
                 f"Şu anda **{len(universe)}** BIST şirketi tanıyorum."
             )
             st.markdown(answer)
+        _answer_footer("why", symbol)
     st.session_state.bot_messages.append({"role": "assistant", "content": answer})
 
 if st.session_state.get("bot_last"):
@@ -344,7 +550,24 @@ if st.session_state.get("bot_last"):
             last = st.session_state.bot_last
             digest = build_digest(last["symbol"], last["decision"], last["snap"], last["regime"])
             text, error = gemini_commentary(digest)
-            st.session_state.ai_comment = text or error
+            if text:
+                st.session_state.ai_comment = "**Gemini yorumu:**\n\n" + text
+            else:
+                # Anahtar yoksa/hata varsa boşbir reddetme değil, işe yarar yerel özet.
+                _last = st.session_state.bot_last
+                _d = _last["decision"]
+                _action = str(_d.get("decision", "BEKLE"))
+                _rec = {"action": _action, "confidence": _d.get("confidence", 0)}
+                _info = {
+                    "signal": "BUY" if _action == "AL" else "SELL" if _action == "SAT" else "NEUTRAL",
+                    "score": _d.get("score"),
+                    "rsi": (_last["snap"].get("info") or {}).get("rsi"),
+                }
+                st.session_state.ai_comment = (
+                    "**Yerel özet (Gemini kapalı veya erişilemez):**\n\n"
+                    + assistant.two_sided_rationale(_rec, _info, {}, _last.get("regime") or {})
+                    + f"\n\n*Servis durumu: {error}*"
+                )
         if st.session_state.get("ai_comment"):
             st.markdown(st.session_state.ai_comment)
 

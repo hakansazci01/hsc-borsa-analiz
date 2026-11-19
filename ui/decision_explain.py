@@ -243,7 +243,7 @@ def render_explanation(
         else:
             stats = analog_stats(
                 df, settings["indicators"], settings["signal_weights"],
-                settings["signal_thresholds"], direction,
+                settings.get("signal", settings.get("signal_thresholds", {})), direction,
             )
             sdf = pd.DataFrame(stats).rename(columns={
                 "ufuk": "Ufuk (gün)", "Ornek": "Örnek", "Kazanma %": "Kazanma %",
