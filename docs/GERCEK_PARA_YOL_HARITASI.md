@@ -124,7 +124,13 @@ tamamı gerekir.
 Binance TR, global Binance'den **ayrı bir borsadır**:
 - Base URL: `https://www.binance.tr` (global `api.binance.com` ile karışmaz)
 - Emir yolu `/open/v1/orders`, sembol formatı `BTC_USDT`, yön `0/1` (al/sat) — global API ile uyumlu değildir
-- Bu ortamdan domain'e erişim **kapalı** (DNS/connection reset); bu yüzden anahtar doğrulaması yapılamadı
+- Bu ortamdan erişim **ISS tarafından engelleniyor**: `http://www.binance.tr` ve
+  `http://api.binance.com` istekleri `guvenliinternet.turktelekom.com.tr/?str=501`
+  adresine yönlendiriliyor (Türk Telekom **Güvenli İnternet** profili). DNS ve TCP
+  çalışıyor; engel TLS/HTTP katmanında. Anahtar/kod sorunu **değildir**.
+- Çözüm yalnızca abone tarafından: Güvenli İnternet profilini kapatmak veya
+  'Geniş/İzinli' profile geçmek; ya da farklı bir operatör/ağ ile test etmek.
+  `api.binance.me` engellenmiyor ancak Binance TR hesabı için kullanılamaz.
 
 Eğer sizin tarayıcınızda `https://www.binance.tr` açılıyorsa, uygulamadaki
 **Borsa API erişim testi** panelinde "Binance TR" satırının OK olması gerekir.

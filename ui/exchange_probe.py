@@ -36,7 +36,11 @@ def probe(timeout: float = 6.0) -> list[dict[str, Any]]:
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "HSC-Borsa-Analiz/1.0"})
             with urllib.request.urlopen(req, timeout=timeout) as resp:
+                final_url = resp.geturl()
                 body = resp.read(4096).decode(errors="replace")
+                if "guvenliinternet" in final_url or "turktelekom.com.tr" in final_url:
+                    rows.append({"Borsa": name, "Erişim": "ENGEL", "Not": "İSS engeli: Türk Telekom Güvenli İnternet (501)"})
+                    continue
                 json.loads(body)  # geçerli JSON mu?
             rows.append({"Borsa": name, "Erişim": "OK", "Not": "API cevap verdi (anahtar gerekmez)"})
         except urllib.error.HTTPError as exc:
@@ -61,7 +65,15 @@ def render() -> None:
             alt="Halka açık borsa API uçlarının erişilebilirlik testi",
         )
         ok = [r["Borsa"] for r in rows if r["Erişim"] == "OK"]
+        blocked = [r["Borsa"] for r in rows if r["Erişim"] == "ENGEL"]
         st.caption(
             "Erişilebilen borsalar: " + (", ".join(ok) if ok else "hiçbiri")
             + ". Hiçbiri yoksa ağ/bölge engeli var; adapter değiştirmek çözmez."
         )
+        if blocked:
+            st.warning(
+                "İSS engeli tespit edildi: " + ", ".join(blocked) + ". "
+                "Türk Telekom **Güvenli İnternet** profilini kapatın veya "
+                "'Geniş/İzinli' profile geçirin; bu işlem yalnızca abone tarafından yapılabilir.",
+                icon=":material/warning:",
+            )
