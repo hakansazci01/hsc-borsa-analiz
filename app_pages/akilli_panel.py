@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from ui import glossary, guide_ui, insights, paper, performance, smart_guide
+from ui import glossary, guide_ui, insights, paper, performance, smart_guide, visual
 from ui.bist_universe import load_companies, ordered_symbols
 from ui.components import real_money_warning
 from ui.core import analysis_args, analyze_symbol
@@ -53,6 +53,11 @@ st.html(
   <p>Önce ne yapacağınızı bilin. Piyasa durumu, tek net karar ve kurgusal portföyünüz — tek ekranda, sade dille.</p>
 </div>
 """
+)
+
+st.html(
+    '<div class="hv-live" style="margin:2px 0 12px"><span class="hv-dot"></span> '
+    'Canlı piyasa verisi bağlı · karar destek sistemi aktif</div>'
 )
 
 settings = st.session_state.settings
@@ -286,4 +291,5 @@ with st.expander("Gelişmiş analizler — tüm araçlar", icon=":material/tune:
             if st.button(title, icon=icon, key=f"hsc_adv_{i}", use_container_width=True):
                 st.switch_page(path)
 
+visual.trust_row()
 glossary.render_glossary()
