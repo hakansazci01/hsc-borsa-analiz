@@ -1,4 +1,12 @@
-# Borsa Asistanı - profesyonel finans paneli teması (koyu)
+# HSC Borsa Analiz - profesyonel finans paneli teması (koyu)
+
+[client]
+# Streamlit'in İngilizce geliştirici menüsünü (Rerun / Clear cache / Deploy /
+# Print / Record screen) gizle. Yerine uygulama içindeki Türkçe Rehber ve
+# "Verileri yenile" düğmeleri kullanılır. Metinler çevrilemediği için menü
+# tamamen kaldırıldı; görsel dil Türkçe ve tutarlı kaldı.
+toolbarMode = "minimal"
+
 [theme]
 base = "dark"
 primaryColor = "#60A5FA"
