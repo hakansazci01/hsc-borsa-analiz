@@ -17,6 +17,8 @@ CSS = """
 @keyframes hvIn { from{opacity:0;transform:translateY(14px) scale(.99)} to{opacity:1;transform:none} }
 @keyframes hvPulse { 0%,100%{opacity:.55;transform:scale(1)} 50%{opacity:.12;transform:scale(1.7)} }
 @keyframes hvShine { 0%{background-position:-180% 0} 100%{background-position:180% 0} }
+@keyframes hvCandle { from{opacity:0;transform:scaleY(.15)} to{opacity:1;transform:none} }
+@keyframes hvDraw { to{stroke-dashoffset:0} }
 .hv-hero {
   position: relative; overflow: hidden;
   background: linear-gradient(125deg,#0b1220 0%,#16243a 58%,#1c3a60 100%);
@@ -81,9 +83,32 @@ CSS = """
   background-size: 200% 100%; animation: hvShine 4.5s linear infinite;
   height: 1px; margin-top: 14px;
 }
+.hv-chart {
+  border: 1px solid rgba(96,165,250,.26); border-radius: 14px;
+  background: rgba(15,23,42,.8); padding: 11px 13px 7px; margin: 2px 0 12px;
+}
+.hv-chart-head { display: flex; justify-content: space-between; align-items: center;
+  font-size: 12px; font-weight: 800; color: #CBD5E1; margin-bottom: 3px; }
+.hv-candle { animation: hvCandle .5s cubic-bezier(.2,.8,.2,1) both;
+  transform-box: fill-box; transform-origin: center; }
+.hv-ema { fill: none; stroke: #60A5FA; stroke-width: 1.7; stroke-dasharray: 900;
+  stroke-dashoffset: 900; animation: hvDraw 2.8s ease forwards; opacity: .85; }
+.hv-axis { display: flex; justify-content: space-between; color: #64748B; font-size: 10px; margin-top: -3px; }
+.hv-praise { border-left: 2px solid rgba(52,211,153,.55); padding: 3px 0 3px 12px; margin: 2px 0 10px; }
+.hv-praise-head { font-size: 12px; font-weight: 800; color: #34D399; letter-spacing: .4px; margin-bottom: 8px; }
+.hv-praise-item { display: flex; gap: 9px; align-items: flex-start; margin: 7px 0;
+  animation: hvIn .5s cubic-bezier(.2,.8,.2,1) both; }
+.hv-praise-item:nth-child(2){animation-delay:.05s}
+.hv-praise-item:nth-child(3){animation-delay:.12s}
+.hv-praise-item:nth-child(4){animation-delay:.19s}
+.hv-praise-item > span { color: #34D399; font-size: 13px; line-height: 1.35; }
+.hv-praise-item b { display: block; font-size: 12.5px; color: #E2E8F0; }
+.hv-praise-item small { display: block; color: #94A3B8; font-size: 11px; margin-top: 1px; line-height: 1.4; }
 @media (max-width: 900px) { .hv-stats { grid-template-columns: repeat(2,1fr); } }
 @media (prefers-reduced-motion: reduce) {
-  .hv-hero, .hv-stat, .hv-orb, .hv-orb::after, .hv-dot::after, .hv-shine { animation: none !important; }
+  .hv-hero, .hv-stat, .hv-orb, .hv-orb::after, .hv-dot::after, .hv-shine,
+  .hv-candle, .hv-ema, .hv-praise-item { animation: none !important; }
+  .hv-ema { stroke-dashoffset: 0; }
 }
 </style>
 """
@@ -92,6 +117,107 @@ CSS = """
 def inject_visual_css() -> None:
     """Görsel katmanın CSS'ini enjekte eder (her sayfada güvenle çağrılabilir)."""
     st.html(CSS)
+
+
+def market_chart_card() -> None:
+    """Temsili, animasyonlu mum grafiği (canlı veri değil — görsel amaçlı)."""
+    import random
+
+    rnd = random.Random(7)
+    count = 30
+    bars: list[tuple[float, float, float, float]] = []
+    price = 11180.0
+    for i in range(count):
+        open_ = price
+        change = rnd.uniform(-34, 42) + (1.8 if i > 12 else 0.3)
+        close = open_ + change
+        high = max(open_, close) + rnd.uniform(3, 16)
+        low = min(open_, close) - rnd.uniform(3, 16)
+        bars.append((open_, high, low, close))
+        price = close
+
+    low_min = min(b[2] for b in bars) - 30
+    high_max = max(b[1] for b in bars) + 30
+    span = high_max - low_min or 1
+
+    def py(value: float) -> float:
+        return 132.0 - (value - low_min) / span * 112.0
+
+    slot = 330 / count
+    parts: list[str] = []
+    for i, (o, hi, lo, c) in enumerate(bars):
+        x = 15 + i * slot + slot / 2
+        color = "#34D399" if c >= o else "#F87171"
+        parts.append(
+            f'<line x1="{x:.1f}" x2="{x:.1f}" y1="{py(hi):.1f}" y2="{py(lo):.1f}" '
+            f'stroke="{color}" stroke-width="1" opacity=".9"/>'
+        )
+        top, bottom = py(max(o, c)), py(min(o, c))
+        parts.append(
+            f'<rect class="hv-candle" style="animation-delay:{i * 0.045:.2f}s" '
+            f'x="{x - 2.6:.1f}" y="{top:.1f}" width="5.2" height="{max(bottom - top, 2):.1f}" '
+            f'fill="{color}" rx="1"/>'
+        )
+    ema_points = " ".join(
+        f"{15 + i * slot + slot / 2:.1f},{py(b[3]):.1f}" for i, b in enumerate(bars)
+    )
+    grid = "".join(
+        f'<line x1="8" x2="352" y1="{yy}" y2="{yy}" stroke="#334155" '
+        f'stroke-width=".7" stroke-dasharray="3 5"/>'
+        for yy in (36, 76, 116)
+    )
+    svg = (
+        f'<svg viewBox="0 0 360 150" width="100%" height="132" role="img" '
+        f'aria-label="Temsili BIST mum grafiği">{grid}'
+        f'<polyline class="hv-ema" points="{ema_points}"/>'
+        f'{"".join(parts)}'
+        f'<text x="350" y="33" fill="#94A3B8" font-size="9" text-anchor="end">{high_max:,.0f}</text>'
+        f'<text x="350" y="119" fill="#94A3B8" font-size="9" text-anchor="end">{low_min:,.0f}</text>'
+        f"</svg>"
+    )
+    # st.html SVG etiketini süzer; grafik izole bir iframe'de render edilir.
+    component = f"""
+<html><head><style>
+  body {{ margin:0; background:#0f172a; font-family:Inter,Arial,sans-serif; }}
+  .hv-chart {{ border:1px solid rgba(96,165,250,.26); border-radius:14px;
+    background:rgba(15,23,42,.8); padding:10px 13px 6px; }}
+  .hv-chart-head {{ display:flex; justify-content:space-between; align-items:center;
+    font-size:12px; font-weight:800; color:#CBD5E1; margin-bottom:3px; }}
+  .hv-candle {{ animation:hvCandle .5s cubic-bezier(.2,.8,.2,1) both;
+    transform-box:fill-box; transform-origin:center; }}
+  .hv-ema {{ fill:none; stroke:#60A5FA; stroke-width:1.7; stroke-dasharray:900;
+    stroke-dashoffset:900; animation:hvDraw 2.8s ease forwards; }}
+  .hv-axis {{ display:flex; justify-content:space-between; color:#64748B;
+    font-size:10px; margin-top:-3px; }}
+  @keyframes hvCandle {{ from{{opacity:0;transform:scaleY(.15)}} to{{opacity:1;transform:none}} }}
+  @keyframes hvDraw {{ to{{stroke-dashoffset:0}} }}
+  @media (prefers-reduced-motion: reduce) {{
+    .hv-candle,.hv-ema {{ animation:none }} .hv-ema {{ stroke-dashoffset:0 }}
+  }}
+</style></head><body>
+<div class="hv-chart">
+  <div class="hv-chart-head"><span>BIST 100 · örnek görünüm</span>
+  <span style="font-size:10px;color:#64748B">temsili görsel, canlı veri değildir</span></div>
+  {svg}
+  <div class="hv-axis"><span>10:00</span><span>12:00</span><span>14:00</span><span>16:00</span><span>18:00</span></div>
+</div></body></html>
+"""
+    st.components.v1.html(component, height=176, scrolling=False)
+
+
+def praise_block() -> None:
+    """Ürünün güçlü yönlerini dürüst ve sakin bir dille anlatır."""
+    st.html(
+        """
+<div class="hv-praise">
+  <div class="hv-praise-head">Neden HSC Borsa Analiz?</div>
+  <div class="hv-praise-item"><span>✦</span><div><b>Derin analiz, sade karar.</b><small>9 zaman dilimi ve KAP verisi tek bir kartta özetlenir.</small></div></div>
+  <div class="hv-praise-item"><span>✦</span><div><b>Rakamları saklamaz.</b><small>Kaybeden sinyaller de dahil şeffaf performans defteri tutar.</small></div></div>
+  <div class="hv-praise-item"><span>✦</span><div><b>Risk önce, kâr sonra.</b><small>ATR stop, rejim ve Kelly boyutuyla disiplinli plan sunar.</small></div></div>
+  <div class="hv-praise-item"><span>✦</span><div><b>Karar yine sizde.</b><small>Gerçek emir gönderilmez; yalnızca kurgusal işlem yapılır.</small></div></div>
+</div>
+"""
+    )
 
 
 def brand_panel() -> None:
@@ -107,7 +233,9 @@ def brand_panel() -> None:
 </div>
 """
     )
+    market_chart_card()
     stat_strip()
+    praise_block()
     st.html('<div class="hv-live" style="margin:2px 0 8px"><span class="hv-dot"></span> Kurgusal işlem sistemi hazır · gerçek emir gönderilmez</div>')
     trust_row()
 

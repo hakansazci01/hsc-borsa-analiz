@@ -11,7 +11,7 @@ HSC Borsa Analiz; bir komut satırı sinyal botundan evrilen, tarayıcıdan kull
 - **Akıllı Panel:** Açılışta sade 3 adım — piyasa durumu, tek net karar (AL/BEKLE/SAT + sade gerekçe), kurgusal portföy. BIST 100 rejimine göre *hangi yöntemin kullanılacağını* önerir. Menüde ana araçlar öne çıkar, teknik sayfalar "Gelişmiş analizler" grubuna alınır; hiçbiri silinmez.
 - **Sade dil sözlüğü:** RSI, MACD, Monte Carlo, R çarpanı gibi 20 teknik terimin panelde tek tıkla açıklaması
 - **Yönlendirici yardım:** Giriş ekranında ve her sayfada küçük açılır paneller ("Bilgileri nereye gireceğim?", "Nasıl kullanılır?"), 5 adımlı animasyonlu rehber penceresi ve hisse seçildiğinde görünen kısa onay animasyonu
-- **Görsel güven katmanı:** İki panelli giriş ekranı; solda animasyonlu marka paneli, 4 istatistik kartı (804 hisse / 16 araç / 1 dk canlı mum / 0 gerçek emir) ve Material ikonlu güven rozetleri (şifre korumalı, canlı veri, rejim analizi, paper-only)
+- **Görsel güven katmanı:** İki panelli giriş ekranı; solda animasyonlu marka paneli, **animasyonlu BIST tarzı mum grafiği** (temsili), 4 istatistik kartı (804 hisse / 16 araç / 1 dk canlı mum / 0 gerçek emir), dürüst "Neden HSC?" övgü metinleri ve Material ikonlu güven rozetleri (şifre korumalı, canlı veri, rejim analizi, paper-only)
 - **Anlık işlem sinyali:** 1 dakikalık canlı mumlardan 5m/15m EMA9/20, VWAP, RSI7 ve hacim patlaması tetikleyicileri; seans ve KAP acil-duyuru filtreleri
 - **İşlem ajansı:** Rejime göre ağırlıklandırılmış 9 zaman dilimi uyumu, tam işlem planı (giriş / ATR stop / 1.5R-2.5R-4R hedefler / Kelly+volatilite boyutu / ufuk / geçersizleme)
 - **Akıllı karar motoru:** AL / BEKLE / SAT trafik lambası, faktör katkı grafiği, gerekçeler
@@ -148,7 +148,7 @@ Bu yardım katmanı yalnızca arayüzdür; hiçbir ayarı veya analiz sonucunu d
 
 Fintech arayüz ilkeleri (güven sinyalleri, okunabilir büyük rakamlar, tutarlı kart düzeni, ölçülü mikro-animasyon) temel alınmıştır:
 
-- **Giriş ekranı:** Sol panelde animasyonlu marka alanı, 4 istatistik kartı ve canlı durum göstergesi; sağ panelde giriş/kayıt formu. Form tek bir net işe odaklanır, yardım tek bir popup'ta toplanır.
+- **Giriş ekranı:** Sol panelde animasyonlu marka alanı, **BIST tarzı mum grafiği** (30 mum, EMA çizgisi çizilerek animasyonlu; açıkça *"temsili görsel, canlı veri değildir"* etiketli), 4 istatistik kartı, **"Neden HSC Borsa Analiz?"** başlıklı sakin ve dürüst övgü metinleri ve canlı durum göstergesi; sağ panelde giriş/kayıt formu. Form tek bir net işe odaklanır, yardım tek bir popup'ta toplanır. Grafik izole bir iframe'de render edilir (Streamlit `st.html` SVG etiketini süzer).
 - **Güven rozetleri:** Şifre korumalı (PBKDF2), canlı veri, rejim analizi ve paper-only rozetleri Material ikonlarla gösterilir.
 - **Akıllı Panel:** Üstte nabız atan "canlı veri" göstergesi, altta güven rozetleri.
 - **Animasyonlar:** kartlar aşamalı belirir, ışık topu yavaşça süzülür, canlı nokta nabız atar; `prefers-reduced-motion` tercihinde tüm animasyonlar kapanır. Tüm CSS `hv-` önekiyle sınırlıdır, analiz sonuçlarına etkisi yoktur.
