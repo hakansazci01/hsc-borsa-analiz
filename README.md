@@ -22,6 +22,8 @@ HSC Borsa Analiz; bir komut satırı sinyal botundan evrilen, tarayıcıdan kull
 - **Yönlendirici yardım:** Giriş ekranında ve her sayfada küçük açılır paneller ("Bilgileri nereye gireceğim?", "Nasıl kullanılır?"), 5 adımlı animasyonlu rehber penceresi ve hisse seçildiğinde görünen kısa onay animasyonu
 - **Görsel güven katmanı:** İki panelli giriş ekranı; solda animasyonlu marka paneli, **animasyonlu BIST tarzı mum grafiği** (temsili), 4 istatistik kartı (804 hisse / 16 araç / 1 dk canlı mum / 0 gerçek emir), dürüst "Neden HSC?" övgü metinleri ve Material ikonlu güven rozetleri (şifre korumalı, canlı veri, rejim analizi, paper-only)
 - **Anlık işlem terminali:** Tek ekranda net **ŞİMDİ AL / BEKLE (~dk) / ŞİMDİ SAT** kartı. 1 dakikalık canlı mumlardan 5m/15m EMA9/20, VWAP, RSI7 ve hacim tetikleyicileri; seans/KAP filtreleri; oynaklık ve tetikleyici mesafesinden **bekleme aralığı**; açık kurgusal pozisyon için **SAT uyarıları**; karar değişince tek seferlik bildirim. Seans dışında ve veri doğrulanamazsa süre tahmini üretilmez, işlem önerisi bastırılır.
+- **Fiyat seviyesi alarmları:** Kullanıcı "THYAO ₺X üzerine çıkarsa / altına inerse" kuralı kurar; koşul gerçekleşince mevcut kanallardan **tek seferlik, gecikmeli veri uyarısı** gider. Alarm bir işlem sinyali değildir; kullanıcı başına yerel JSON'da saklanır ve veri sıfırlanınca temizlenir.
+- **Kurgusal takip stop (trailing stop):** Açık pozisyonun girişinden bu yana görülen tepe fiyat üzerinden ATR/oryansal takip stop hesaplanır; stop, hedef veya takip stop tetiklenirse **SAT önerisi ve nedeni** gösterilir. Tamamen simülasyondur, otomatik satış yapılmaz.
 - **İşlem ajansı:** Rejime göre ağırlıklandırılmış 9 zaman dilimi uyumu, tam işlem planı (giriş / ATR stop / 1.5R-2.5R-4R hedefler / Kelly+volatilite boyutu / ufuk / geçersizleme)
 - **Akıllı karar motoru:** AL / BEKLE / SAT trafik lambası, faktör katkı grafiği, gerekçeler
 - **Gelecek K/Z projeksiyonu:** 1/5/20 günlük Monte Carlo bantları, stop/hedef olasılıkları, benzer sinyallerin MFE/MAE profili
@@ -184,7 +186,9 @@ Fintech arayüz ilkeleri (güven sinyalleri, okunabilir büyük rakamlar, tutarl
 | Veri kapısı (/ fail-closed) nedir? | Her sinyal gösterilmeden önce fiyatın pozitifliği, günlük değişim bandı, alış-satış tutarlılığı, kaynak ve veri yaşı kontrol edilir. Kritik kontrol başarısızsa AL/SAT bastırılır ve **BEKLE** gösterilir — bozuk veriyle "makul görünen" sinyal üretilmez. |
 | Sinyalleri nasıl kapatırım? | Sol yan menüdeki **Sinyalleri kapat (kill switch)** anahtarını açın; tüm panellerde kararlar BEKLE'ye çekilir, veri kaybı olmaz. |
 | Denetim kaydı nerede? | Akıllı Panel'in altındaki **Karar denetim kaydı** bölümü son kararları, doğrulama seviyesini ve kaynağı gösterir. Kayıtlar `users/<kullanici>/hsc_audit.jsonl` dosyasındadır. |
-| Anlık işlem terminali ne gösterir? | Seçtiğin hisse için **ŞİMDİ AL**, **BEKLE (yaklaşık dakika aralığı)** veya **ŞİMDİ SAT** der. Hangi tetikleyicinin eksik olduğunu ve ne kadar uzakta olduğunu gösterir. Açık kurgusal pozisyonun için stop/hedef/sinyal tersine dönmesi durumunda **SAT uyarısı** çıkar. Karar değiştiğinde (kanallar açıksa) bildirim gider. |
+| Fiyat alarmı ile işlem sinyali aynı mı? | Hayır. Fiyat alarmı yalnızca "şu seviyeye ulaşıldı" bilgisidir, yön önermez ve veri gecikmelidir. İşlem sinyali ise göstergelerin birleşiminden üretilir; ikisi birbirinden ayrıdır. |
+| Takip stop otomatik satar mı? | Hayır. Takip stop seviyesi kurgusal olarak hesaplanıp gösterilir; tetiklenirse **SAT önerisi** çıkar. Satışa karar verip uygulamak tamamen kullanıcıdadır, gerçek emir gönderilmez. |
+| Anlık işlem terminali ne gösterir? | Seçtiğin hisse için **ŞİMDİ AL**, **BEKLE (yaklaşık dakika aralığı)** veya **ŞİMDİ SAT** der. Hangi tetikleyicinin eksik olduğunu ve ne kadar uzakta olduğunu gösterir. Açık kurgusal pozisyonun için stop/hedef/takip stop/sinyal tersine dönmesi durumunda **SAT uyarısı** çıkar. Karar değiştiğinde (kanallar açıksa) bildirim gider. |
 | Bekleme süresi garanti mi? | Hayır. Fiyatın tetikleyici seviyeye uzaklığı ve son dakikalık oynaklıkla hesaplanan **yaklaşık bir aralıktır**. 1 dakikalık mum oluşmakta olabilir; 5m/15m mum kapanmadan koşullar değişebilir. Seans dışında tahmin üretilmez. |
 | Bot'a ne sorabilirim? | Hisse sembolü yanında *"Portföyümü incele"*, *"THYAO neden AL?"*, *"Risk profilime uygun muyum?"*, *"Bugün ne değişti?"*, *"BIST 100'a göre nasıl?"*, *"Verinin kaynağı nedir?"* sorularını sorabilirsiniz. Her yanıtın altında bağlamlı takip önerileri çıkar. |
 | Bot bana emir veya kesin sinyal verir mi? | Hayır. Emir, kesinlik, canlı fiyat ve yarın tahmini isteyen sorular açıkça reddedilir; bot sizi onaylamak için değil riskleri göstermek için çalışır. |
@@ -212,7 +216,7 @@ assets/        # Logo
 ## Test ve doğrulama
 
 - `python -m compileall` ile tüm modüller derlenir
-- `tests/run_all.py`: veri şeması kontratları, golden fixture regresyonu, OHLC/fiyat invariansları, günlük temizleme/rotasyon, güven kapısı (12 test)
+- `tests/run_all.py`: veri şeması kontratları, golden fixture regresyonu, OHLC/fiyat invariansları, günlük temizleme/rotasyon, güven kapısı, fiyat alarmı ve takip stop (14 test)
 - `tests/test_app_flow.py`: AppTest ile giriş + 16 sayfa + etkileşimler
 - `.github/workflows/ci.yml`: her push'ta derleme + testler + gizli anahtar taraması
 - Günlük kayıtlar `ui/log_store.py` ile temizlenir, kilitlenir ve 2 MB'ı geçince döndürülür (3 yedek)

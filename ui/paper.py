@@ -53,6 +53,7 @@ def open_position(
         "confidence": int(confidence),
         "reason": reason,
         "opened_at": auth._now(),
+        "peak_price": float(price),  # takip stop için girişten itibaren tepe fiyat
     }
     positions = load_positions(username)
     positions.append(position)
@@ -106,6 +107,7 @@ def evaluate(username: str, settings: dict[str, Any] | None = None) -> list[dict
     settings = settings or (st.session_state.get("settings", {}) if st.session_state else {})
     risk = settings.get("risk", {})
     results: list[dict[str, Any]] = []
+    peak_updated = False
 
     for p in positions:
         quote = live_quote(p["symbol"])
@@ -117,12 +119,25 @@ def evaluate(username: str, settings: dict[str, Any] | None = None) -> list[dict
 
         stop = p.get("stop")
         target = p.get("target")
+        # Takip stop: girişten bu yana görülen tepe fiyat üzerinden hesaplanır.
+        peak = max(float(p.get("peak_price") or p["entry_price"]), price)
+        if peak > float(p.get("peak_price") or p["entry_price"]) + 1e-6:
+            p["peak_price"] = round(peak, 4)
+            peak_updated = True
+        trailing_pct = float(risk.get("trailing_stop_pct", 0.03) or 0)
+        trailing_stop = round(peak * (1 - trailing_pct), 4) if trailing_pct > 0 else None
+
         if stop and price <= float(stop):
             action = "SAT"
             reasons.append(f"Stop-loss seviyesi ({float(stop):,.2f}) tetiklendi.")
         elif target and price >= float(target):
             action = "SAT"
             reasons.append(f"Hedef fiyata ({float(target):,.2f}) ulaşıldı.")
+        elif trailing_stop and price <= trailing_stop:
+            action = "SAT"
+            reasons.append(
+                f"Takip stop tetiklendi ({trailing_stop:,.2f} ₺ · tepe {peak:,.2f} ₺)."
+            )
 
         if action == "TUT":
             try:
@@ -153,7 +168,11 @@ def evaluate(username: str, settings: dict[str, Any] | None = None) -> list[dict
             "pnl_amount": round(pnl_amount, 2),
             "action": action,
             "reasons": reasons,
+            "peak_price": round(peak, 4),
+            "trailing_stop": trailing_stop,
             "source": quote.get("source", "—") if quote else "—",
             "session": quote.get("session", "—") if quote else "—",
         })
+    if peak_updated:
+        save_positions(username, positions)
     return results

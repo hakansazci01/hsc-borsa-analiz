@@ -5,7 +5,7 @@ from __future__ import annotations
 import altair as alt
 import streamlit as st
 
-from ui import audit_log, data_freshness, event_risk, format_tr as ftr, notify, paper, trust_gate
+from ui import audit_log, data_freshness, event_risk, format_tr as ftr, notify, paper, price_alerts, trust_gate
 from ui.bist_universe import load_companies, ordered_symbols
 from ui.components import real_money_warning
 from ui.help_texts import h
@@ -156,6 +156,24 @@ def _render() -> None:
     m3.metric("Hedef", ftr.money(result["target"]) if result["target"] else "—")
     m4.metric("Güven", f"%{confidence}")
 
+    # Fiyat seviyesi alarmları (gecikmeli veri, bilgilendirme amaçlı)
+    quotes = {symbol: price}
+    for rule in price_alerts.load(user):
+        alert_symbol = str(rule.get("symbol", "")).upper()
+        if alert_symbol and alert_symbol not in quotes:
+            try:
+                from ui.stream import live_quote
+
+                quote = live_quote(alert_symbol)
+                if quote and quote.get("price"):
+                    quotes[alert_symbol] = float(quote["price"])
+            except Exception:
+                pass
+    fired = price_alerts.check(user, quotes, settings)
+    if fired:
+        st.toast(f"{len(fired)} fiyat alarmı tetiklendi.", icon=":material/notifications:")
+    price_alerts.render_panel(user, symbol, price)
+
     # Açık kurgusal pozisyonlar ve SAT uyarıları
     positions = paper.evaluate(user, settings)
     sell_alerts = [p for p in positions if p.get("action") == "SAT"]
@@ -165,6 +183,27 @@ def _render() -> None:
                 f'<div class="ith-alert">SAT UYARISI · {p["symbol"]} · '
                 f'K/Z {ftr.pct(p.get("pnl_pct", 0), sign=True)} · '
                 f'{" / ".join(p.get("reasons", [])[:2])}</div>'
+            )
+
+    if positions:
+        with st.container(border=True):
+            st.subheader("Açık kurgusal pozisyonlar — çıkış planı", divider="gray")
+            for p in positions:
+                col1, col2, col3 = st.columns([1.2, 1, 1])
+                col1.markdown(
+                    f"**{p['symbol']}** · {p.get('action')} · "
+                    f"K/Z {ftr.pct(p.get('pnl_pct', 0), sign=True)}"
+                )
+                col2.caption(
+                    f"Tepe {ftr.money(p.get('peak_price'))} · "
+                    f"Takip stop {ftr.money(p.get('trailing_stop'))}"
+                )
+                col3.caption(
+                    f"Sabit stop {ftr.money(p.get('stop'))} · Hedef {ftr.money(p.get('target'))}"
+                )
+            st.caption(
+                "Takip stop, pozisyon açıldıktan sonra görülen tepe fiyat üzerinden "
+                "kurgusal olarak hesaplanır; gerçek emir veya otomatik satış yoktur."
             )
 
     c1, c2 = st.columns([1, 1.25], gap="medium")

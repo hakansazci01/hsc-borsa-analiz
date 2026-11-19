@@ -119,7 +119,8 @@ def reset_user_data(username: str) -> None:
     """Ayarlar, portföy, geçmiş ve performans defterini siler; hesabı korur."""
     name = _safe_name(username)
     performance_path = user_dir(name) / "performance.jsonl"
-    for path in (settings_path(name), portfolio_path(name), history_path(name), performance_path):
+    alerts_path = user_dir(name) / "price_alerts.json"
+    for path in (settings_path(name), portfolio_path(name), history_path(name), performance_path, alerts_path):
         if path.exists():
             path.unlink()
 

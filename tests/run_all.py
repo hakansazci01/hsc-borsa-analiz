@@ -8,10 +8,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from tests import test_contracts, test_golden, test_invariants  # noqa: E402
+from tests import test_bot_features, test_contracts, test_golden, test_invariants  # noqa: E402
 
 
-MODULES = (test_contracts, test_golden, test_invariants)
+MODULES = (test_contracts, test_golden, test_invariants, test_bot_features)
 
 
 def main() -> int:
