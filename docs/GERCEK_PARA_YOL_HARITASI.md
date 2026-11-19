@@ -125,8 +125,20 @@ Canlı BIST yerine önce **sanal para** ile gerçek emir mekaniğini test edebil
 
 1. `testnet.binance.vision` adresine gidin → **API Management** → yeni API anahtarı oluşturun.
    Bu anahtar **gerçek borsa anahtarından farklıdır** ve sanal bakiyeyi kullanır.
-2. API izinlerinde **yalnızca "Enable Spot Trading"** açık olsun;
-   **"Enable Withdrawals" kesinlikle kapalı** kalsın. Mümkünse IP kısıtlaması ekleyin.
+2. Ekrandaki kutuların doğru ayarı:
+
+   | Kutu | Ayar | Sebep |
+   |---|---|---|
+   | Enable Reading | ✅ AÇIK | bakiye/fiyat okuma |
+   | Enable Spot & Margin Trading | ✅ AÇIK | spot alım-satım emri |
+   | Enable Futures | ❌ KAPALI | vadeli risk istemiyoruz |
+   | Enable Margin Trading | ❌ KAPALI | kaldıraç istemiyoruz |
+   | Enable Withdrawals | ❌ KAPALI | para çekme yetkisi asla verilmez |
+   | Enable Options Trading | ❌ KAPALI | gereksiz |
+   | Restrict access to trusted IPs only | önerilir (sabit IP varsa) | anahtar çalınsa bile başka IP çalışmaz |
+
+   Secret key **yalnızca bir kez** gösterilir; ekran görüntüsü almayın, sohbete yapıştırmayın.
+   Paylaşılmış/görüntülenmiş bir anahtar varsa **hemen iptal edip yenisi üretin**.
 3. Anahtarı **sohbete yapıştırmayın**; kendi bilgisayarınızda
    `.streamlit/secrets.toml` dosyasına şunu yazın:
    ```toml
