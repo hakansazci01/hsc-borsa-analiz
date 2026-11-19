@@ -205,8 +205,59 @@ def intraday_signal(symbol: str, settings: dict[str, Any]) -> dict[str, Any] | N
     stop_pct = float(risk.get("stop_loss_pct", 0.05))
     target_pct = float(risk.get("take_profit_pct", 0.10))
     sign = 1 if decision == "AL" else -1 if decision == "SAT" else 0
-    stop = round(price - sign * max(float(last["ATR14"]), price * stop_pct), 2) if sign else None
-    target = round(price + sign * max(float(last["ATR14"]), price * stop_pct) * 2, 2) if sign else None
+    atr_value = float(last["ATR14"]) if pd.notna(last["ATR14"]) else price * 0.01
+    stop = round(price - sign * max(atr_value, price * stop_pct), 2) if sign else None
+    target = round(price + sign * max(atr_value, price * stop_pct) * 2, 2) if sign else None
+
+    # --- Zaman tahmini: mesafe / dakikalık oynaklık ---
+    # Bu bir garanti değil; yalnızca "koşulların yaklaşık ne kadar sürede
+    # oluşabileceği"ni gösteren oynaklık tabanlı bir tahmindir.
+    per_minute = max(atr_value / 5.0, price * 0.0002)
+    gaps: list[tuple[float, str]] = []
+
+    def _gap(distance: float, label: str) -> None:
+        if distance > 0 and pd.notna(distance):
+            gaps.append((float(distance), label))
+
+    ema9, ema20 = float(last["EMA9"]), float(last["EMA20"])
+    vwap = float(last["VWAP"]) if pd.notna(last["VWAP"]) else price
+    rsi = float(last["RSI7"]) if pd.notna(last["RSI7"]) else 50.0
+
+    if decision == "BEKLE":
+        if ema9 <= ema20:
+            _gap(ema20 - ema9, "5m EMA9/20 yukarı kesişimi")
+        if price <= vwap:
+            _gap(vwap - price, "fiyatın VWAP üzerine geçmesi")
+        if rsi <= 50:
+            _gap((50 - rsi) / 8.0 * atr_value, "RSI7'nin 50 üzerine çıkması")
+        ema9_15, ema20_15 = float(last15["EMA9"]), float(last15["EMA20"])
+        if ema9_15 <= ema20_15:
+            _gap(ema20_15 - ema9_15, "15m EMA9/20 onayı")
+    else:
+        if target:
+            _gap(abs(float(target) - price), "hedef fiyat")
+
+    wait_minutes: int | None = None
+    wait_low: int | None = None
+    wait_high: int | None = None
+    hold_minutes: int | None = None
+    closest_trigger = ""
+    # Seans dışında, pencere dışında veya KAP durdurması varsa süre tahmini üretme.
+    if not session["in_session"] or not in_window or halted:
+        gaps = []
+    if gaps:
+        nearest = min(gaps, key=lambda g: g[0])
+        closest_trigger = nearest[1]
+        estimated = nearest[0] / per_minute
+        if decision == "BEKLE":
+            wait_minutes = int(min(240, max(1, round(estimated))))
+            # Kesin süre iddia etme yerine oynaklık temelli bir aralık ver.
+            wait_low = max(1, int(wait_minutes * 0.6))
+            wait_high = min(240, int(wait_minutes * 1.6))
+        else:
+            hold_minutes = int(min(240, max(1, round(estimated))))
+
+    remaining_minutes = max(0, close_min - minute_of_day)
 
     return {
         "symbol": symbol.upper(),
@@ -219,7 +270,14 @@ def intraday_signal(symbol: str, settings: dict[str, Any]) -> dict[str, Any] | N
         "candles": candles,
         "stop": stop,
         "target": target,
-        "atr": float(last["ATR14"]),
+        "atr": atr_value,
+        "wait_minutes": wait_minutes,
+        "wait_low": wait_low,
+        "wait_high": wait_high,
+        "remaining_minutes": remaining_minutes,
+        "hold_minutes": hold_minutes,
+        "closest_trigger": closest_trigger,
+        "per_minute_move": round(per_minute, 4),
         "bias": bias,
         "session": session["label"],
         "time": moment.strftime("%H:%M:%S"),
