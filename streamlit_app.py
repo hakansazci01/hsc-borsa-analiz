@@ -115,6 +115,9 @@ def _render_auth() -> None:
             "Yerel tek kullanıcı oturumudur. İnternet üzerinden yayınlama için "
             "Streamlit `st.login()` + OIDC kullanılmalıdır."
         )
+        visual.login_feature_panel()
+
+    visual.auth_footer()
 
 
 if not st.session_state.user:

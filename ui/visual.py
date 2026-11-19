@@ -19,6 +19,8 @@ CSS = """
 @keyframes hvShine { 0%{background-position:-180% 0} 100%{background-position:180% 0} }
 @keyframes hvCandle { from{opacity:0;transform:scaleY(.15)} to{opacity:1;transform:none} }
 @keyframes hvDraw { to{stroke-dashoffset:0} }
+@keyframes hvCoinFloat { 0%,100%{transform:translateY(0) rotate(-8deg)} 50%{transform:translateY(-10px) rotate(8deg)} }
+@keyframes hvNoteFloat { 0%,100%{transform:translateY(0) rotate(3deg)} 50%{transform:translateY(-7px) rotate(-3deg)} }
 .hv-hero {
   position: relative; overflow: hidden;
   background: linear-gradient(125deg,#0b1220 0%,#16243a 58%,#1c3a60 100%);
@@ -104,10 +106,77 @@ CSS = """
 .hv-praise-item > span { color: #34D399; font-size: 13px; line-height: 1.35; }
 .hv-praise-item b { display: block; font-size: 12.5px; color: #E2E8F0; }
 .hv-praise-item small { display: block; color: #94A3B8; font-size: 11px; margin-top: 1px; line-height: 1.4; }
+.hv-step-card {
+  animation: hvIn .5s cubic-bezier(.2,.8,.2,1) both;
+  border: 1px solid rgba(96,165,250,.24); border-radius: 12px;
+  background: rgba(30,41,59,.6); padding: 11px 12px; transition: transform .2s, border-color .2s;
+}
+.hv-step-card:nth-child(2){animation-delay:.06s}
+.hv-step-card:nth-child(3){animation-delay:.12s}
+.hv-step-card:hover { transform: translateY(-3px); border-color: rgba(96,165,250,.6); }
+.hv-step-no {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 800;
+  background: rgba(96,165,250,.18); color: #93C5FD; border: 1px solid rgba(96,165,250,.45);
+  margin-bottom: 6px;
+}
+.hv-step-card b { display: block; font-size: 12.5px; color: #E2E8F0; }
+.hv-step-card small { display: block; font-size: 10.5px; color: #94A3B8; margin-top: 2px; }
+.hv-feature {
+  animation: hvIn .5s cubic-bezier(.2,.8,.2,1) both;
+  display: flex; gap: 10px; align-items: flex-start;
+  border: 1px solid rgba(148,163,184,.16); border-radius: 12px;
+  background: rgba(15,23,42,.55); padding: 10px 12px; transition: transform .2s, border-color .2s;
+}
+.hv-feature:hover { transform: translateY(-2px); border-color: rgba(52,211,153,.45); }
+.hv-feature-icon {
+  flex: 0 0 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  background: rgba(96,165,250,.12); color: #60A5FA; font-size: 13px; font-weight: 800;
+}
+.hv-feature b { display: block; font-size: 12px; color: #E2E8F0; }
+.hv-feature small { display: block; font-size: 10.5px; color: #94A3B8; margin-top: 2px; line-height: 1.35; }
+.hv-footer-band {
+  animation: hvIn .6s cubic-bezier(.2,.8,.2,1) both;
+  border: 1px solid rgba(96,165,250,.22); border-radius: 16px;
+  background: linear-gradient(100deg, rgba(15,23,42,.9), rgba(30,58,95,.55), rgba(15,23,42,.9));
+  padding: 14px 18px; margin-top: 18px;
+}
+.hv-footer-items { display: flex; flex-wrap: wrap; gap: 18px 30px; justify-content: space-around; }
+.hv-footer-item { text-align: center; color: #CBD5E1; font-size: 12px; font-weight: 700; }
+.hv-footer-item span { display: block; color: #60A5FA; font-size: 17px; margin-bottom: 2px; }
+.hv-footer-note { text-align: center; color: #64748B; font-size: 11px; margin-top: 10px; }
+.hv-money-field { position: relative; overflow: hidden; }
+.hv-footer-band { position: relative; overflow: hidden; }
+.hv-footer-items, .hv-footer-note { position: relative; z-index: 2; }
+.hv-coin {
+  position: absolute; display: flex; align-items: center; justify-content: center;
+  width: 54px; height: 54px; border-radius: 50%; font-weight: 800; font-size: 22px;
+  color: #34D399; border: 2px solid rgba(52,211,153,.5);
+  background: radial-gradient(circle at 35% 30%, rgba(52,211,153,.30), rgba(16,185,129,.05));
+  box-shadow: 0 0 22px rgba(52,211,153,.16), inset 0 0 12px rgba(52,211,153,.12);
+  opacity: .55; animation: hvCoinFloat 6s ease-in-out infinite;
+}
+.hv-banknote {
+  position: absolute; display: flex; align-items: center; justify-content: center;
+  width: 96px; height: 54px; border-radius: 10px; font-weight: 800; font-size: 25px;
+  color: #93C5FD; border: 1px solid rgba(96,165,250,.45);
+  background: linear-gradient(135deg, rgba(96,165,250,.20), rgba(52,211,153,.12));
+  box-shadow: 0 0 22px rgba(96,165,250,.12);
+  opacity: .45; animation: hvNoteFloat 8s ease-in-out infinite;
+}
+.hv-banknote::before, .hv-banknote::after {
+  content: ""; position: absolute; left: 10px; right: 10px; height: 2px;
+  background: rgba(148,163,184,.28); border-radius: 2px;
+}
+.hv-banknote::before { top: 9px; }
+.hv-banknote::after { bottom: 9px; }
+.hv-hero .hv-coin { opacity: .4; animation-delay: .8s; }
+.hv-hero .hv-banknote { opacity: .3; animation-delay: 1.6s; }
 @media (max-width: 900px) { .hv-stats { grid-template-columns: repeat(2,1fr); } }
 @media (prefers-reduced-motion: reduce) {
   .hv-hero, .hv-stat, .hv-orb, .hv-orb::after, .hv-dot::after, .hv-shine,
-  .hv-candle, .hv-ema, .hv-praise-item { animation: none !important; }
+  .hv-candle, .hv-ema, .hv-praise-item, .hv-step-card, .hv-feature, .hv-footer-band,
+  .hv-coin, .hv-banknote { animation: none !important; }
   .hv-ema { stroke-dashoffset: 0; }
 }
 </style>
@@ -226,6 +295,8 @@ def brand_panel() -> None:
         """
 <div class="hv-hero">
   <div class="hv-orb"></div>
+  <div class="hv-banknote" style="right:170px;top:64px">₺</div>
+  <div class="hv-coin" style="right:58px;bottom:30px">₺</div>
   <div class="hv-tag">HSC · BIST ANALİZ</div>
   <div class="hv-title">Veriyle karar ver.<br/>Disiplinle yönet.</div>
   <p class="hv-desc">Gerçek BIST verisi, 9 zaman dilimi uyumu, şeffaf performans defteri ve risk odaklı karar desteği — tek panelde.</p>
@@ -262,3 +333,61 @@ def trust_row() -> None:
         st.badge("Canlı veri", icon=":material/sensors:", color="blue")
         st.badge("Rejim analizi", icon=":material/psychology:", color="violet")
         st.badge("Paper-only", icon=":material/security:", color="orange")
+
+
+def login_feature_panel() -> None:
+    """Formun altındaki boşluğu adım rehberi ve özellik kartlarıyla doldurur."""
+    st.container(height=1, border=False)
+    st.markdown("**3 adımda başlayın**")
+    c1, c2, c3 = st.columns(3, gap="small")
+    steps = [
+        ("1", "Kayıt ol", "Güvenli giriş oluştur"),
+        ("2", "Hisse seç", "804 şirket arasından"),
+        ("3", "Kararı gör", "Tek net sinyal kartı"),
+    ]
+    for col, (no, title, desc) in zip((c1, c2, c3), steps):
+        with col:
+            st.html(
+                f'<div class="hv-step-card"><div class="hv-step-no">{no}</div>'
+                f'<b>{title}</b><small>{desc}</small></div>'
+            )
+
+    st.container(height=1, border=False)
+    st.markdown("**Panelde neler var?**")
+    features = [
+        ("⚡", "Anlık sinyal", "1 dk mumlarla AL/SAT tetikleyici"),
+        ("◈", "İşlem ajansı", "Tam plan: giriş, stop, hedef, boyut"),
+        ("▤", "BIST tarayıcı", "804 hissesi saniyeler içinde taranır"),
+        ("◎", "Risk merkezi", "Rejim, Kelly, Monte Carlo, VaR"),
+        ("✦", "Performans defteri", "R çarpanıyla şeffaf sonuç kaydı"),
+        ("✉", "Bildirimler", "Karar değişince ntfy / Telegram / e-posta"),
+    ]
+    for i in range(0, len(features), 2):
+        left, right = st.columns(2, gap="small")
+        for col, (symbol, title, desc) in zip((left, right), features[i:i + 2]):
+            with col:
+                st.html(
+                    f'<div class="hv-feature"><div class="hv-feature-icon">{symbol}</div>'
+                    f'<div><b>{title}</b><small>{desc}</small></div></div>'
+                )
+
+
+def auth_footer() -> None:
+    """Giriş sayfasının altındaki geniş şeffaflık şeridi."""
+    st.html(
+        """
+<div class="hv-footer-band hv-money-field">
+  <div class="hv-coin" style="left:24px;top:6px">₺</div>
+  <div class="hv-banknote" style="right:120px;top:0">₺</div>
+  <div class="hv-coin" style="right:26px;bottom:8px;width:42px;height:42px;font-size:17px">₺</div>
+  <div class="hv-footer-items">
+    <div class="hv-footer-item"><span>◈</span>Gerçek BIST verisi</div>
+    <div class="hv-footer-item"><span>◎</span>İstatistiksel doğrulama</div>
+    <div class="hv-footer-item"><span>⚖</span>Risk odaklı plan</div>
+    <div class="hv-footer-item"><span>✦</span>Şeffaf sonuç defteri</div>
+    <div class="hv-footer-item"><span>⚡</span>Gerçek emir yok</div>
+  </div>
+  <div class="hv-footer-note">Yatırım tavsiyesi değildir · Geçmiş performans gelecek getiriyi garanti etmez · Tüm işlemler kurgusaldır</div>
+</div>
+"""
+    )
