@@ -9,7 +9,7 @@ import json
 
 import streamlit as st
 
-from ui import auth
+from ui import auth, guide_ui
 from ui.core import (
     INTERVAL_OPTIONS, PERIOD_OPTIONS, SUGGESTED_SYMBOLS,
     analyze_symbol, default_settings, reset_settings, save_settings, scan_market,
@@ -40,6 +40,18 @@ st.subheader("Ayarlar", divider="gray")
 st.caption(
     "Değişiklikler **Kaydet**'e bastığınızda analiz sayfalarına yansır ve tarayıcıda saklanır. "
     "Her ayarın üzerine fareyi getirerek neyi değiştirdiğinizi görebilirsiniz."
+)
+guide_ui.tip(
+    "Ayarlarda nereye ne yazmalı?",
+    [
+        "**İzleme listesi:** Hisse ekle alanına `THYAO` veya `GARAN` yazıp Ekleyin; tam liste BIST tarayıcı sayfasındadır.",
+        "**Risk profili:** Temkinli/Dengeli/Atak seçimi sinyal eşiklerini ve pozisyon boyutunu değiştirir.",
+        "**Bildirim kanalları:** ntfy/Telegram/e-posta tamamen opsiyoneldir; anahtar olmadan da çalışır.",
+        "**Kaydet:** Değişiklikler Kaydet'e basıldığında geçerli olur; Varsayılana dön geri alır.",
+        "**Veri sıfırlama:** Hesabım sayfasındaki Verilerimi sıfırla ayarları, portföyü ve performans defterini temizler.",
+    ],
+    key="ayarlar_rehber",
+    label="Nereye ne yazmalı?",
 )
 
 with st.expander("Varsayılan ayarlar nelerdir?", icon=":material/info:"):

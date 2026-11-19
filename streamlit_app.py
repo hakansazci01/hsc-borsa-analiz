@@ -16,6 +16,7 @@ st.set_page_config(
 )
 
 from ui import auth  # noqa: E402
+from ui import guide_ui  # noqa: E402
 from ui.core import load_settings  # noqa: E402
 from ui.market_ticker import render_sidebar_ticker  # noqa: E402
 from ui.password_tools import generate_password, strength  # noqa: E402
@@ -49,6 +50,18 @@ def _render_auth() -> None:
     st.caption(
         "Kişisel ayarlarınız, kurgusal portföyünüz ve karar geçmişiniz kullanıcı adınıza saklanır. "
         "Şifreler tuzlu PBKDF2 ile hash'lenir; düz metin tutulmaz."
+    )
+    guide_ui.inject_guide_css()
+    guide_ui.tip(
+        "Kullanıcı bilgilerini nereye, nasıl girmeli?",
+        [
+            "**İlk kez kullanıyorsunuz:** Kayıt ol sekmesinde kullanıcı adı (3-32 karakter) ve şifre (en az 10 karakter) belirleyin.",
+            "**Şifre zorlanıyorsa:** Güçlü şifre öner düğmesi sizin için güvenli bir şifre üretir.",
+            "**Daha önce kayıt olduysanız:** Giriş yap sekmesinden aynı kullanıcı adı ve şifreyi yazın.",
+            "**API anahtarı gerekmez:** ntfy/Telegram/e-posta opsiyoneldir; Ayarlar sayfasından sonra ekleyebilirsiniz.",
+        ],
+        key="auth_userinfo",
+        label="Bilgileri nereye gireceğim?",
     )
     login_tab, register_tab = st.tabs(["Giriş yap", "Kayıt ol"])
 
@@ -147,6 +160,7 @@ st.caption(
 )
 
 render_sidebar_ticker()
+guide_ui.render_global_guide()
 
 with st.sidebar:
     st.caption(f"Oturum: **{user}**")

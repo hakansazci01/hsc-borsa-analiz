@@ -10,6 +10,7 @@ HSC Borsa Analiz; bir komut satırı sinyal botundan evrilen, tarayıcıdan kull
 
 - **Akıllı Panel:** Açılışta sade 3 adım — piyasa durumu, tek net karar (AL/BEKLE/SAT + sade gerekçe), kurgusal portföy. BIST 100 rejimine göre *hangi yöntemin kullanılacağını* önerir. Menüde ana araçlar öne çıkar, teknik sayfalar "Gelişmiş analizler" grubuna alınır; hiçbiri silinmez.
 - **Sade dil sözlüğü:** RSI, MACD, Monte Carlo, R çarpanı gibi 20 teknik terimin panelde tek tıkla açıklaması
+- **Yönlendirici yardım:** Giriş ekranında ve her sayfada küçük açılır paneller ("Bilgileri nereye gireceğim?", "Nasıl kullanılır?"), 5 adımlı animasyonlu rehber penceresi ve hisse seçildiğinde görünen kısa onay animasyonu
 - **Anlık işlem sinyali:** 1 dakikalık canlı mumlardan 5m/15m EMA9/20, VWAP, RSI7 ve hacim patlaması tetikleyicileri; seans ve KAP acil-duyuru filtreleri
 - **İşlem ajansı:** Rejime göre ağırlıklandırılmış 9 zaman dilimi uyumu, tam işlem planı (giriş / ATR stop / 1.5R-2.5R-4R hedefler / Kelly+volatilite boyutu / ufuk / geçersizleme)
 - **Akıllı karar motoru:** AL / BEKLE / SAT trafik lambası, faktör katkı grafiği, gerekçeler
@@ -134,6 +135,14 @@ Açılış sayfası **Akıllı Panel**'dir. Amaç teknik karmaşıklığı kulla
 
 Üst menüde sadece 7 ana araç görünür; tarayıcı, bot, risk merkezi, laboratuvar, denetim, piyasa analizi, hisse detayı ve portföy testi **"Gelişmiş analizler"** başlıklı açılır grupta toplanır. **Hiçbir sayfa kaldırılmadı.** Panelin altındaki **"Teknik terimler sade dille"** bölümü 20 terimi günlük dille açıklar.
 
+### Yönlendirici yardım ve animasyonlar
+
+- **Küçük popup'lar:** Giriş ekranındaki *"Bilgileri nereye gireceğim?"*, Akıllı Panel'deki *"Rozet ne demek?" / "Nasıl kullanılır?" / "Nasıl hesaplanır?" / "Bu sayılar ne?"* ve Ayarlar'daki *"Nereye ne yazmalı?"* düğmeleri tıklanınca açılır, tekrar tıklanınca kapanır.
+- **5 adımlı rehber:** Üstteki **Rehber** düğmesi kayıt → izleme listesi → piyasa durumu → karar kartı → sonuç defteri akışını anlatan bir pencere açar. **İleri / Geri** ile adımlar arasında gezinilir; pencere kapanmadan ilerler.
+- **Animasyonlar:** Rehber kartı yumuşak geçişle belirir, rozetler ve onay mesajları kısa bir parlama efektiyle gösterilir. Hisse seçtiğinizde *"THYAO seçildi · karar kartı güncellendi"* bildirimi animasyonlu olarak çıkar. Hareket azaltma tercihi (`prefers-reduced-motion`) olan kullanıcılarda animasyonlar devre dışı kalır.
+
+Bu yardım katmanı yalnızca arayüzdür; hiçbir ayarı veya analiz sonucunu değiştirmez.
+
 ## Sık sorulan sorular ve sorun giderme
 
 | Soru | Cevap |
@@ -144,6 +153,8 @@ Açılış sayfası **Akıllı Panel**'dir. Amaç teknik karmaşıklığı kulla
 | Bildirim gelmiyor | ntfy için konuya abone olunduğundan ve Ayarlar'da kanalın açık olduğundan emin olun. Bildirim yalnızca karar değiştiğinde gönderilir. |
 | API anahtarı şart mı? | Hayır. Tüm servisler opsiyoneldir; anahtarsız da çalışır. |
 | Gerçek emir veriliyor mu? | Hayır. Sistem yalnızca kurgusal (paper) işlem yapar, aracı kuruma bağlanmaz. |
+| Rehberi nereden açarım? | Giriş yaptıktan sonra üstteki **Rehber** düğmesiyle 5 adımlı turu açın; İleri/Geri ile gezinin. |
+| Bir düğmenin ne yaptığını bilmiyorum | Akıllı Panel'deki *"Nasıl kullanılır?"* ve Ayarlar'daki *"Nereye ne yazmalı?"* popup'larına tıklayın; her adımın yanında açıklama var. |
 | Gelişmiş analizlere nasıl ulaşırım? | Üst menüdeki **Gelişmiş analizler** grubunu açın veya Akıllı Panel'in altındaki "Gelişmiş analizler — tüm araçlar" bölümünü kullanın. |
 | Teknik terimleri anlamıyorum | Akıllı Panel'in en altındaki **"Teknik terimler sade dille"** bölümüne bakın; RSI'dan Monte Carlo'ya 20 terim günlük dille açıklanır. |
 | R çarpanı nedir? | Kâr/zararın alınan riske (stop mesafesine) oranı. Detaylı anlatım **Sinyal performansı** sayfasındaki "R çarpanı nasıl hesaplanıyor?" bölümünde. |

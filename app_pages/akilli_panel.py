@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from ui import glossary, insights, paper, performance, smart_guide
+from ui import glossary, guide_ui, insights, paper, performance, smart_guide
 from ui.bist_universe import load_companies, ordered_symbols
 from ui.components import real_money_warning
 from ui.core import analysis_args, analyze_symbol
@@ -72,6 +72,17 @@ regime = smart_guide.market_regime()
 guide = smart_guide.guide_for(regime)
 with st.container(border=True, key="hsc_regime_card"):
     st.markdown("**1 · Piyasa durumu**")
+    guide_ui.tip(
+        "Rejim rozeti ne anlama geliyor?",
+        [
+            "**Yeşil (Yükseliş):** ana eğilim yukarı; planlı alım ve İşlem ajansı uygun.",
+            "**Kırmızı (Düşüş):** eğilim aşağı; yeni alım yerine risk yönetimi öne çıkar.",
+            "**Sarı (Yatay):** net yön yok; kısa vadeli tetikleyiciler veya BEKLE.",
+            "**Turuncu (Oynak):** fiyat sert hareket ediyor; pozisyonu küçültün.",
+        ],
+        key="panel_regime",
+        label="Rozet ne demek?",
+    )
     left, right = st.columns([1.05, 2.1], gap="medium")
     with left:
         st.html(
@@ -92,6 +103,17 @@ with st.container(border=True, key="hsc_regime_card"):
 # ---------------------------------------------------------------- 2. Karar
 with st.container(border=True, key="hsc_decision_card"):
     st.markdown("**2 · Hisse ve net karar**")
+    guide_ui.tip(
+        "Burada ne seçmelisiniz?",
+        [
+            "**Hisse seçin:** listeden bir BIST hissesi seçin; karar kartı otomatik güncellenir.",
+            "**Karar kartı:** yeşil AL, sarı BEKLE/İZLE, kırmızı SAT anlamına gelir. Güven skoru tek başına karar değildir.",
+            "**Giriş / Stop / Hedef:** işlem taslağının seviyeleridir; stop zararı sınırlar, hedef kârı belirler.",
+            "**Kurgusal pozisyon aç:** yalnızca seans içinde ve AL sinyalinde aktiftir; gerçek emir gönderilmez.",
+        ],
+        key="panel_decision",
+        label="Nasıl kullanılır?",
+    )
 
     universe = load_companies()
     symbols = ordered_symbols(universe)
@@ -106,9 +128,26 @@ with st.container(border=True, key="hsc_decision_card"):
         help=h("bist_search"),
     )
 
+    if st.session_state.get("hsc_prev_symbol") != symbol:
+        st.session_state["hsc_prev_symbol"] = symbol
+        st.session_state["hsc_flash_msg"] = f"{symbol} seçildi · karar kartı güncellendi."
+    _flash_msg = st.session_state.pop("hsc_flash_msg", None)
+    if _flash_msg:
+        guide_ui.flash(_flash_msg)
+
     # "Bugün ne yapmalı?" — tek bir birleşik öneri
     with st.container(border=True, key="hsc_top_pick"):
         st.markdown("**Bugün ne yapmalı?** · izleme listem")
+        guide_ui.tip(
+            "Bu öneri nasıl oluşuyor?",
+            [
+                "İzleme listenizdeki hisseler taranır; risk profilinize uyan en güçlü aday seçilir.",
+                "Güven eşiğini geçen aday yoksa sistem açıkça **BEKLE** der; uydurma sinyal üretmez.",
+                "Aday gördüğünüzde 'Bu hisseyi incele' ile karar kartına taşıyabilirsiniz.",
+            ],
+            key="panel_top_pick",
+            label="Nasıl hesaplanır?",
+        )
         pick = smart_guide.top_pick(settings, regime)
         if not pick:
             st.caption("İzleme listesi analiz edilemedi. Birazdan tekrar deneyin.")
@@ -189,6 +228,17 @@ with st.container(border=True, key="hsc_decision_card"):
 # ---------------------------------------------------------------- 3. Portföy
 with st.container(border=True, key="hsc_pnl_panel"):
     st.markdown("**3 · Kurgusal portföyüm**")
+    guide_ui.tip(
+        "Portföy rakamları ne ifade ediyor?",
+        [
+            "**Açık pozisyon:** henüz kapatılmamış kurgusal işlem sayısı.",
+            "**Açık K/Z:** bu pozisyonların güncel fiyatla hesaplanan kâr/zararı.",
+            "**Kapanan sinyal / Net R:** sonuç defterine işlenen işlem sayısı ve toplam R çarpanı.",
+            "Detay ve veri sıfırlama için **Hesabım** sayfasını kullanın.",
+        ],
+        key="panel_portfolio",
+        label="Bu sayılar ne?",
+    )
     try:
         open_positions = paper.evaluate(user, settings)
     except Exception:
