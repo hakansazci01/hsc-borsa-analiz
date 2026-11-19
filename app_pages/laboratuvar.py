@@ -161,6 +161,14 @@ with st.container(border=True):
         perm = permutation_test(champion)
         st.metric("Permütasyon p-değeri", perm.get("p_value", "—"), help="Getiriler rastgele karıştırıldığında bu sonucun çıkma olasılığı.")
         st.caption(perm.get("verdict", perm.get("reason", "")))
+        from ui.methodology import simulation_notes
+
+        simulation_notes(
+            "Permütasyon testi metodolojisi — girdiler gerçek",
+            f"{args['period']} / {args['interval']} gerçek OHLCV verisinden hesaplanan strateji getirileri",
+            "Seçilen şampiyon stratejinin gerçek getiri serisi; rastgele karıştırma yalnızca 'şans' dağılımı için",
+            "p-değeri düşük olsa bile bu, stratejinin gelecekte kârlı olacağını kanıtlamaz; walk-forward ve maliyetler birlikte okunmalıdır.",
+        )
 
     purged = purged_walk_forward(
         df, args["indicators"], args["weights"], args["thresholds"],

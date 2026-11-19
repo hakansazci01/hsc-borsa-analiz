@@ -214,6 +214,15 @@ elif section == "Monte Carlo":
                 f"{mc['simulations']:,} olası gelecek senaryosu oluşturuldu (bootstrap, tohum=42). "
                 f"Her senaryoda sermayenin %{mc['position_size_pct']}'i riske atıldı."
             )
+            from ui.methodology import simulation_notes
+
+            simulation_notes(
+                "Monte Carlo metodolojisi — girdiler gerçek",
+                f"{sym} için {args['period']} / {args['interval']} gerçek OHLCV verisinden "
+                "çalıştırılan backtest'in kapanmış işlemleri",
+                f"{mc['trade_count']} gerçek işlem getirisi · {mc['simulations']:,} senaryo · sabit tohum 42 (tekrarlanabilir)",
+                "Geçmiş işlem dağılımı geleceği garanti etmez; kuyruk riski ve veri gecikmesi ayrıca değerlendirilmelidir.",
+            )
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("Zarar olasılığı", f"%{mc['prob_loss_pct']}", icon=":material/warning:", help=h("monte_carlo"))
             m2.metric("VaR %95", f"%{mc['var95_pct']}", icon=":material/shield:", help=h("var95"))
