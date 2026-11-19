@@ -16,13 +16,14 @@ st.set_page_config(
 )
 
 from ui import auth  # noqa: E402
-from ui import guide_ui, tr_ui, visual  # noqa: E402
+from ui import guide_ui, motion, tr_ui, visual  # noqa: E402
 from ui.core import load_settings  # noqa: E402
 from ui.market_ticker import render_sidebar_ticker  # noqa: E402
 from ui.password_tools import generate_password, strength  # noqa: E402
 from ui.style import inject_modern_style  # noqa: E402
 
 inject_modern_style()
+motion.inject_motion_tokens()  # hareket token'ları + reduced-motion koruması
 visual.inject_visual_css()  # kart, rozet ve animasyon stilleri (hv- öneki)
 tr_ui.install()  # Streamlit'in İngilizce menü/toolbar etiketlerini Türkçe yapar
 
@@ -174,6 +175,11 @@ guide_ui.render_global_guide()
 
 with st.sidebar:
     st.caption(f"Oturum: **{user}**")
+    st.toggle(
+        "Sinyalleri kapat (kill switch)",
+        key="signals_off",
+        help="Açıkken veri kapısı tüm AL/SAT sinyallerini BEKLE'ye çeker; mevcut veri korunur.",
+    )
     if st.button(
         "Ayarları dosyadan yeniden yükle", icon=":material/refresh:", key="reload_settings_button",
         help="Kayıtlı ayarları diskten okur; oturumu kapatmadan uygular.",

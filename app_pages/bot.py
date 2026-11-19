@@ -6,7 +6,7 @@ import re
 
 import streamlit as st
 
-from ui import assistant
+from ui import assistant, audit_log
 from ui.ai_analyst import build_digest, gemini_commentary
 from ui.batch_analysis import analyze_batch, batch_text, render_batch
 from ui.bist_universe import load_companies
@@ -131,6 +131,14 @@ def _render_answer(answer: str, intent: str = "general", symbol: str | None = No
         st.markdown(answer)
         _answer_footer(intent, symbol)
     st.session_state.bot_messages.append({"role": "assistant", "content": answer})
+    audit_log.append(st.session_state.user, "ASISTAN_YANIT", {
+        "intent": intent,
+        "symbol": symbol or "—",
+        "decision": "YANIT",
+        "gate": "—",
+        "source": "asistan (gecikmeli veri)",
+        "idempotency_key": f"asst|{intent}|{len(answer)}|{answer[:60]}",
+    })
 
 
 def _intent_answer(intent: str, prompt: str) -> str:

@@ -10,6 +10,9 @@ HSC Borsa Analiz; bir komut satırı sinyal botundan evrilen, tarayıcıdan kull
 
 - **Akıllı Panel:** Açılışta sade 3 adım — piyasa durumu, tek net karar (AL/BEKLE/SAT + sade gerekçe), kurgusal portföy. BIST 100 rejimine göre *hangi yöntemin kullanılacağını* önerir. Menüde ana araçlar öne çıkar, teknik sayfalar "Gelişmiş analizler" grubuna alınır; hiçbiri silinmez.
 - **Sade dil sözlüğü:** RSI, MACD, Monte Carlo, R çarpanı gibi 20 teknik terimin panelde tek tıkla açıklaması
+- **Fail-closed veri kapısı:** Her sinyal gösterilmeden önce fiyat geçerliliği, kaynak, tazelik ve anomali kontrollerinden geçer. Doğrulanamayan veride AL/SAT **bastırılır** ve BEKLE'ye çekilir. Yan menüdeki **kill switch** ile tüm sinyaller anında kapatılabilir.
+- **Karar denetim kaydı:** Her karar/yanıt, hangi veri ve doğrulama sonucuyla üretildiyse o şekilde yerel, eklemeli ve idempotent bir JSONL kayda yazılır (aynı veri iki kez kaydedilmez).
+- **Birleşik hareket sistemi:** Stripe/Linear/Material 3 ilkeleriyle tek bir token katmanı (120/200/260ms, ease-out), aşamalı kart girişleri, transform/opacity tabanlı iskelet yükleyiciler, odak halkaları ve tam `prefers-reduced-motion` desteği.
 - **İnsan odaklı AI asistanı:** Hisse analizinin ötesine geçer — *"Portföyümü incele"*, *"Neden bu sinyal?"*, *"Riskim ne?"*, *"Verinin kaynağı nedir?"* sorularını anlar; lehte/aleyhte kanıt ve geçersizleştirici koşullar üretir; emir/kesinlik/canlı fiyat/tahmin isteklerini reddeder; her yanıttan sonra bağlamlı takip soruları önerir. Gemini anahtarı yoksa deterministik yerel özet devreye girer.
 - **Yönlendirici yardım:** Giriş ekranında ve her sayfada küçük açılır paneller ("Bilgileri nereye gireceğim?", "Nasıl kullanılır?"), 5 adımlı animasyonlu rehber penceresi ve hisse seçildiğinde görünen kısa onay animasyonu
 - **Görsel güven katmanı:** İki panelli giriş ekranı; solda animasyonlu marka paneli, **animasyonlu BIST tarzı mum grafiği** (temsili), 4 istatistik kartı (804 hisse / 16 araç / 1 dk canlı mum / 0 gerçek emir), dürüst "Neden HSC?" övgü metinleri ve Material ikonlu güven rozetleri (şifre korumalı, canlı veri, rejim analizi, paper-only)
@@ -167,6 +170,9 @@ Fintech arayüz ilkeleri (güven sinyalleri, okunabilir büyük rakamlar, tutarl
 | Bildirim gelmiyor | ntfy için konuya abone olunduğundan ve Ayarlar'da kanalın açık olduğundan emin olun. Bildirim yalnızca karar değiştiğinde gönderilir. |
 | API anahtarı şart mı? | Hayır. Tüm servisler opsiyoneldir; anahtarsız da çalışır. |
 | Gerçek emir veriliyor mu? | Hayır. Sistem yalnızca kurgusal (paper) işlem yapar, aracı kuruma bağlanmaz. |
+| Veri kapısı (/ fail-closed) nedir? | Her sinyal gösterilmeden önce fiyatın pozitifliği, günlük değişim bandı, alış-satış tutarlılığı, kaynak ve veri yaşı kontrol edilir. Kritik kontrol başarısızsa AL/SAT bastırılır ve **BEKLE** gösterilir — bozuk veriyle "makul görünen" sinyal üretilmez. |
+| Sinyalleri nasıl kapatırım? | Sol yan menüdeki **Sinyalleri kapat (kill switch)** anahtarını açın; tüm panellerde kararlar BEKLE'ye çekilir, veri kaybı olmaz. |
+| Denetim kaydı nerede? | Akıllı Panel'in altındaki **Karar denetim kaydı** bölümü son kararları, doğrulama seviyesini ve kaynağı gösterir. Kayıtlar `users/<kullanici>/hsc_audit.jsonl` dosyasındadır. |
 | Bot'a ne sorabilirim? | Hisse sembolü yanında *"Portföyümü incele"*, *"THYAO neden AL?"*, *"Risk profilime uygun muyum?"*, *"Bugün ne değişti?"*, *"BIST 100'a göre nasıl?"*, *"Verinin kaynağı nedir?"* sorularını sorabilirsiniz. Her yanıtın altında bağlamlı takip önerileri çıkar. |
 | Bot bana emir veya kesin sinyal verir mi? | Hayır. Emir, kesinlik, canlı fiyat ve yarın tahmini isteyen sorular açıkça reddedilir; bot sizi onaylamak için değil riskleri göstermek için çalışır. |
 | Rehberi nereden açarım? | Giriş yaptıktan sonra üstteki **Rehber** düğmesiyle 5 adımlı turu açın; İleri/Geri ile gezinin. |
@@ -182,7 +188,7 @@ Fintech arayüz ilkeleri (güven sinyalleri, okunabilir büyük rakamlar, tutarl
 
 ```
 borsa_bot/     # Sinyal, gösterge, backtest, veri, koruma motoru
-ui/            # Streamlit katmanı: akıllı rehber, sade dil sözlüğü, ajan, terminal, intraday, risk, performans defteri, doğrulama
+ui/            # Streamlit katmanı: güven kapısı, denetim kaydı, hareket sistemi, akıllı rehber, sade dil sözlüğü, ajan, terminal, intraday, risk, performans defteri, doğrulama
 app_pages/     # 16 sayfa (Akıllı Panel + 15 analiz aracı)
 docs/          # Denetim raporu, araç planı, görseller
 assets/        # Logo

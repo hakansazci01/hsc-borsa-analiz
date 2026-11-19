@@ -6,7 +6,10 @@ import logging
 
 import streamlit as st
 
-from ui import data_freshness, glossary, guide_ui, insights, paper, performance, smart_guide, visual
+from ui import (
+    audit_log, data_freshness, glossary, guide_ui, insights, motion, paper,
+    performance, smart_guide, trust_gate, visual,
+)
 from ui.bist_universe import load_companies, ordered_symbols
 from ui.components import real_money_warning
 from ui.core import analysis_args, analyze_symbol
@@ -184,6 +187,21 @@ with st.container(border=True, key="hsc_decision_card"):
         rec = insights.recommendation(
             info, bt, str(settings.get("profile", "Dengeli")), settings.get("risk", {})
         )
+        # Fail-closed veri kapısı: bozuk/eski veride AL/SAT bastırılır.
+        snap = data_freshness.snapshot(symbol)
+        gate = trust_gate.evaluate(
+            symbol,
+            {"decision": rec["action"], "confidence": rec["confidence"]},
+            snap, settings,
+        )
+        rec = trust_gate.apply_gate(rec, gate)
+        audit_log.append(user, "PANEL_KARAR", {
+            "symbol": symbol,
+            "decision": rec["action"],
+            "gate": gate["level"],
+            "source": gate["source"],
+            "idempotency_key": gate["decision_id"],
+        })
     except Exception as exc:
         logging.exception("Akıllı Panel analiz hatası: %s", exc)
         info, rec = None, None
@@ -194,6 +212,7 @@ with st.container(border=True, key="hsc_decision_card"):
             "birazdan tekrar deneyin.", icon=":material/warning:"
         )
     else:
+        trust_gate.render(gate)
         tone = _tone(rec["action"])
         st.html(
             f'<div class="hsc-verdict {tone}">'
@@ -297,5 +316,18 @@ with st.expander("Gelişmiş analizler — tüm araçlar", icon=":material/tune:
             if st.button(title, icon=icon, key=f"hsc_adv_{i}", use_container_width=True):
                 st.switch_page(path)
 
+st.markdown("**HSC farkı — güveni gösterir, iddia etmez**")
+motion.stagger([
+    '<div class="hscm-card" style="border:1px solid rgba(52,211,153,.35);border-radius:10px;padding:9px 11px;'
+    'background:rgba(52,211,153,.08);font-size:12px;color:#34D399;font-weight:700">✓ Veri kapısı: taze ve tutarlı veri</div>',
+    '<div class="hscm-card" style="border:1px solid rgba(96,165,250,.35);border-radius:10px;padding:9px 11px;'
+    'background:rgba(96,165,250,.08);font-size:12px;color:#93C5FD;font-weight:700">✓ Maliyet sonrası R hesabı</div>',
+    '<div class="hscm-card" style="border:1px solid rgba(251,146,60,.35);border-radius:10px;padding:9px 11px;'
+    'background:rgba(251,146,60,.08);font-size:12px;color:#FDBA74;font-weight:700">✓ Kaybedenler de defterde</div>',
+    '<div class="hscm-card" style="border:1px solid rgba(167,139,250,.35);border-radius:10px;padding:9px 11px;'
+    'background:rgba(167,139,250,.08);font-size:12px;color:#C4B5FD;font-weight:700">✓ Gerçek emir yok</div>',
+])
+
+audit_log.render_panel(user)
 visual.trust_row()
 glossary.render_glossary()

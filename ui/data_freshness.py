@@ -26,6 +26,11 @@ def _snapshot(symbol: str) -> dict[str, Any]:
         return {}
 
 
+def snapshot(symbol: str) -> dict[str, Any]:
+    """Kotasyon anlık görüntüsünü (5 dk önbellekli) döndürür."""
+    return _snapshot(symbol)
+
+
 def _age_text(value: Any) -> str | None:
     moment: datetime | None = None
     if isinstance(value, datetime):
