@@ -12,7 +12,7 @@ st.set_page_config(
     page_title="HSC Borsa Analiz",
     page_icon=":material/show_chart:",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 from ui import auth  # noqa: E402
@@ -289,6 +289,7 @@ page = st.navigation(
                 help="Risk profiline göre dağılım önerisi ve backtest getiri karşılaştırması sunar.",
             ),
     ],
-    position="top",
+    position="sidebar",
+    expanded=True,
 )
 page.run()
