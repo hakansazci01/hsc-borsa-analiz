@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 
 import altair as alt
 import pandas as pd
 import streamlit as st
 
-from ui import components
+from ui import broker, components, live_bot, live_guard
 from ui.bist_universe import load_companies, ordered_symbols, search_symbols
 from ui.components import real_money_warning
 from ui.help_texts import h
@@ -309,6 +310,62 @@ if auto_refresh:
     _auto_panel(symbol, strategy or "Dengeli", news_weight, settings["risk"])
 else:
     _render_panel(symbol, strategy or "Dengeli", news_weight, settings["risk"])
+
+    # ---- GERÇEK PARA: varsayılan olarak tamamen kilitli ----
+    with st.expander("GERÇEK PARA emir (varsayılan KAPALI)", icon=":material/lock:"):
+        st.error(
+            "Bu özellik **gerçek para** ile emir gönderebilir. Uygulama gerçek para için "
+            "**onaylanmamıştır**; yasal/broker önkoşulları tamamlanmadan açmayın. "
+            "Tüm kilitler sağlanmadan hiçbir ağ çağrısı yapılmaz.",
+            icon=":material/warning:",
+        )
+        cfg_live = live_guard.config(settings)
+        st.caption(
+            "Kilit durumu: "
+            + ("✅ açık" if cfg_live.get("enabled") else "❌ config.yaml live_trading.enabled = false")
+            + " · "
+            + ("✅ HSC_LIVE_ARMED=YES" if os.environ.get("HSC_LIVE_ARMED") == "YES"
+               else "❌ HSC_LIVE_ARMED ortam değişkeni yok")
+            + " · "
+            + ("✅ canlı broker anahtarı var" if broker.live_configured()
+               else "❌ canlı broker anahtarı yok")
+        )
+        phrase = st.text_input("Onay ifadesi", key="live_phrase", type="password")
+        armed = st.checkbox("Oturumu gerçek emir için onaylıyorum", key="live_armed_session")
+        qty_live = st.number_input(
+            "Adet", min_value=0.0, value=0.0, step=1.0, key="live_qty",
+            help=f"Tek emir limiti {float(cfg_live.get('max_order_tl', 5000)):,.0f} ₺",
+        )
+        price_live = float(decision.get("price") or 0)
+        ok_live, reasons_live, _ = live_guard.check(
+            st.session_state.user, symbol, qty_live, price_live,
+            phrase=phrase, session_armed=armed, settings=settings,
+        )
+        if reasons_live:
+            st.caption("Eksik kilitler: " + " · ".join(reasons_live))
+        if st.button(
+            "GERÇEK EMİR GÖNDER", icon=":material/send:", key="live_send",
+            disabled=not ok_live, type="primary",
+        ):
+            result = live_bot.execute(
+                st.session_state.user, symbol,
+                str(decision.get("decision", "BEKLE")), qty_live, price_live,
+                phrase=phrase, session_armed=armed, settings=settings,
+            )
+            if result.get("ok"):
+                st.success(f"Emir iletildi · broker ID {result.get('id')}", icon=":material/check:")
+            else:
+                st.warning(result.get("reason", "Emir gönderilmedi."), icon=":material/warning:")
+            st.rerun()
+
+        orders = live_bot.recent_orders(st.session_state.user, 10)
+        st.dataframe(
+            pd.DataFrame(orders) if orders else pd.DataFrame(
+                [{"time": "—", "symbol": "—", "decision": "—", "ok": "—", "status": "—"}]
+            ),
+            hide_index=True,
+            alt="Gerçek emir denemelerinin yerel kaydı (anahtar veya hassas veri içermez)",
+        )
 
 # ---- BIST hızlı tarama ----
 with st.expander("BIST hızlı tarama (günlük teknik sinyal)", icon=":material/radar:"):

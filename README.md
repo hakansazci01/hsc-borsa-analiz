@@ -225,6 +225,7 @@ assets/        # Logo
 - Erişilebilirlik: tüm grafik/tablo çağrılarında `alt=` metni, KPI satırlarında `wrap=True`, `:focus-visible` ring, `prefers-reduced-motion` desteği
 - Denetim raporu: `docs/AUDIT_REPORT.md`
 - Gerçek para geçişi için gereksinimler ve eksiklik analizi: `docs/GERCEK_PARA_YOL_HARITASI.md` (uygulama **paper-only** ve gerçek para için **onaylanmamıştır**)
+- Gerçek emir kodu yolu **varsayılan olarak kilitlidir** (`ui/live_guard.py`): `live_trading.enabled` + `HSC_LIVE_ARMED` ortam değişkeni + arayüz onay ifadesi + oturum onayı + canlı broker anahtarı + kill switch kapalı olmalı. Kilitler açılmadan hiçbir emir gönderilmez; **bu bir hazırlık iskeletidir, canlı kullanım onayı değildir**.
 
 ## ⚠️ Yasal uyarı
 

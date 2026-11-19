@@ -97,6 +97,16 @@ alerts:
   ntfy_topic: ""                 # Ornegin: borsa-xxxxxxxxxxxx
   email_enabled: false           # Gmail SMTP (uygulama sifresi gerekir)
 
+# GERCEK PARA - VARSAIYLAN KAPALI. Acmak icin butun kilitlerin saglanmasi gerekir.
+# Bu ayarlar tek basina emir acmaz; bkz. docs/GERCEK_PARA_YOL_HARITASI.md
+live_trading:
+  enabled: false                 # asla varsayilan acik birakma
+  confirmation_phrase: "HSC-LIVE-ARM"  # arayuzde yazilmasi gereken ifade
+  max_order_tl: 5000             # tek emir ust siniri
+  max_daily_orders: 3            # gunluk emir sayisi siniri
+  allowed_symbols: []            # bos = hicbir sembol izinli degil
+  require_env_armed: true        # HSC_LIVE_ARMED ortam degiskeni sart
+
 # Goruntuleme
 visualize:
   save_charts: true

@@ -1,9 +1,11 @@
 # Gerçek para ile işlem için gereksinimler (Yol Haritası)
 
 > **Durum: UYGULAMA GERÇEK PARA İÇİN ONAYLANMAMIŞTIR.**
-> Bu doküman bir *plan* ve *eksiklik analizidir*. Gerçek emir gönderen kod, broker
-> bağlantısı veya canlı API anahtarı **eklenmemiştir** ve mevcut argsız onay
-> olmadan eklenmeyecektir.
+> Bu doküman bir *plan* ve *eksiklik analizidir*. Depoda **varsayılan olarak tamamen
+> kilitli** bir gerçek emir kodu yolu bulunmaktadır (`ui/live_guard.py`,
+> `ui/live_bot.py`, `ui/broker.py::place_live_order`). Kilitler açılmadan hiçbir ağ
+> çağrısı yapılmaz; canlı API anahtarı depoda yoktur. Bu, "gerçek para hazır" anlamına
+> **gelmez**: yasal/broker önkoşulları ve aşağıdaki eksiklikler devam etmektedir.
 
 ## Neden sadece "emir gönder" değil?
 
@@ -104,9 +106,9 @@ tamamı gerekir.
 | Risk motoru, pozisyon boyutu, Monte Carlo | ✅ | canlı limitlerin broker ile eşleşmesi |
 | Denetim kaydı, veri kapısı, kill switch (paper) | ✅ | gerçek emir kapsamına genişletme |
 | **Lisanslı gerçek zamanlı veri** | ❌ | BIST DDA / yetkili sağlayıcı |
-| **Broker API + OMS** | ❌ | tamamı |
+| **Broker API + OMS** | ⚠️ kilitli iskelet var | gerçek anahtar, mutabakat, dolum yönetimi, test sertifikasyonu |
 | **SPK/BIST bildirim ve taahhüt** | ❌ | tamamı |
-| **OIDC + MFA + secrets vault** | ❌ | tamamı |
+| **OIDC + MFA + secrets vault** | ❌ | tamamı (mevcut kilitler oturum onayı + ortam değişkeni + onay ifadesi) |
 | **7/24 servis, mutabakat, operasyon** | ❌ | tamamı |
 
 ## Önerilen sıra

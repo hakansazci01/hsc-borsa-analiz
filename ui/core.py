@@ -60,6 +60,7 @@ def default_settings() -> dict[str, Any]:
         "risk": cfg.risk,
         "guards": cfg.get("guards", default={}),
         "alerts": cfg.alerts,
+        "live_trading": dict(cfg.get("live_trading", default={})),
         "schedule": "Kapalı",
     }
 
