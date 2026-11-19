@@ -369,6 +369,9 @@ else:
 
     # ---- BINANCE (varsayılan TESTNET / sanal para) ----
     with st.expander("Binance botu (varsayılan TESTNET — sanal para)", icon=":material/smart_toy:"):
+        from ui.api_keys import render_binance_editor
+
+        render_binance_editor()
         bcfg = binance_bot.cfg(settings)
         st.caption(
             "Binance API anahtarı **kullanıcı adı/şifre değildir**. Testnet için ayrı anahtar "

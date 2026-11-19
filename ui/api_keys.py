@@ -223,3 +223,47 @@ def render_editor() -> None:
             "Güvenlik: Bu anahtarlar sohbete yazıldıysa sağlayıcı panellerinden yenileyin (rotate).",
             icon=":material/warning:",
         )
+
+
+def render_binance_editor() -> None:
+    """Binance API anahtarını doğrudan bot panelinden girmek için küçük form.
+
+    Binance **giriş şifresi buraya yazılmaz**; yalnızca API Management ekranında
+    üretilen `api_key` ve `secret_key` yazılır. Değerler maskelenir ve yalnızca
+    yerel `.streamlit/secrets.toml` dosyasına kaydedilir.
+    """
+    with st.expander("Binance API anahtarını buraya girin", icon=":material/key:"):
+        st.caption(
+            "⚠️ Binance **kullanıcı adı ve giriş şifrenizi BURAYA YAZMAYIN.** "
+            "Yalnızca API Management → Create API ekranında üretilen **API Key** ve "
+            "**Secret Key** değerlerini girin. Giriş şifreniz hiçbir yere kaydedilmez."
+        )
+        with st.form("binance_key_editor", border=False):
+            api_key = st.text_input(
+                "API Key", type="password", key="bin_api_key_input",
+                placeholder="API Management ekranındaki API Key",
+            )
+            secret_key = st.text_input(
+                "Secret Key", type="password", key="bin_secret_input",
+                placeholder="Secret Key (bir kez gösterilir)",
+            )
+            if st.form_submit_button("Yerel olarak kaydet", type="primary"):
+                if not api_key or not secret_key:
+                    st.warning("İki alan da gerekli.", icon=":material/warning:")
+                else:
+                    data = _read_secrets()
+                    data.setdefault("binance", {}).update({
+                        "api_key": api_key, "secret_key": secret_key,
+                    })
+                    _write_secrets(data)
+                    st.success(
+                        "Anahtarlar yerel secrets.toml dosyasına kaydedildi "
+                        "(depoya gitmez). Önbellek temizleniyor.",
+                        icon=":material/check:",
+                    )
+                    st.cache_data.clear()
+                    st.rerun()
+        st.caption(
+            "Fotoğrafta/görüntüde görünen veya sohbete yazılan bir secret kullanmayın; "
+            "Binance panelinden iptal edip yenisi üretin."
+        )

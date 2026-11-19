@@ -139,8 +139,11 @@ Canlı BIST yerine önce **sanal para** ile gerçek emir mekaniğini test edebil
 
    Secret key **yalnızca bir kez** gösterilir; ekran görüntüsü almayın, sohbete yapıştırmayın.
    Paylaşılmış/görüntülenmiş bir anahtar varsa **hemen iptal edip yenisi üretin**.
-3. Anahtarı **sohbete yapıştırmayın**; kendi bilgisayarınızda
-   `.streamlit/secrets.toml` dosyasına şunu yazın:
+3. Anahtarı **sohbete yapıştırmayın**. Dosyayı elle aramanıza gerek yok:
+   uygulamada **Canlı işlem → Binance botu → "Binance API anahtarını buraya girin"**
+   panelinden API Key ve Secret Key değerlerini yazabilirsiniz (maskeli alanlar,
+   yalnızca yerel `.streamlit/secrets.toml` dosyasına kaydedilir).
+   Elle yazmak isterseniz kendi bilgisayarınızda şunu ekleyin:
    ```toml
    [binance]
    api_key = "buraya-testnet-key"
