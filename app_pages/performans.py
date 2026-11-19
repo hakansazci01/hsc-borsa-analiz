@@ -46,7 +46,7 @@ def _pf(value: float) -> str:
     return "∞" if value == float("inf") else f"{value:.2f}"
 
 
-with st.container(horizontal=True):
+with st.container(horizontal=True, wrap=True):
     st.metric("Kapanan sinyal", summary["total"], border=True,
               icon=":material/leaderboard:", help=h("signal_ledger"))
     st.metric("Kazanma oranı",

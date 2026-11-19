@@ -45,7 +45,7 @@ conf_spark = [
     insights.confidence(r["info"], r["backtest"])
     for r in results if "info" in r
 ]
-with st.container(horizontal=True):
+with st.container(horizontal=True, wrap=True):
     st.metric("Taranan hisse", summary["total"], border=True,
               icon=":material/leaderboard:", help=h("symbols"))
     st.metric("AL sinyali", summary["buy_count"], border=True,

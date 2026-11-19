@@ -80,7 +80,9 @@ streamlit run streamlit_app.py
 
 > Mac/Linux için elle kurulum gerekir: `python3 -m venv .venv`, `source .venv/bin/activate`, `pip install -r requirements.txt`, `streamlit run streamlit_app.py`.
 
-İlk açılışta **Kayıt ol** sekmesinden bir kullanıcı oluşturun. Şifreler PBKDF2-HMAC-SHA256 ile tuzlanarak saklanır; düz metin tutulmaz. Harici API anahtarı **gerekmez**; canlı veri için internet bağlantısı gerekir.
+İlk açılışta **Kayıt ol** sekmesinden bir kullanıcı oluşturun. Şifreler PBKDF2-HMAC-SHA256 ile tuzlanarak saklanır; düz metin tutulmaz. Harici API anahtarı **gerekmez**; canlı veri için internet bağlantısı gerekir. İlk girişte sistemin sınırlarını anlatan bilgilendirme penceresi açılır; "Anladım" ile kabul edilen durum denetim kaydına işlenir.
+
+**Geliştirme / test kurulumu:** `pip install -r requirements-dev.txt` (pytest dahil). Testleri `python tests/run_all.py` (hızlı birim/kontrat testleri) ve `python -m pytest tests/test_app_flow.py -q` (giriş + 16 sayfa AppTest) ile çalıştırabilirsiniz. `.github/workflows/ci.yml` her push'ta derleme, testleri ve gizli anahtar taramasını çalıştırır.
 
 ### API anahtarları (opsiyonel)
 
@@ -201,15 +203,22 @@ Fintech arayüz ilkeleri (güven sinyalleri, okunabilir büyük rakamlar, tutarl
 borsa_bot/     # Sinyal, gösterge, backtest, veri, koruma motoru
 ui/            # Streamlit katmanı: güven kapısı, denetim kaydı, hareket sistemi, akıllı rehber, sade dil sözlüğü, ajan, terminal, intraday, risk, performans defteri, doğrulama
 app_pages/     # 16 sayfa (Akıllı Panel + 15 analiz aracı)
-docs/          # Denetim raporu, araç planı, görseller
+docs/          # Denetim raporu, araç planı, anahtar döndürme politikası, görseller
+tests/         # Kontrat, golden fixture, invarians ve AppTest testleri
+.github/       # CI workflow
 assets/        # Logo
 ```
 
 ## Test ve doğrulama
 
 - `python -m compileall` ile tüm modüller derlenir
-- AppTest ile giriş + 16 sayfa + etkileşimler (buton, seçim, kayıt/sıfırlama, kurgusal işlem) doğrulanır
-- Agent API ile çalışan uygulama üzerinden tüm sayfalar `ready` durumunda doğrulanır
+- `tests/run_all.py`: veri şeması kontratları, golden fixture regresyonu, OHLC/fiyat invariansları, günlük temizleme/rotasyon, güven kapısı (12 test)
+- `tests/test_app_flow.py`: AppTest ile giriş + 16 sayfa + etkileşimler
+- `.github/workflows/ci.yml`: her push'ta derleme + testler + gizli anahtar taraması
+- Günlük kayıtlar `ui/log_store.py` ile temizlenir, kilitlenir ve 2 MB'ı geçince döndürülür (3 yedek)
+- Anahtar döndürme politikası: `docs/SECRET_ROTATION.md` · Denetim sayfasında takip
+- Kaynak doğrulama: resmi ücretsiz API olmayan VBTS/KAP/temettü için elle attestation (Denetim sayfası)
+- Erişilebilirlik: tüm grafik/tablo çağrılarında `alt=` metni, KPI satırlarında `wrap=True`, `:focus-visible` ring, `prefers-reduced-motion` desteği
 - Denetim raporu: `docs/AUDIT_REPORT.md`
 
 ## ⚠️ Yasal uyarı

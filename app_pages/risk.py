@@ -58,7 +58,7 @@ if section == "Rejim analizi":
         st.stop()
 
     with st.container(border=True):
-        with st.container(horizontal=True, vertical_alignment="bottom"):
+        with st.container(horizontal=True, wrap=True, vertical_alignment="bottom"):
             st.badge(
                 regime["regime"], color=REGIME_COLORS[regime["regime"]],
                 icon=REGIME_ICONS[regime["regime"]],
@@ -298,7 +298,8 @@ with st.container(border=True):
         ":material/groups: Azami açık pozisyon": str(risk["max_positions"]),
         ":material/savings: Başlangıç sermayesi": f"{risk['initial_capital']:,.0f}",
         ":material/health_and_safety: Uygulanan tavan": "%2 sermaye / işlem (Kelly + sert cap)",
-    }, border="horizontal", width="content")
+    }, border="horizontal", width="content",
+       alt="Risk kuralları: işlem başına stop-loss yüzdesi, pozisyon büyüklüğü, azami açık pozisyon sayısı, başlangıç sermayesi ve Kelly sonrası sert tavan.")
     st.caption(
         "Rejim motoru yüksek oynaklık veya düşüş rejiminde pozisyon önerisini otomatik azaltır; "
         "güven eşiği altındaki AL sinyallerini BEKLE'ye çevirir. Ayarlar sayfasından limitleri değiştirebilirsiniz."

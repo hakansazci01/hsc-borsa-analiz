@@ -20,7 +20,7 @@ user = st.session_state.user
 st.subheader("Hesabım", divider="gray")
 real_money_warning(compact=True)
 
-with st.container(horizontal=True, vertical_alignment="bottom"):
+with st.container(horizontal=True, wrap=True, vertical_alignment="bottom"):
     st.metric("Kullanıcı", user, icon=":material/person:", border=True)
     positions = paper.evaluate(user, st.session_state.settings)
     open_count = len(positions)
@@ -107,7 +107,8 @@ with st.container(border=True):
         "Sermaye": f"{float(settings.get('risk', {}).get('initial_capital', 0)):,.0f}",
         "Pozisyon": f"%{float(settings.get('risk', {}).get('position_size_pct', 0))*100:.0f}",
         "Koruma": "Açık" if settings.get("guards") else "Kapalı",
-    }, border="horizontal", width="content")
+    }, border="horizontal", width="content",
+       alt="Kayıtlı kullanıcı ayarları: izleme listesi, risk profili, veri periyodu, kurgusal sermaye, işlem başına pozisyon yüzdesi ve koruma durumu.")
     st.caption("Ayarları değiştirmek için **Ayarlar** sayfasını kullanın.")
 
 # ---- Veri dönüştürücüler ----

@@ -139,10 +139,9 @@ def write_json(path: Path, data: Any) -> None:
 
 
 def append_history(username: str, record: dict[str, Any]) -> None:
-    path = history_path(username)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    from ui import log_store
+
+    log_store.append(history_path(username), record)
 
 
 def read_history(username: str, limit: int = 100) -> list[dict[str, Any]]:

@@ -45,7 +45,7 @@ conf = insights.confidence(info, bt)
 rec = insights.recommendation(info, bt, profile, settings["risk"])
 
 # ---- Başlık ----
-with st.container(horizontal=True, vertical_alignment="bottom"):
+with st.container(horizontal=True, wrap=True, vertical_alignment="bottom"):
     st.markdown(f"## {symbol}")
     components.signal_badge(info["signal"])
     st.metric("Son fiyat", f"{info['last_close']:,.2f}", help=h("last_close"))

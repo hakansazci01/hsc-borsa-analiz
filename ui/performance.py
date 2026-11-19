@@ -22,7 +22,7 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from ui import auth
+from ui import auth, log_store
 
 PERFORMANCE_FILE = "performance.jsonl"
 
@@ -134,10 +134,7 @@ def record_close(
         "outcome": "KÂR" if r > 0 else "ZARAR" if r < 0 else "BAŞA BAŞ",
     }
 
-    path = performance_path(username)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    log_store.append(performance_path(username), record)
     return record
 
 

@@ -158,6 +158,9 @@ with c1:
         )
         for warning in dq["warnings"]:
             st.caption(f"- {warning}")
+        from ui import source_attestation
+
+        source_attestation.render_panel()
 with c2:
     with st.container(border=True):
         st.subheader("Sinyal kalitesi", divider="gray")
@@ -209,6 +212,9 @@ with st.container(border=True):
     )
     api_keys.render_guide()
     api_keys.render_editor()
+    from ui import secret_policy
+
+    secret_policy.render_panel()
 
     st.markdown("**Hızlı bağlantı testleri**")
     t1, t2 = st.columns(2)

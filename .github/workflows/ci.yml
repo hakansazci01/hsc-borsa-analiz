@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Depoyu al
+        uses: actions/checkout@v4
+
+      - name: Python kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Bağımlılıkları yükle
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Derleme kontrolü
+        run: python -m compileall -q streamlit_app.py ui borsa_bot app_pages main.py
+
+      - name: Kontrat / golden / invarians testleri
+        run: python tests/run_all.py
+
+      - name: AppTest — giriş ve 16 sayfa
+        run: python -m pytest tests/test_app_flow.py -q
+
+      - name: Gizli anahtar taraması
+        run: |
+          if git grep -n -E 'dbr28|AQ\.Ab8|T23OT_|signkey-prod|PKMC2' -- ':!*.example'; then
+            echo "Gizli anahtar görünüyor!"; exit 1
+          fi

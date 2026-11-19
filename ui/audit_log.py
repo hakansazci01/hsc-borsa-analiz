@@ -18,7 +18,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from ui import auth
+from ui import auth, log_store
 
 
 AUDIT_FILE = "hsc_audit.jsonl"
@@ -36,16 +36,9 @@ def append(username: str, event_type: str, payload: dict[str, Any]) -> bool:
     path.parent.mkdir(parents=True, exist_ok=True)
 
     existing_keys: set[str] = set()
-    if path.exists():
-        try:
-            lines = path.read_text(encoding="utf-8").splitlines()[-_MAX_DEDUPE_LINES:]
-            for line in lines:
-                if line.strip():
-                    row = json.loads(line)
-                    if row.get("idempotency_key"):
-                        existing_keys.add(str(row["idempotency_key"]))
-        except (OSError, ValueError):
-            pass
+    for row in log_store.read(path, _MAX_DEDUPE_LINES):
+        if row.get("idempotency_key"):
+            existing_keys.add(str(row["idempotency_key"]))
     if key and key in existing_keys:
         return False
 
@@ -55,8 +48,7 @@ def append(username: str, event_type: str, payload: dict[str, Any]) -> bool:
         **payload,
         "idempotency_key": key,
     }
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    log_store.append(path, record)
     return True
 
 
@@ -96,7 +88,10 @@ def render_panel(username: str, limit: int = 20) -> None:
             }
             for r in reversed(rows)
         ])
-        st.dataframe(table, hide_index=True, use_container_width=True)
+        st.dataframe(
+            table, hide_index=True, use_container_width=True,
+            alt="Son kararların denetim kaydı: zaman, olay türü, sembol, karar, doğrulama seviyesi ve veri kaynağı.",
+        )
         st.caption(
             "Kayıtlar yerel ve eklemelidir (append-only). Aynı veriyle aynı karar "
             "yeniden yazılmaz; geçmiş değiştirilmez. Bu bir performans iddiası değil, "
