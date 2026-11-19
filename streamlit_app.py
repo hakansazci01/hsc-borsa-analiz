@@ -16,7 +16,7 @@ st.set_page_config(
 )
 
 from ui import auth  # noqa: E402
-from ui import guide_ui, motion, tr_ui, visual  # noqa: E402
+from ui import disclosure, guide_ui, motion, tr_ui, visual  # noqa: E402
 from ui.core import load_settings  # noqa: E402
 from ui.market_ticker import render_sidebar_ticker  # noqa: E402
 from ui.password_tools import generate_password, strength  # noqa: E402
@@ -126,6 +126,7 @@ if not st.session_state.user:
     st.stop()
 
 user = st.session_state.user
+disclosure.render_once(user)
 if st.session_state.settings_owner != user or "settings" not in st.session_state:
     st.session_state.settings = load_settings(auth.settings_path(user))
     st.session_state.settings_owner = user

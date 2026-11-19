@@ -41,31 +41,45 @@ def status() -> dict:
         return {
             "key": "closed", "label": "Hafta sonu",
             "detail": "BIST hafta sonu kapalı. Sonraki seans pazartesi 10:00.",
-            "seconds_to_open": None, "in_session": False,
+            "seconds_to_open": None, "in_session": False, "phase": "Piyasa kapalı",
         }
     if day_iso in HOLIDAYS_2026:
         return {
             "key": "closed", "label": "Resmi tatil",
             "detail": "Borsa İstanbul bugün resmi tatil nedeniyle kapalı.",
-            "seconds_to_open": None, "in_session": False,
+            "seconds_to_open": None, "in_session": False, "phase": "Resmi tatil",
         }
     close_time = time(13, 0) if day_iso in HALF_DAYS_2026 else CLOSE_TIME
     if current < OPEN_TIME:
         target = datetime.combine(moment.date(), datetime.min.time().replace(hour=10), TZ)
+        phase = "Açılış açık artırma" if current >= time(9, 55) else "Seans öncesi"
         return {
-            "key": "pre_market", "label": "Seans öncesi",
+            "key": "pre_market", "label": phase,
             "detail": f"Piyasa 10:00'da açılıyor. Kalan: {_fmt(target - moment)}",
             "seconds_to_open": max(0, int((target - moment).total_seconds())),
-            "in_session": False,
+            "in_session": False, "phase": phase,
+        }
+    # BIST öğle arası: 13:00–14:00 sürekli işlem yoktur.
+    if time(13, 0) <= current < time(14, 0) and close_time > time(13, 0):
+        target = datetime.combine(moment.date(), datetime.min.time().replace(hour=14), TZ)
+        return {
+            "key": "lunch", "label": "Öğle arası",
+            "detail": f"Sürekli işlem 14:00'te yeniden başlıyor. Kalan: {_fmt(target - moment)}",
+            "seconds_to_open": max(0, int((target - moment).total_seconds())),
+            "in_session": False, "phase": "Öğle arası",
         }
     if current < close_time:
+        phase = (
+            "Sürekli işlem · 1. seans" if current < time(13, 0)
+            else "Sürekli işlem · 2. seans"
+        )
         target = datetime.combine(moment.date(), datetime.min.time().replace(
             hour=close_time.hour, minute=close_time.minute
         ), TZ)
         return {
             "key": "open", "label": "Seans açık",
             "detail": f"Seans {close_time.strftime('%H:%M')}'de kapanıyor. Kalan: {_fmt(target - moment)}",
-            "seconds_to_open": 0, "in_session": True,
+            "seconds_to_open": 0, "in_session": True, "phase": phase,
         }
     # seans kapandı, ertesi iş günü 10:00
     next_day = moment.date() + timedelta(days=1)
@@ -76,7 +90,7 @@ def status() -> dict:
         "key": "after_hours", "label": "Seans kapalı",
         "detail": f"Sonraki seans {next_day.strftime('%d.%m')} 10:00. Kalan: {_fmt(target - moment)}",
         "seconds_to_open": max(0, int((target - moment).total_seconds())),
-        "in_session": False,
+        "in_session": False, "phase": "Kapanış sonrası",
     }
 
 

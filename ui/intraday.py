@@ -280,6 +280,7 @@ def intraday_signal(symbol: str, settings: dict[str, Any]) -> dict[str, Any] | N
         "per_minute_move": round(per_minute, 4),
         "bias": bias,
         "session": session["label"],
+        "phase": session.get("phase", session["label"]),
         "time": moment.strftime("%H:%M:%S"),
         "reason": (
             "Tetikleyici koşulların çoğu birleşti." if decision == "AL"

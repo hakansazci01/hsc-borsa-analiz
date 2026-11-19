@@ -5,7 +5,7 @@ from __future__ import annotations
 import altair as alt
 import streamlit as st
 
-from ui import audit_log, data_freshness, notify, paper, trust_gate
+from ui import audit_log, data_freshness, format_tr as ftr, notify, paper, trust_gate
 from ui.bist_universe import load_companies, ordered_symbols
 from ui.components import real_money_warning
 from ui.help_texts import h
@@ -101,7 +101,7 @@ def _render() -> None:
             )
             notify.send_notification(
                 f"HSC Anlık İşlem · {symbol}: {previous} → {decision}\n"
-                f"Fiyat {price:,.2f} ₺ · {timing}\n"
+                f"Fiyat {ftr.money(price)} · {timing}\n"
                 "Gecikmeli veri · yatırım tavsiyesi değildir · gerçek emir yok.",
                 settings,
             )
@@ -129,9 +129,9 @@ def _render() -> None:
         f'<div class="ith-verdict ith-{tone}">'
         f'<div class="ith-big">{symbol} · {headline}</div>'
         f'<div class="ith-sub"><span class="ith-dot"></span>{timing_line} · '
-        f'güven %{confidence} · fiyat {price:,.2f} ₺</div>'
+        f'güven %{confidence} · fiyat {ftr.money(price)}</div>'
         f'<div class="ith-meta">En yakın tetikleyici: {result.get("closest_trigger") or "—"} · '
-        f'son güncelleme {result["time"]} · {result["session"]}</div>'
+        f'son güncelleme {result["time"]} · {result.get("phase", result["session"])}</div>'
         f"</div>"
     )
     if decision == "BEKLE":
@@ -150,9 +150,9 @@ def _render() -> None:
     })
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Fiyat", f"{price:,.2f} ₺")
-    m2.metric("Stop", f"{result['stop']:,.2f} ₺" if result["stop"] else "—")
-    m3.metric("Hedef", f"{result['target']:,.2f} ₺" if result["target"] else "—")
+    m1.metric("Fiyat", ftr.money(price))
+    m2.metric("Stop", ftr.money(result["stop"]) if result["stop"] else "—")
+    m3.metric("Hedef", ftr.money(result["target"]) if result["target"] else "—")
     m4.metric("Güven", f"%{confidence}")
 
     # Açık kurgusal pozisyonlar ve SAT uyarıları
@@ -162,7 +162,7 @@ def _render() -> None:
         for p in sell_alerts:
             st.html(
                 f'<div class="ith-alert">SAT UYARISI · {p["symbol"]} · '
-                f'K/Z %{float(p.get("pnl_pct", 0)):+.2f} · '
+                f'K/Z {ftr.pct(p.get("pnl_pct", 0), sign=True)} · '
                 f'{" / ".join(p.get("reasons", [])[:2])}</div>'
             )
 
