@@ -161,6 +161,9 @@ with c1:
         from ui import source_attestation
 
         source_attestation.render_panel()
+        from ui import live_readiness
+
+        live_readiness.render()
 with c2:
     with st.container(border=True):
         st.subheader("Sinyal kalitesi", divider="gray")

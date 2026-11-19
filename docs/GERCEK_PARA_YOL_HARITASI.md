@@ -119,5 +119,25 @@ tamamı gerekir.
 4. OIDC + MFA + secrets vault + IP allowlist.
 5. Broker test ortamında kademeli doğrulama → çok küçük canlı pilot → gözetimli ölçekleme.
 
+## Görev paylaşımı (kim ne yapacak?)
+
+**Yazılım tarafı (bizim yapabileceğimiz):**
+- Gerçek emir kod yolu, kilitler, idempotency, denetim kaydı ✅ (mevcut)
+- Hazırlık kontrol paneli (`ui/live_readiness.py`) ✅ (mevcut)
+- Otomatik mutabakat, 7/24 worker/kuyruk/izleme, IdP entegrasyonu, broker test senaryoları ⬜ (sıradaki işler)
+
+**Kullanıcı / yetkili kurum tarafı (bizim yapamayacağımız):**
+1. Yetkili aracı kurumda hesap + **canlı API anahtarı** (para çekme yetkisi olmadan, IP allowlist ile)
+2. **SPK / BIST algoritmik işlem bildirimi ve taahhütnamesi** (aracı kurum üzerinden)
+3. **Lisanslı gerçek zamanlı BIST verisi** aboneliği
+4. KYC / MASAK ve vergi kayıt yükümlülükleri
+5. Kimlik sağlayıcı (IdP) seçimi ve MFA yapılandırması
+6. Ortam değişkeni `HSC_LIVE_ARMED=YES`, `config.yaml` onayı ve arayüz onayı
+7. Broker test ortamında kabul testleri ve gözetimli küçük canlı pilot
+
+**Yapılmayacaklar:** chat'te paylaşılan e-posta/şifre kullanılmayacak; gizli bilgiler
+asla depoya konulmayacak; siz açıkça onaylamadan ve yasal önkoşullar tamamlanmadan
+`live_trading.enabled` açılmayacak.
+
 > Bu doküman bir taahhüt değildir. Mevcut uygulama **paper-only** ve
 > **GERÇEK PARA İÇİN ONAYLANMADI** durumunu korumaktadır.

@@ -57,6 +57,16 @@ def test_keys_and_phrase_required() -> None:
         _clean()
 
 
+def test_readiness_checklist() -> None:
+    from ui.live_readiness import assess
+
+    items = assess()
+    assert len(items) >= 10
+    assert any(i["Sorumlu"] == "SİZ" for i in items)
+    assert any("Lisanslı" in i["Madde"] for i in items)
+    assert not any(i["Madde"].startswith("Gerçek emir hazır") for i in items)
+
+
 def test_idempotency_when_unlocked() -> None:
     _clean()
     try:

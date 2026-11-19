@@ -28,6 +28,8 @@ SOURCES: tuple[str, ...] = (
     "KAP özel durum akışı",
     "Temettü ex-date takvimi",
     "Fiyat verisi sağlayıcısı (auto_adjust ayarı)",
+    "SPK/BIST algoritmik işlem bildirimi",
+    "Lisanslı gerçek zamanlı veri",
 )
 
 
