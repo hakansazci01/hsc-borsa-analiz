@@ -22,6 +22,20 @@ _JS = r"""
   // Uzun ifadeler önce: "Auto rerun" içindeki "rerun" yanlışlıkla
   // "Yeniden çalıştır" olmasın diye sıralama önemlidir.
   var RULES = [
+    // Yayınla penceresi (yedek çeviri; düğme gizli olduğu için normalde açılmaz)
+    ['Deploy unlimited private apps with role-based sharing', 'Rol tabanlı paylaşımla sınırsız özel uygulama yayınla'],
+    ['Deploy unlimited public apps', 'Sınırsız herkese açık uygulama yayınla'],
+    ['Deploy on your own hardware or cloud service', 'Kendi donanımınızda veya bulut hizmetinizde yayınla'],
+    ['Deploy now', 'Şimdi yayınla'],
+    ['For community, always free', 'Topluluk için, her zaman ücretsiz'],
+    ['For custom deployment', 'Özel dağıtım için'],
+    ['For personal hobbies and learning', 'Kişisel hobiler ve öğrenme için'],
+    ['For enterprise', 'Kurumsal kullanım için'],
+    ['Enterprise-level security, support, and fully managed infrastructure', 'Kurumsal güvenlik, destek ve tam yönetilen altyapı'],
+    ["Integrate with Snowflake's full data stack", "Snowflake'in tüm veri yığınıyla entegre olun"],
+    ['Set up and maintain your own authentication, resources, and costs', 'Kendi kimlik doğrulama, kaynak ve maliyet yönetiminizi kurun'],
+    ['Learn more', 'Daha fazla bilgi'],
+    ['Start trial', 'Denemeyi başlat'],
     ['Auto rerun', 'Otomatik yenile'],
     ['Clear cache', 'Önbelleği temizle'],
     ['Record screen', 'Ekranı kaydet'],
@@ -40,6 +54,9 @@ _JS = r"""
   function tr(s) {
     if (!s || typeof s !== 'string') return s;
     var trimmed = s.trim();
+    if (trimmed.indexOf('this app using') !== -1) {
+      return 'Bu uygulamayı şurada yayınla…';
+    }
     for (var i = 0; i < RULES.length; i++) {
       if (s.indexOf(RULES[i][0]) !== -1) {
         s = s.split(RULES[i][0]).join(RULES[i][1]);
@@ -94,6 +111,14 @@ _JS = r"""
           if (nv2 !== val) els[j].setAttribute(attr, nv2);
         }
       });
+    }
+    // Yayınla düğmesi: yerel paper-only uygulamada gereksiz; pencereyi açmasın.
+    var buttons = root.querySelectorAll('button');
+    for (var m = 0; m < buttons.length; m++) {
+      var label = (buttons[m].innerText || '').trim();
+      if (label === 'Deploy' || label === 'Yayınla') {
+        buttons[m].style.display = 'none';
+      }
     }
   }
 

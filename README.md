@@ -157,7 +157,8 @@ Fintech arayüz ilkeleri (güven sinyalleri, okunabilir büyük rakamlar, tutarl
 
 | Soru | Cevap |
 |---|---|
-| Sağ üstteki menü İngilizce mi? | Hayır. Streamlit'in yerleşik menüsü tarayıcıda anlık olarak Türkçe'ye çevrilir: `Rerun` → **Yeniden çalıştır**, `Clear cache` → **Önbelleği temizle**, `Print` → **Yazdır**, `Record screen` → **Ekranı kaydet**, `Deploy` → **Yayınla**. Düğmelerin işlevi değişmez. Üstteki **Menü nedir?** popup'ı her birini ayrıntılı anlatır. |
+| Sağ üstteki menü İngilizce mi? | Hayır. Streamlit'in yerleşik menüsü tarayıcıda anlık olarak Türkçe'ye çevrilir: `Rerun` → **Yeniden çalıştır**, `Clear cache` → **Önbelleği temizle**, `Print` → **Yazdır**, `Record screen` → **Ekranı kaydet**. Düğmelerin işlevi değişmez. Üstteki **Menü nedir?** popup'ı her birini ayrıntılı anlatır. |
+| "Yayınla / Deploy" penceresi nedir? | Streamlit'in uygulamayı kendi bulutuna (Community Cloud / Snowflake / kendi sunucunuz) yükleme teklifidir. Bu proje **yerelde çalışan paper-only** bir karar destek uygulaması olduğu için bu düğme kaldırılmıştır; yanlışlıkla açılsa bile pencere tamamen Türkçe çevrilir. |
 | Uygulama açılmıyor | Python 3.10+ kurulu ve PATH'de mi? `calistir.bat` sanal ortamı/paketleri otomatik kurar; internet gerekir. |
 | Tarayıcı açılmadı | `http://localhost:8501` adresine gidin. Port doluysa `streamlit run streamlit_app.py --server.port 8502`. |
 | Fiyat/sinyal gelmiyor | Internet bağlantısını ve seans durumunu kontrol edin. Ücretsiz veri ~15 dk gecikmelidir. |
