@@ -224,6 +224,7 @@ assets/        # Logo
 - Kaynak doğrulama: resmi ücretsiz API olmayan VBTS/KAP/temettü için elle attestation (Denetim sayfası)
 - Erişilebilirlik: tüm grafik/tablo çağrılarında `alt=` metni, KPI satırlarında `wrap=True`, `:focus-visible` ring, `prefers-reduced-motion` desteği
 - Denetim raporu: `docs/AUDIT_REPORT.md`
+- Gerçek para geçişi için gereksinimler ve eksiklik analizi: `docs/GERCEK_PARA_YOL_HARITASI.md` (uygulama **paper-only** ve gerçek para için **onaylanmamıştır**)
 
 ## ⚠️ Yasal uyarı
 
