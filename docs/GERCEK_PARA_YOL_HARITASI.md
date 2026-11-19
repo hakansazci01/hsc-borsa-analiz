@@ -150,7 +150,8 @@ Canlı BIST yerine önce **sanal para** ile gerçek emir mekaniğini test edebil
    secret_key = "buraya-testnet-secret"
    ```
 4. `config.yaml` → `binance.enabled: true` ve `binance.testnet: true` (varsayılan).
-5. Uygulamayı başlatmadan önce ortam değişkeni: `HSC_BINANCE_ARMED=YES`.
+5. Ortam kilidi: `HSC_BINANCE_ARMED=YES` değişkeni **veya** paneldeki
+   **"Ortam kilidini yerel olarak aç"** kutusu (kısayoldan başlatıyorsanız bunu kullanın).
 6. **Canlı işlem** sayfasındaki *Binance botu* panelinde: sembol → **15m sinyal al** →
    onay ifadesi (`HSC-BINANCE-ARM`) → oturum onayı → miktar → **Binance emir gönder**.
 

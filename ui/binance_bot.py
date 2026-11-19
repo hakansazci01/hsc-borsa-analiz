@@ -29,6 +29,21 @@ from ui import audit_log, auth, log_store, live_guard
 from ui.secrets_access import get
 
 
+ARM_FILE = "binance_armed.json"
+
+
+def is_local_armed() -> bool:
+    """Arayüzden açılan yerel ortam kilidi (env değişkeni alternatifi)."""
+    data = auth.read_json(auth.USERS_DIR / ARM_FILE, {})
+    return bool(data.get("armed")) if isinstance(data, dict) else False
+
+
+def set_local_armed(enabled: bool) -> None:
+    auth.write_json(auth.USERS_DIR / ARM_FILE, {
+        "armed": bool(enabled), "at": auth._now(),
+    })
+
+
 def cfg(settings: dict[str, Any] | None = None) -> dict[str, Any]:
     if settings and isinstance(settings.get("binance"), dict):
         return settings["binance"]
@@ -158,8 +173,8 @@ def guard(
     reasons: list[str] = []
     if not bool(config.get("enabled", False)):
         reasons.append("config.yaml: binance.enabled = false")
-    if os.environ.get("HSC_BINANCE_ARMED") != "YES":
-        reasons.append("HSC_BINANCE_ARMED=YES ortam değişkeni yok")
+    if os.environ.get("HSC_BINANCE_ARMED") != "YES" and not is_local_armed():
+        reasons.append("Ortam kilidi yok (HSC_BINANCE_ARMED veya arayüzdeki yerel kilit)")
     if str(phrase).strip() != str(config.get("confirmation_phrase", "HSC-BINANCE-ARM")):
         reasons.append("Onay ifadesi eksik/yanlış")
     if not session_armed:

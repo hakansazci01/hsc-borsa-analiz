@@ -62,15 +62,16 @@ def test_binance_default_locked() -> None:
     from ui.core import default_settings
 
     _clean()
+    binance_bot.set_local_armed(False)
     try:
         settings = default_settings()
         ok, reasons, config = binance_bot.guard(
             "BTCUSDT", 0.001, 50000, "", False, settings
         )
         assert not ok and config.get("testnet") is True
-        assert any("HSC_BINANCE_ARMED" in r for r in reasons)
+        assert any("Ortam kilidi" in r for r in reasons)
         assert any("Onay ifadesi" in r for r in reasons)
-        assert any("anahtar" in r for r in reasons)
+        assert any("Oturum onayı" in r for r in reasons)
         with patch("ui.binance_bot._request") as send:
             result = binance_bot.execute(
                 USER, "BTCUSDT", "buy", 0.001, 50000, settings=settings

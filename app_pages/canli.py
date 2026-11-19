@@ -400,6 +400,14 @@ with st.expander("Binance botu (varsayılan TESTNET — sanal para)", icon=":mat
             f"RSI {sig.get('rsi', '—')} · {sig.get('reason', '')}"
         )
     b_phrase = st.text_input("Onay ifadesi", key="bin_phrase", type="password")
+    b_local_armed = st.checkbox(
+        "Ortam kilidini yerel olarak aç (HSC_BINANCE_ARMED yerine)",
+        value=binance_bot.is_local_armed(), key="bin_local_armed",
+        help="Kısayoldan başlatırken ortam değişkeni ayarlanamıyorsa bunu kullanın.",
+    )
+    if b_local_armed != binance_bot.is_local_armed():
+        binance_bot.set_local_armed(b_local_armed)
+        st.rerun()
     b_armed = st.checkbox("Oturumu Binance emri için onaylıyorum", key="bin_armed_session")
     b_qty = st.number_input("Miktar", min_value=0.0, value=0.0, step=0.001, key="bin_qty")
     b_price = float((sig or {}).get("price") or 0)
