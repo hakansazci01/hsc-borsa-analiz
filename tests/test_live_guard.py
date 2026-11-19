@@ -68,7 +68,9 @@ def test_binance_default_locked() -> None:
             "BTCUSDT", 0.001, 50000, "", False, settings
         )
         assert not ok and config.get("testnet") is True
-        assert any("enabled" in r for r in reasons)
+        assert any("HSC_BINANCE_ARMED" in r for r in reasons)
+        assert any("Onay ifadesi" in r for r in reasons)
+        assert any("anahtar" in r for r in reasons)
         with patch("ui.binance_bot._request") as send:
             result = binance_bot.execute(
                 USER, "BTCUSDT", "buy", 0.001, 50000, settings=settings
