@@ -5,7 +5,7 @@ from __future__ import annotations
 import altair as alt
 import streamlit as st
 
-from ui import audit_log, data_freshness, format_tr as ftr, notify, paper, trust_gate
+from ui import audit_log, data_freshness, event_risk, format_tr as ftr, notify, paper, trust_gate
 from ui.bist_universe import load_companies, ordered_symbols
 from ui.components import real_money_warning
 from ui.help_texts import h
@@ -108,6 +108,7 @@ def _render() -> None:
         st.session_state[last_key] = decision
 
     trust_gate.render(gate)
+    event_risk.render(event_risk.assess())
 
     if result.get("wait_low") and result.get("wait_high"):
         low, high = result["wait_low"], result["wait_high"]

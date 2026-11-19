@@ -127,6 +127,19 @@ def evaluate(
     if st.session_state.get("signals_off"):
         add("Sinyel anahtarı", False, "Kullanıcı sinyalleri kapattı (kill switch)")
 
+    # Fiyat serisi bütünlüğü: düzeltilmemiş kurumsal işlem varsa fail-closed.
+    integrity: dict[str, Any] = {}
+    try:
+        from ui.data_integrity import check_symbol
+
+        integrity = check_symbol(str(symbol).upper())
+        if integrity.get("level") == "quarantine":
+            add("Kurumsal işlem bütünlüğü", False, integrity.get("note", "Şüpheli fiyat serisi"))
+        elif integrity.get("level") == "suspect":
+            add("Kurumsal işlem bütünlüğü", None, integrity.get("note", "Şüpheli fiyat serisi"), blocking=False)
+    except Exception:
+        add("Kurumsal işlem bütünlüğü", None, "Bütünlük kontrolü çalıştırılamadı", blocking=False)
+
     failed = [c for c in checks if c["Geçti"] is False]
     critical_failed = [c for c in failed if c["Kritik"]]
     unknown = [c for c in checks if c["Geçti"] is None]
@@ -151,6 +164,7 @@ def evaluate(
         "checks": checks,
         "age_min": round(age, 1) if age is not None else None,
         "source": source,
+        "integrity": integrity,
         "decision_id": (
             f"{str(symbol).upper()}|{(decision or {}).get('decision') or (decision or {}).get('action') or 'BEKLE'}"
             f"|{int(age // 5) if age is not None else 'x'}"

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from ui import components, insights
+from ui import breadth, components, event_risk, insights
 from ui.core import analysis_args, analyze_symbol, scan_market
 from ui.economic_calendar import today_events
 from ui.help_texts import h
@@ -57,6 +57,11 @@ with st.container(horizontal=True):
     st.metric("Ortalama güven", f"%{summary['avg_confidence']}", border=True,
               icon=":material/speed:", chart_data=conf_spark,
               chart_type="line", help=h("confidence"))
+
+with st.container(border=True, key="piyasa_breadth"):
+    st.subheader("Piyasa genişliği", divider="gray")
+    breadth.render(breadth.compute())
+    event_risk.render(event_risk.assess())
 
 st.container(height=1, border=False)
 
