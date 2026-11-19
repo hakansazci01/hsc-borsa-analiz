@@ -99,7 +99,7 @@ alerts:
 
 # BINANCE - varsayilan TESTNET (sanal para). Gercek anahtar siz ekleyene kadar kapali.
 binance:
-  enabled: false
+  enabled: true             # yazilim tarafi acik; anahtar/env/onay kilitle bloklu kalir
   testnet: true             # ONCE testnet.binance.vision adresinden sanal API anahtari alin
   base_test: "https://testnet.binance.vision/api"
   base_live: "https://api.binance.com/api"
