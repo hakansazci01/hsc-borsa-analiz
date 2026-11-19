@@ -119,6 +119,18 @@ tamamı gerekir.
 4. OIDC + MFA + secrets vault + IP allowlist.
 5. Broker test ortamında kademeli doğrulama → çok küçük canlı pilot → gözetimli ölçekleme.
 
+## Binance TR hakkında önemli
+
+Binance TR, global Binance'den **ayrı bir borsadır**:
+- Base URL: `https://www.binance.tr` (global `api.binance.com` ile karışmaz)
+- Emir yolu `/open/v1/orders`, sembol formatı `BTC_USDT`, yön `0/1` (al/sat) — global API ile uyumlu değildir
+- Bu ortamdan domain'e erişim **kapalı** (DNS/connection reset); bu yüzden anahtar doğrulaması yapılamadı
+
+Eğer sizin tarayıcınızda `https://www.binance.tr` açılıyorsa, uygulamadaki
+**Borsa API erişim testi** panelinde "Binance TR" satırının OK olması gerekir.
+O zaman `ui/binance_tr_bot.py` adapterini bu formata göre yazabiliriz.
+Anahtarları `[binance_tr]` bölümüne girin (global `[binance]` ile karışmasın).
+
 ## Gate.io testnet — bu ağda çalışan yol
 
 Yapılan API erişim testinde Binance, Bybit, Kraken, Coinbase ve OKX uçları

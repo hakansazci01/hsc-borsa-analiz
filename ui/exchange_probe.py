@@ -20,6 +20,7 @@ import streamlit as st
 ENDPOINTS: dict[str, str] = {
     "Binance TESTNET": "https://testnet.binance.vision/api/v3/ticker/price?symbol=BTCUSDT",
     "Binance CANLI": "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",
+    "Binance TR": "https://www.binance.tr/open/v1/time",
     "Bybit": "https://api.bybit.com/v5/market/tickers?category=spot&symbol=BTCUSDT",
     "Kraken": "https://api.kraken.com/0/public/Ticker?pair=XBTUSD",
     "Coinbase": "https://api.coinbase.com/v2/prices/BTC-USD/spot",
