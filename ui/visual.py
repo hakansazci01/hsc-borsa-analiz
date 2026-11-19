@@ -189,89 +189,10 @@ def inject_visual_css() -> None:
 
 
 def market_chart_card() -> None:
-    """Temsili, animasyonlu mum grafiği (canlı veri değil — görsel amaçlı)."""
-    import random
+    """Gerçek BIST 100 verisiyle animasyonlu mum grafiği."""
+    from ui.real_chart import render
 
-    rnd = random.Random(7)
-    count = 30
-    bars: list[tuple[float, float, float, float]] = []
-    price = 11180.0
-    for i in range(count):
-        open_ = price
-        change = rnd.uniform(-34, 42) + (1.8 if i > 12 else 0.3)
-        close = open_ + change
-        high = max(open_, close) + rnd.uniform(3, 16)
-        low = min(open_, close) - rnd.uniform(3, 16)
-        bars.append((open_, high, low, close))
-        price = close
-
-    low_min = min(b[2] for b in bars) - 30
-    high_max = max(b[1] for b in bars) + 30
-    span = high_max - low_min or 1
-
-    def py(value: float) -> float:
-        return 132.0 - (value - low_min) / span * 112.0
-
-    slot = 330 / count
-    parts: list[str] = []
-    for i, (o, hi, lo, c) in enumerate(bars):
-        x = 15 + i * slot + slot / 2
-        color = "#34D399" if c >= o else "#F87171"
-        parts.append(
-            f'<line x1="{x:.1f}" x2="{x:.1f}" y1="{py(hi):.1f}" y2="{py(lo):.1f}" '
-            f'stroke="{color}" stroke-width="1" opacity=".9"/>'
-        )
-        top, bottom = py(max(o, c)), py(min(o, c))
-        parts.append(
-            f'<rect class="hv-candle" style="animation-delay:{i * 0.045:.2f}s" '
-            f'x="{x - 2.6:.1f}" y="{top:.1f}" width="5.2" height="{max(bottom - top, 2):.1f}" '
-            f'fill="{color}" rx="1"/>'
-        )
-    ema_points = " ".join(
-        f"{15 + i * slot + slot / 2:.1f},{py(b[3]):.1f}" for i, b in enumerate(bars)
-    )
-    grid = "".join(
-        f'<line x1="8" x2="352" y1="{yy}" y2="{yy}" stroke="#334155" '
-        f'stroke-width=".7" stroke-dasharray="3 5"/>'
-        for yy in (36, 76, 116)
-    )
-    svg = (
-        f'<svg viewBox="0 0 360 150" width="100%" height="132" role="img" '
-        f'aria-label="Temsili BIST mum grafiği">{grid}'
-        f'<polyline class="hv-ema" points="{ema_points}"/>'
-        f'{"".join(parts)}'
-        f'<text x="350" y="33" fill="#94A3B8" font-size="9" text-anchor="end">{high_max:,.0f}</text>'
-        f'<text x="350" y="119" fill="#94A3B8" font-size="9" text-anchor="end">{low_min:,.0f}</text>'
-        f"</svg>"
-    )
-    # st.html SVG etiketini süzer; grafik izole bir iframe'de render edilir.
-    component = f"""
-<html><head><style>
-  body {{ margin:0; background:#0f172a; font-family:Inter,Arial,sans-serif; }}
-  .hv-chart {{ border:1px solid rgba(96,165,250,.26); border-radius:14px;
-    background:rgba(15,23,42,.8); padding:10px 13px 6px; }}
-  .hv-chart-head {{ display:flex; justify-content:space-between; align-items:center;
-    font-size:12px; font-weight:800; color:#CBD5E1; margin-bottom:3px; }}
-  .hv-candle {{ animation:hvCandle .5s cubic-bezier(.2,.8,.2,1) both;
-    transform-box:fill-box; transform-origin:center; }}
-  .hv-ema {{ fill:none; stroke:#60A5FA; stroke-width:1.7; stroke-dasharray:900;
-    stroke-dashoffset:900; animation:hvDraw 2.8s ease forwards; }}
-  .hv-axis {{ display:flex; justify-content:space-between; color:#64748B;
-    font-size:10px; margin-top:-3px; }}
-  @keyframes hvCandle {{ from{{opacity:0;transform:scaleY(.15)}} to{{opacity:1;transform:none}} }}
-  @keyframes hvDraw {{ to{{stroke-dashoffset:0}} }}
-  @media (prefers-reduced-motion: reduce) {{
-    .hv-candle,.hv-ema {{ animation:none }} .hv-ema {{ stroke-dashoffset:0 }}
-  }}
-</style></head><body>
-<div class="hv-chart">
-  <div class="hv-chart-head"><span>BIST 100 · örnek görünüm</span>
-  <span style="font-size:10px;color:#64748B">temsili görsel, canlı veri değildir</span></div>
-  {svg}
-  <div class="hv-axis"><span>10:00</span><span>12:00</span><span>14:00</span><span>16:00</span><span>18:00</span></div>
-</div></body></html>
-"""
-    st.components.v1.html(component, height=176, scrolling=False)
+    render()
 
 
 def praise_block() -> None:

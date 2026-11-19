@@ -102,12 +102,19 @@ if section == "Rejim analizi":
                     args["thresholds"], args["risk"], args["backtest_cfg"], args["guards"],
                 )
                 from ui.trade_engine import build_decision
-                fake_snap = {
+                frame = res.get("df")
+                if frame is not None and len(frame) > 1:
+                    real_change = (
+                        float(frame["Close"].iloc[-1]) / float(frame["Close"].iloc[-2]) - 1
+                    ) * 100
+                else:
+                    real_change = 0.0
+                real_snap = {
                     "symbol": symbol, "name": universe.get(symbol, symbol),
-                    "info": {"price": float(res["info"]["last_close"]), "change_pct": 0.0},
+                    "info": {"price": float(res["info"]["last_close"]), "change_pct": real_change},
                     "signals": {}, "news": None, "intraday": None, "fetched_at": None, "errors": [],
                 }
-                base = build_decision(fake_snap, "Dengeli", settings["risk"])
+                base = build_decision(real_snap, "Dengeli", settings["risk"])
                 adj = adjust_decision_for_regime(base, regime)
                 st.markdown(f"Ham karar: **{base['decision']}** (güven %{base['confidence']}, pozisyon %{base['position_pct']})")
                 st.markdown(f"Rejime uyarlanmış: **{adj['decision']}** (güven %{adj['confidence']}, pozisyon %{adj['position_pct']})")
