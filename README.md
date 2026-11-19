@@ -226,7 +226,7 @@ assets/        # Logo
 - Denetim raporu: `docs/AUDIT_REPORT.md`
 - Gerçek para geçişi için gereksinimler ve eksiklik analizi: `docs/GERCEK_PARA_YOL_HARITASI.md` (uygulama **paper-only** ve gerçek para için **onaylanmamıştır**)
 - Gerçek emir kodu yolu **varsayılan olarak kilitlidir** (`ui/live_guard.py`): `live_trading.enabled` + `HSC_LIVE_ARMED` ortam değişkeni + arayüz onay ifadesi + oturum onayı + canlı broker anahtarı + kill switch kapalı olmalı. Kilitler açılmadan hiçbir emir gönderilmez; **bu bir hazırlık iskeletidir, canlı kullanım onayı değildir**.
-- **Binance testnet botu:** sanal para ile gerçek emir mekaniğini güvenle test etmek için `ui/binance_bot.py`; varsayılan `testnet: true`, çoklu kilit, idempotency ve denetim kaydı. Kurulum adımları: `docs/GERCEK_PARA_YOL_HARITASI.md`. API anahtarını **sohbete değil** `.streamlit/secrets.toml` içine yazın.
+- **Borsa botları (sanal para):** `ui/exchange_probe.py` hangi borsa API'sinin erişilebilir olduğunu test eder; bu ağda **Gate.io** çalıştığı için `ui/gateio_bot.py` eklendi (varsayılan `testnet: true`, çoklu kilit, idempotency, denetim kaydı). `ui/binance_bot.py` da mevcut ancak Binance domain'i bu ağda engelli. Kurulum: `docs/GERCEK_PARA_YOL_HARITASI.md`. API anahtarını **sohbete değil** panelden veya `.streamlit/secrets.toml` içine yazın.
 
 ## ⚠️ Yasal uyarı
 

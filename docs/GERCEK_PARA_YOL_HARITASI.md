@@ -119,6 +119,22 @@ tamamı gerekir.
 4. OIDC + MFA + secrets vault + IP allowlist.
 5. Broker test ortamında kademeli doğrulama → çok küçük canlı pilot → gözetimli ölçekleme.
 
+## Gate.io testnet — bu ağda çalışan yol
+
+Yapılan API erişim testinde Binance, Bybit, Kraken, Coinbase ve OKX uçları
+bu ağdan erişilemezken **Gate.io testnet ve canlı uçları erişilebilir** bulundu.
+Bu nedenle `ui/gateio_bot.py` adapteri eklendi (varsayılan `testnet: true`).
+
+Kurulum:
+1. `gate.io/testnet` → API Keys → yeni anahtar (Withdrawal kapalı)
+2. Canlı işlem → **Gate.io botu** → "Gate.io API anahtarını buraya girin" → Key/Secret
+3. `config.yaml` → `gateio.enabled: true` (testnet true kalır)
+4. Panelde **Ortam kilidini yerel olarak aç** + onay ifadesi `HSC-GATEIO-ARM` + oturum onayı
+5. 15m sinyal al → miktar (≤50 USDT) → limit emir
+
+Binance adapteri de duruyor; ancak bu ağda domain'e erişilemediği için şu an
+kullanılamıyor. Ağ erişimi değişirse paneldeki **Borsa API erişim testi** ile görülebilir.
+
 ## Binance testnet ile güvenli başlangıç (önerilen)
 
 Canlı BIST yerine önce **sanal para** ile gerçek emir mekaniğini test edebilirsiniz:

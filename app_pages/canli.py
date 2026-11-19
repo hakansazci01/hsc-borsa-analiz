@@ -372,7 +372,9 @@ with st.expander("GERÇEK PARA emir (varsayılan KAPALI)", icon=":material/lock:
 # ---- BINANCE (varsayılan TESTNET / sanal para) ----
 with st.expander("Binance botu (varsayılan TESTNET — sanal para)", icon=":material/smart_toy:"):
     from ui.api_keys import render_binance_editor
+    from ui.exchange_probe import render as render_probe
 
+    render_probe()
     render_binance_editor()
     bcfg = binance_bot.cfg(settings)
     st.caption(
@@ -424,6 +426,63 @@ with st.expander("Binance botu (varsayılan TESTNET — sanal para)", icon=":mat
         result = binance_bot.execute(
             st.session_state.user, b_symbol, decision_side, b_qty, b_price,
             b_phrase, b_armed, settings,
+        )
+        if result.get("ok"):
+            st.success("Emir iletildi (testnet/sanal bakiye).", icon=":material/check:")
+        else:
+            st.warning(result.get("reason", "Emir gönderilmedi."), icon=":material/warning:")
+        st.rerun()
+
+with st.expander("Gate.io botu (erişilebilir — TESTNET / sanal para)", icon=":material/smart_toy:"):
+    from ui.gateio_bot import cfg as gate_cfg
+    from ui.gateio_bot import configured as gate_configured
+    from ui.gateio_bot import execute as gate_execute
+    from ui.gateio_bot import guard as gate_guard
+    from ui.gateio_bot import is_local_armed as gate_armed
+    from ui.gateio_bot import quick_signal as gate_signal
+    from ui.gateio_bot import set_local_armed as gate_set_armed
+    from ui.api_keys import render_gateio_editor
+
+    render_gateio_editor()
+    gcfg = gate_cfg(settings)
+    st.caption(
+        "Durum: " + ("✅ açık" if gcfg.get("enabled") else "❌ kapalı (gateio.enabled)")
+        + " · " + ("✅ testnet" if gcfg.get("testnet", True) else "⚠️ CANLI")
+        + " · " + ("✅ anahtar var" if gate_configured() else "❌ anahtar yok")
+    )
+    g_symbol = st.selectbox(
+        "Sembol", [str(s).upper() for s in gcfg.get("allowed_symbols", ["BTC_USDT"])],
+        key="gate_symbol",
+    )
+    if st.button("15m sinyal al", icon=":material/flash_on:", key="gate_signal"):
+        st.session_state["gate_last_signal"] = gate_signal(g_symbol)
+    gsig = st.session_state.get("gate_last_signal")
+    if gsig:
+        st.caption(
+            f"Sinyal: **{gsig.get('decision')}** · fiyat {gsig.get('price', 0):,.4f} USDT · "
+            f"RSI {gsig.get('rsi', '—')} · {gsig.get('reason', '')}"
+        )
+    g_phrase = st.text_input("Onay ifadesi", key="gate_phrase", type="password")
+    g_local = st.checkbox(
+        "Ortam kilidini yerel olarak aç", value=gate_armed(), key="gate_local_armed"
+    )
+    if g_local != gate_armed():
+        gate_set_armed(g_local)
+        st.rerun()
+    g_session = st.checkbox("Oturumu Gate.io emri için onaylıyorum", key="gate_session")
+    g_qty = st.number_input("Miktar", min_value=0.0, value=0.0, step=0.001, key="gate_qty")
+    g_price = float((gsig or {}).get("price") or 0)
+    g_ok, g_reasons, _ = gate_guard(g_symbol, g_qty, g_price, g_phrase, g_session, settings)
+    if g_reasons:
+        st.caption("Eksik kilitler: " + " · ".join(g_reasons))
+    g_side = "buy" if (gsig or {}).get("decision") == "AL" else "sell"
+    if st.button(
+        "GATEIO EMIR GONDER", icon=":material/send:", key="gate_send",
+        disabled=not g_ok or not gsig or gsig.get("decision") == "BEKLE", type="primary",
+    ):
+        result = gate_execute(
+            st.session_state.user, g_symbol, g_side, g_qty, g_price,
+            g_phrase, g_session, settings,
         )
         if result.get("ok"):
             st.success("Emir iletildi (testnet/sanal bakiye).", icon=":material/check:")

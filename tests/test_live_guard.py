@@ -82,6 +82,32 @@ def test_binance_default_locked() -> None:
         _clean()
 
 
+def test_gateio_adapter() -> None:
+    from ui import gateio_bot
+    from ui.core import default_settings
+
+    _clean()
+    gateio_bot.set_local_armed(False)
+    try:
+        settings = default_settings()
+        config = gateio_bot.cfg(settings)
+        assert config.get("testnet") is True
+        ok, reasons, _ = gateio_bot.guard(
+            "BTC_USDT", 0.001, 50000, "", False, settings
+        )
+        assert not ok and reasons
+        with patch("ui.gateio_bot._request") as send:
+            result = gateio_bot.execute(
+                USER, "BTC_USDT", "buy", 0.001, 50000, settings=settings
+            )
+        assert not result.get("ok")
+        send.assert_not_called()
+        signal = gateio_bot.quick_signal("BTC_USDT")
+        assert signal.get("decision") in ("AL", "SAT", "BEKLE")
+    finally:
+        _clean()
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

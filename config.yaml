@@ -107,6 +107,16 @@ binance:
   max_order_usdt: 50
   confirmation_phrase: "HSC-BINANCE-ARM"
 
+# GATE.IO - bu agda erisilebilen tek borsa. Varsayilan TESTNET (sanal para).
+gateio:
+  enabled: false
+  testnet: true
+  base_test: "https://api-testnet.gateapi.io/api/v4"
+  base_live: "https://api.gateio.ws/api/v4"
+  allowed_symbols: ["BTC_USDT", "ETH_USDT"]
+  max_order_usdt: 50
+  confirmation_phrase: "HSC-GATEIO-ARM"
+
 # GERCEK PARA - VARSAIYLAN KAPALI. Acmak icin butun kilitlerin saglanmasi gerekir.
 # Bu ayarlar tek basina emir acmaz; bkz. docs/GERCEK_PARA_YOL_HARITASI.md
 live_trading:

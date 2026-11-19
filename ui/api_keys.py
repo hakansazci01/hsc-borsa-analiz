@@ -225,6 +225,28 @@ def render_editor() -> None:
         )
 
 
+def render_gateio_editor() -> None:
+    """Gate.io API anahtarı için maskeli yerel giriş formu."""
+    with st.expander("Gate.io API anahtarını buraya girin", icon=":material/key:"):
+        st.caption(
+            "Yalnızca Gate.io **API Key / Secret** girin; giriş şifreniz değil. "
+            "Testnet anahtarı: gate.io/testnet → API Keys. Withdrawal izni vermeyin."
+        )
+        with st.form("gateio_key_editor", border=False):
+            key = st.text_input("API Key", type="password", key="gate_key_input")
+            secret = st.text_input("API Secret", type="password", key="gate_secret_input")
+            if st.form_submit_button("Yerel olarak kaydet", type="primary"):
+                if not key or not secret:
+                    st.warning("İki alan da gerekli.", icon=":material/warning:")
+                else:
+                    data = _read_secrets()
+                    data.setdefault("gateio", {}).update({"key": key, "secret": secret})
+                    _write_secrets(data)
+                    st.success("Gate.io anahtarı yerel secrets.toml dosyasına kaydedildi.", icon=":material/check:")
+                    st.cache_data.clear()
+                    st.rerun()
+
+
 def render_binance_editor() -> None:
     """Binance API anahtarını doğrudan bot panelinden girmek için küçük form.
 
