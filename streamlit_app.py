@@ -191,10 +191,9 @@ with st.sidebar:
         pass
 
 page = st.navigation(
-    {
-        "": [
-            st.Page(
-                "app_pages/akilli_panel.py",
+    [
+        st.Page(
+            "app_pages/akilli_panel.py",
                 title="Akıllı Panel",
                 icon=":material/auto_awesome:",
                 help="Sade 3 adımda piyasa durumu, tek net karar ve kurgusal portföy; rejime göre yöntem önerisi.",
@@ -235,10 +234,8 @@ page = st.navigation(
                 icon=":material/settings:",
                 help="İzleme listesi, eşikler, gösterge ağırlıkları ve risk parametrelerini düzenler.",
             ),
-        ],
-        "Gelişmiş analizler": [
-            st.Page(
-                "app_pages/tarayici.py",
+        st.Page(
+            "app_pages/tarayici.py",
                 title="BIST tarayıcı",
                 icon=":material/radar:",
                 help="BIST'te kayıtlı 804 hissenin tamamını teknik koşullarla tarar.",
@@ -291,8 +288,7 @@ page = st.navigation(
                 icon=":material/account_balance_wallet:",
                 help="Risk profiline göre dağılım önerisi ve backtest getiri karşılaştırması sunar.",
             ),
-        ],
-    },
+    ],
     position="top",
 )
 page.run()

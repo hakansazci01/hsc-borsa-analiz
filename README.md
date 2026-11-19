@@ -8,7 +8,7 @@ HSC Borsa Analiz; bir komut satırı sinyal botundan evrilen, tarayıcıdan kull
 
 ## Öne çıkanlar
 
-- **Akıllı Panel:** Açılışta sade 3 adım — piyasa durumu, tek net karar (AL/BEKLE/SAT + sade gerekçe), kurgusal portföy. BIST 100 rejimine göre *hangi yöntemin kullanılacağını* önerir. Menüde ana araçlar öne çıkar, teknik sayfalar "Gelişmiş analizler" grubuna alınır; hiçbiri silinmez.
+- **Akıllı Panel:** Açılışta sade 3 adım — piyasa durumu, tek net karar (AL/BEKLE/SAT + sade gerekçe), kurgusal portföy. BIST 100 rejimine göre *hangi yöntemin kullanılacağını* önerir. 16 sayfanın tamamı üst menüde düz butonlar olarak görünür; açılır "daha fazla" menüsü yoktur.
 - **Sade dil sözlüğü:** RSI, MACD, Monte Carlo, R çarpanı gibi 20 teknik terimin panelde tek tıkla açıklaması
 - **Fail-closed veri kapısı:** Her sinyal gösterilmeden önce fiyat geçerliliği, kaynak, tazelik ve anomali kontrollerinden geçer. Doğrulanamayan veride AL/SAT **bastırılır** ve BEKLE'ye çekilir. Yan menüdeki **kill switch** ile tüm sinyaller anında kapatılabilir.
 - **Karar denetim kaydı:** Her karar/yanıt, hangi veri ve doğrulama sonucuyla üretildiyse o şekilde yerel, eklemeli ve idempotent bir JSONL kayda yazılır (aynı veri iki kez kaydedilmez).
@@ -88,7 +88,7 @@ Ardından `.streamlit/secrets.toml` içine kendi anahtarlarınızı girin veya u
 ## Nasıl çalışır? — İlk kullanım akışı
 
 1. **Giriş:** Uygulama açılınca **Kayıt ol** ile kullanıcı adı/şifre oluşturun. Verileriniz (ayarlar, kurgusal portföy, sinyal geçmişi) bu kullanıcıya özel saklanır.
-2. **Akıllı Panel:** Açılış sayfasında önce piyasa durumunu görün; size önerilen yöntemi ve "Bugün ne yapmalı?" önerisini okuyun. Hisse seçip tek net karar kartını inceleyin. Detay isterseniz **Gelişmiş analizler** grubundaki araçları kullanın.
+2. **Akıllı Panel:** Açılış sayfasında önce piyasa durumunu görün; size önerilen yöntemi ve "Bugün ne yapmalı?" önerisini okuyun. Hisse seçip tek net karar kartını inceleyin. Detay isterseniz üst menüdeki diğer araç butonlarını kullanın.
 3. **Hisse seçimi:** **Ayarlar → İzleme listesi** veya **BIST tarayıcı** sayfasından ilgilendiğiniz hisseleri seçin. BIST'te kayıtlı 804 hisse aranabilir.
 4. **Sinyal alma — üç yol:**
    - **Anlık sinyal:** seans içinde 1 dakikalık canlı mumlardan EMA9/20 + VWAP + RSI7 + hacim tetikleyicileriyle anlık AL/SAT,
@@ -139,7 +139,7 @@ Açılış sayfası **Akıllı Panel**'dir. Amaç teknik karmaşıklığı kulla
 2. **Tek net karar:** Seçilen hisse için AL / BEKLE / SAT, güven skoru, 2 cümlelik sade gerekçe ve giriş/stop/hedef seviyeleri tek kartta toplanır. "Bugün ne yapmalı?" önerisi izleme listesinin tamamını tarayıp tek aday çıkarır; aday yoksa açıkça **BEKLE** der.
 3. **Kurgusal portföy:** Açık pozisyon, açık K/Z, kapanan sinyal ve net R birlikte görünür.
 
-Üst menüde sadece 7 ana araç görünür; tarayıcı, bot, canlı işlem, risk merkezi, laboratuvar, denetim, piyasa analizi, hisse detayı ve portföy testi **"Gelişmiş analizler"** başlıklı açılır grupta toplanır. **Hiçbir sayfa kaldırılmadı.** Panelin altındaki **"Teknik terimler sade dille"** bölümü 20 terimi günlük dille açıklar.
+Üst menüde **16 sayfa** gruplandırılmadan düz butonlar olarak listelenir (Akıllı Panel'den Portföy ve test'e kadar); "Gelişmiş analizler" gibi bir açılır grup yoktur. Çok dar pencerelerde Streamlit kendi taşma davranışını uygulayabilir. **Hiçbir sayfa kaldırılmadı.** Panelin altındaki **"Teknik terimler sade dille"** bölümü 20 terimi günlük dille açıklar.
 
 ### Yönlendirici yardım ve animasyonlar
 
@@ -177,7 +177,7 @@ Fintech arayüz ilkeleri (güven sinyalleri, okunabilir büyük rakamlar, tutarl
 | Bot bana emir veya kesin sinyal verir mi? | Hayır. Emir, kesinlik, canlı fiyat ve yarın tahmini isteyen sorular açıkça reddedilir; bot sizi onaylamak için değil riskleri göstermek için çalışır. |
 | Rehberi nereden açarım? | Giriş yaptıktan sonra üstteki **Rehber** düğmesiyle 5 adımlı turu açın; İleri/Geri ile gezinin. |
 | Bir düğmenin ne yaptığını bilmiyorum | Akıllı Panel'deki *"Nasıl kullanılır?"* ve Ayarlar'daki *"Nereye ne yazmalı?"* popup'larına tıklayın; her adımın yanında açıklama var. |
-| Gelişmiş analizlere nasıl ulaşırım? | Üst menüdeki **Gelişmiş analizler** grubunu açın veya Akıllı Panel'in altındaki "Gelişmiş analizler — tüm araçlar" bölümünü kullanın. |
+| Diğer analiz sayfalarına nasıl ulaşırım? | Üst menüdeki butonlara tıklayın; 16 sayfanın tamamı açılır menü olmadan doğrudan görünür. |
 | Teknik terimleri anlamıyorum | Akıllı Panel'in en altındaki **"Teknik terimler sade dille"** bölümüne bakın; RSI'dan Monte Carlo'ya 20 terim günlük dille açıklanır. |
 | R çarpanı nedir? | Kâr/zararın alınan riske (stop mesafesine) oranı. Detaylı anlatım **Sinyal performansı** sayfasındaki "R çarpanı nasıl hesaplanıyor?" bölümünde. |
 | Sonuç defteri nerede saklanıyor? | `users/<kullanici>/performance.jsonl`. Hesabı silince veya veriler sıfırlanınca kaldırılır. |
