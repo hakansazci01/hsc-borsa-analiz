@@ -195,15 +195,16 @@ def render_global_guide() -> None:
     inject_guide_css()
     with st.container(horizontal=True, horizontal_alignment="right"):
         tip(
-            "Üstteki İngilizce menü nerede?",
+            "Sağ üstteki menü nedir?",
             [
-                "**Rerun / yeniden çalıştır:** Anlık sinyal sayfasındaki *Verileri yenile* düğmesini kullanın.",
-                "**Clear cache / önbelleği temizle:** Piyasa analizi sayfasındaki *Verileri yenile* aynı işi yapar.",
-                "**Print / Record screen:** Tarayıcınızın Ctrl+P yazdırma ve ekran kayıt araçlarını kullanın.",
-                "**Deploy / yayınla:** Uygulama yerel çalışır; bu seçenek gerekli değildir. İngilizce menü Streamlit'e aittir; Türkçe arayüz için gizlendi.",
+                "**Yeniden çalıştır (R):** sayfayı baştan çalıştırır, fiyat ve analiz verilerini tekrar çeker.",
+                "**Otomatik yenile:** açıkken kod değişirse sayfa kendiliğinden yenilenir (geliştirici ayarı).",
+                "**Önbelleği temizle (C):** analiz önbelleğini siler; Piyasa analizi sayfasındaki *Verileri yenile* düğmesi de aynı işi yapar.",
+                "**Yazdır / Ekranı kaydet:** tarayıcınızın Ctrl+P yazdırma ve ekran kayıt araçlarıdır.",
+                "**Yayınla:** Streamlit Cloud'a yayınlama kısayolu; yerel kullanımda gerekli değildir.",
             ],
             key="streamlit_menu",
-            label="Üst menü",
+            label="Menü nedir?",
         )
         tip(
             "Kullanıcı bilgilerini nereye girmeli?",

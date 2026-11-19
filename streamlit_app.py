@@ -16,13 +16,14 @@ st.set_page_config(
 )
 
 from ui import auth  # noqa: E402
-from ui import guide_ui  # noqa: E402
+from ui import guide_ui, tr_ui  # noqa: E402
 from ui.core import load_settings  # noqa: E402
 from ui.market_ticker import render_sidebar_ticker  # noqa: E402
 from ui.password_tools import generate_password, strength  # noqa: E402
 from ui.style import inject_modern_style  # noqa: E402
 
 inject_modern_style()
+tr_ui.install()  # Streamlit'in İngilizce menü/toolbar etiketlerini Türkçe yapar
 
 
 if "user" not in st.session_state:

@@ -147,7 +147,7 @@ Bu yardım katmanı yalnızca arayüzdür; hiçbir ayarı veya analiz sonucunu d
 
 | Soru | Cevap |
 |---|---|
-| Sağ üstteki İngilizce menü nerede? | `Rerun`, `Clear cache`, `Deploy`, `Print`, `Record screen` Streamlit'in kendi geliştirici menüsüdür; metinleri çevrilemediği için gizlendi. Yenileme için **Anlık sinyal** / **Piyasa analizi** sayfalarındaki *Verileri yenile* düğmelerini kullanın. Üstteki **Üst menü** popup'ı her seçeneğin Türkçe karşılığını anlatır. |
+| Sağ üstteki menü İngilizce mi? | Hayır. Streamlit'in yerleşik menüsü tarayıcıda anlık olarak Türkçe'ye çevrilir: `Rerun` → **Yeniden çalıştır**, `Clear cache` → **Önbelleği temizle**, `Print` → **Yazdır**, `Record screen` → **Ekranı kaydet**, `Deploy` → **Yayınla**. Düğmelerin işlevi değişmez. Üstteki **Menü nedir?** popup'ı her birini ayrıntılı anlatır. |
 | Uygulama açılmıyor | Python 3.10+ kurulu ve PATH'de mi? `calistir.bat` sanal ortamı/paketleri otomatik kurar; internet gerekir. |
 | Tarayıcı açılmadı | `http://localhost:8501` adresine gidin. Port doluysa `streamlit run streamlit_app.py --server.port 8502`. |
 | Fiyat/sinyal gelmiyor | Internet bağlantısını ve seans durumunu kontrol edin. Ücretsiz veri ~15 dk gecikmelidir. |
