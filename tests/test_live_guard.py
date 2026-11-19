@@ -57,6 +57,28 @@ def test_keys_and_phrase_required() -> None:
         _clean()
 
 
+def test_binance_default_locked() -> None:
+    from ui import binance_bot
+    from ui.core import default_settings
+
+    _clean()
+    try:
+        settings = default_settings()
+        ok, reasons, config = binance_bot.guard(
+            "BTCUSDT", 0.001, 50000, "", False, settings
+        )
+        assert not ok and config.get("testnet") is True
+        assert any("enabled" in r for r in reasons)
+        with patch("ui.binance_bot._request") as send:
+            result = binance_bot.execute(
+                USER, "BTCUSDT", "buy", 0.001, 50000, settings=settings
+            )
+        assert not result.get("ok")
+        send.assert_not_called()
+    finally:
+        _clean()
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

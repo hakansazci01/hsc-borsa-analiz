@@ -9,7 +9,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from ui import broker, components, live_bot, live_guard
+from ui import binance_bot, broker, components, live_bot, live_guard
 from ui.bist_universe import load_companies, ordered_symbols, search_symbols
 from ui.components import real_money_warning
 from ui.help_texts import h
@@ -366,6 +366,57 @@ else:
             hide_index=True,
             alt="Gerçek emir denemelerinin yerel kaydı (anahtar veya hassas veri içermez)",
         )
+
+    # ---- BINANCE (varsayılan TESTNET / sanal para) ----
+    with st.expander("Binance botu (varsayılan TESTNET — sanal para)", icon=":material/smart_toy:"):
+        bcfg = binance_bot.cfg(settings)
+        st.caption(
+            "Binance API anahtarı **kullanıcı adı/şifre değildir**. Testnet için ayrı anahtar "
+            "üretin (testnet.binance.vision), para çekme yetkisi vermeyin, IP kısıtlayın. "
+            "Anahtarları sohbete yapıştırmayın; `.streamlit/secrets.toml` → `[binance]` bölümüne yazın."
+        )
+        st.caption(
+            "Durum: "
+            + ("✅ açık" if bcfg.get("enabled") else "❌ kapalı (binance.enabled)")
+            + " · " + ("✅ testnet" if bcfg.get("testnet", True) else "⚠️ CANLI mod")
+            + " · " + ("✅ anahtar var" if binance_bot.configured() else "❌ anahtar yok")
+        )
+        b_symbol = st.selectbox(
+            "Sembol", [str(s).upper() for s in bcfg.get("allowed_symbols", ["BTCUSDT"])],
+            key="bin_symbol",
+        )
+        if st.button("15m sinyal al", icon=":material/flash_on:", key="bin_signal"):
+            sig = binance_bot.quick_signal(b_symbol)
+            st.session_state["bin_last_signal"] = sig
+        sig = st.session_state.get("bin_last_signal")
+        if sig:
+            st.caption(
+                f"Sinyal: **{sig.get('decision')}** · fiyat {sig.get('price', 0):,.4f} USDT · "
+                f"RSI {sig.get('rsi', '—')} · {sig.get('reason', '')}"
+            )
+        b_phrase = st.text_input("Onay ifadesi", key="bin_phrase", type="password")
+        b_armed = st.checkbox("Oturumu Binance emri için onaylıyorum", key="bin_armed_session")
+        b_qty = st.number_input("Miktar", min_value=0.0, value=0.0, step=0.001, key="bin_qty")
+        b_price = float((sig or {}).get("price") or 0)
+        b_ok, b_reasons, _ = binance_bot.guard(
+            b_symbol, b_qty, b_price, b_phrase, b_armed, settings
+        )
+        if b_reasons:
+            st.caption("Eksik kilitler: " + " · ".join(b_reasons))
+        decision_side = "buy" if (sig or {}).get("decision") == "AL" else "sell"
+        if st.button(
+            "BINANCE EMIR GONDER", icon=":material/send:", key="bin_send",
+            disabled=not b_ok or not sig or sig.get("decision") == "BEKLE", type="primary",
+        ):
+            result = binance_bot.execute(
+                st.session_state.user, b_symbol, decision_side, b_qty, b_price,
+                b_phrase, b_armed, settings,
+            )
+            if result.get("ok"):
+                st.success("Emir iletildi (testnet/sanal bakiye).", icon=":material/check:")
+            else:
+                st.warning(result.get("reason", "Emir gönderilmedi."), icon=":material/warning:")
+            st.rerun()
 
 # ---- BIST hızlı tarama ----
 with st.expander("BIST hızlı tarama (günlük teknik sinyal)", icon=":material/radar:"):

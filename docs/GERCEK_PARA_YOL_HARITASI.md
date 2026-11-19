@@ -119,6 +119,32 @@ tamamı gerekir.
 4. OIDC + MFA + secrets vault + IP allowlist.
 5. Broker test ortamında kademeli doğrulama → çok küçük canlı pilot → gözetimli ölçekleme.
 
+## Binance testnet ile güvenli başlangıç (önerilen)
+
+Canlı BIST yerine önce **sanal para** ile gerçek emir mekaniğini test edebilirsiniz:
+
+1. `testnet.binance.vision` adresine gidin → **API Management** → yeni API anahtarı oluşturun.
+   Bu anahtar **gerçek borsa anahtarından farklıdır** ve sanal bakiyeyi kullanır.
+2. API izinlerinde **yalnızca "Enable Spot Trading"** açık olsun;
+   **"Enable Withdrawals" kesinlikle kapalı** kalsın. Mümkünse IP kısıtlaması ekleyin.
+3. Anahtarı **sohbete yapıştırmayın**; kendi bilgisayarınızda
+   `.streamlit/secrets.toml` dosyasına şunu yazın:
+   ```toml
+   [binance]
+   api_key = "buraya-testnet-key"
+   secret_key = "buraya-testnet-secret"
+   ```
+4. `config.yaml` → `binance.enabled: true` ve `binance.testnet: true` (varsayılan).
+5. Uygulamayı başlatmadan önce ortam değişkeni: `HSC_BINANCE_ARMED=YES`.
+6. **Canlı işlem** sayfasındaki *Binance botu* panelinde: sembol → **15m sinyal al** →
+   onay ifadesi (`HSC-BINANCE-ARM`) → oturum onayı → miktar → **Binance emir gönder**.
+
+Güvenlik kilitleri: `enabled` + ortam değişkeni + onay ifadesi + oturum onayı + anahtar +
+kill switch + izinli sembol + tek emir limiti. Bunlardan biri eksikse **hiçbir ağ çağrısı yapılmaz**.
+
+Canlı Binance için ayrıca `HSC_BINANCE_LIVE=YES` ve `binance.testnet: false` gerekir;
+**bunu acele etmeden, küçük tutarlarla ve gözetim altında yapın.**
+
 ## Görev paylaşımı (kim ne yapacak?)
 
 **Yazılım tarafı (bizim yapabileceğimiz):**
