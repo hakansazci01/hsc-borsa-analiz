@@ -8,6 +8,7 @@ Arayüz ile mevcut analiz motoru (borsa_bot) arasındaki köprü.
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -77,8 +78,8 @@ def load_settings(path: str | Path | None = None) -> dict[str, Any]:
                 for key in settings:
                     if key in saved:
                         settings[key] = saved[key]
-        except (OSError, ValueError):
-            pass
+        except (OSError, ValueError) as exc:
+            logging.warning("Kayıtlı ayarlar okunamadı, varsayılanlar kullanılıyor: %s", exc)
     return settings
 
 

@@ -96,5 +96,5 @@ Bunları eklemek arayüzü şişirir, bakım maliyetini artırır ve kullanıcı
 
 - Config Doctor, kasıtlı bozulan bir `config.yaml` / JSON dosyasını **doğru satır ve alanla** yakalayabilmeli
 - Şifre önericisi ürettiği şifre mevcut `auth.register` doğrulamasından geçmeli
-- Hiçbir yeni araç mevcut sayfaların çalışmasını bozmamalı (AppTest + agent API ile 10 sayfa doğrulanmalı)
+- Hiçbir yeni araç mevcut sayfaların çalışmasını bozmamalı (AppTest + agent API ile 16 sayfa doğrulanmalı)
 - Eklenen tüm dosyalar `.gitignore` kapsamında olmalı, gizli değerler arayüzde gösterilmemeli

@@ -74,6 +74,10 @@ def record_close(
     """Kapanan kurgusal pozisyonu performans defterine ekler ve kaydı döndürür."""
     risk_cfg = (settings or {}).get("risk", {}) or {}
     stop_pct = float(risk_cfg.get("stop_loss_pct", 0.05) or 0.05) * 100.0
+    costs_on = bool(risk_cfg.get("journal_costs", True))
+    commission_pct = float(risk_cfg.get("commission_pct", 0.0015) or 0)
+    slippage_pct = float(risk_cfg.get("slippage_pct", 0.001) or 0)
+    spread_pct = float(risk_cfg.get("spread_pct", 0.001) or 0)
 
     entry = float(position["entry_price"])
     exit_price = float(exit_price)
@@ -84,6 +88,20 @@ def record_close(
     r, risk_pct, basis = compute_r(entry, exit_price, stop, stop_pct)
     pnl_pct = (exit_price / entry - 1) * 100 if entry else 0.0
     pnl_amount = (exit_price - entry) * qty
+
+    # Gerçekçi maliyet simülasyonu: komisyon + spread + kayma (yarı giriş, yarı çıkış).
+    risk_per_unit = entry - float(stop) if stop and entry > float(stop) else entry * (stop_pct / 100.0)
+    risk_per_unit = max(risk_per_unit, 1e-9)
+    if costs_on:
+        cost_per_share = (
+            (entry + exit_price) * commission_pct
+            + (entry + exit_price) * (slippage_pct / 2.0)
+            + (entry + exit_price) * (spread_pct / 2.0)
+        )
+    else:
+        cost_per_share = 0.0
+    net_pnl_amount = (exit_price - entry - cost_per_share) * qty
+    net_r = (exit_price - entry - cost_per_share) / risk_per_unit
 
     record = {
         "id": position.get("id", ""),
@@ -101,6 +119,15 @@ def record_close(
         "r_basis": basis,
         "pnl_pct": round(pnl_pct, 2),
         "pnl_amount": round(pnl_amount, 2),
+        "net_r_multiple": round(net_r, 3),
+        "net_pnl_amount": round(net_pnl_amount, 2),
+        "cost_amount": round(pnl_amount - net_pnl_amount, 2),
+        "costs_applied": costs_on,
+        "cost_assumptions": {
+            "commission_pct": round(commission_pct * 100, 3),
+            "slippage_pct": round(slippage_pct * 100, 3),
+            "spread_pct": round(spread_pct * 100, 3),
+        } if costs_on else None,
         "confidence": int(position.get("confidence", 0) or 0),
         "entry_signal": str(position.get("reason", "")),
         "exit_reason": str(reason),
@@ -135,6 +162,7 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any] | None:
         return None
 
     rs = [float(r.get("r_multiple", 0) or 0) for r in records]
+    nets = [float(r.get("net_r_multiple", r.get("r_multiple", 0)) or 0) for r in records]
     n = len(rs)
     wins = [r for r in rs if r > 0]
     losses = [r for r in rs if r < 0]
@@ -150,6 +178,26 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any] | None:
     profit_factor = gross_win / gross_loss if gross_loss > 0 else (float("inf") if gross_win > 0 else 0.0)
     payoff = avg_win / abs(avg_loss) if avg_loss else 0.0
     expectancy = (win_rate / 100.0) * avg_win + (n_loss / n) * avg_loss
+
+    # Maliyet dahil edilmiş sonuçlar (eski kayıtlarda maliyet alanı yoksa brüt = net)
+    n_wins = [r for r in nets if r > 0]
+    n_losses = [r for r in nets if r < 0]
+    net_total = sum(nets)
+    net_gross_win = sum(n_wins)
+    net_gross_loss = abs(sum(n_losses))
+    net_pf = (
+        net_gross_win / net_gross_loss if net_gross_loss > 0
+        else (float("inf") if net_gross_win > 0 else 0.0)
+    )
+    total_costs = sum(float(r.get("cost_amount", 0) or 0) for r in records)
+    any_costs = any(bool(r.get("costs_applied", False)) for r in records)
+    net_cum = 0.0
+    net_peak = 0.0
+    net_max_dd = 0.0
+    for value in nets:
+        net_cum += value
+        net_peak = max(net_peak, net_cum)
+        net_max_dd = min(net_max_dd, net_cum - net_peak)
 
     curve: list[dict[str, Any]] = []
     cum = 0.0
@@ -201,6 +249,13 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any] | None:
         "best_win_streak": best_win_streak,
         "best_loss_streak": best_loss_streak,
         "total_pnl_amount": round(sum(float(r.get("pnl_amount", 0) or 0) for r in records), 2),
+        "net_r_after_costs": round(net_total, 2),
+        "avg_r_after_costs": round(net_total / n, 3),
+        "win_rate_after_costs_pct": round(len(n_wins) / n * 100, 1),
+        "profit_factor_after_costs": round(net_pf, 3),
+        "max_drawdown_after_costs_r": round(net_max_dd, 2),
+        "total_costs": round(total_costs, 2),
+        "costs_applied": any_costs,
         "curve": curve,
     }
 

@@ -1,5 +1,5 @@
 """
-Borsa Al/Sat Sinyal Botu - Ana giris noktasi.
+HSC Borsa Analiz - Ana giris noktasi.
 
 Kullanim:
     python main.py scan
@@ -17,7 +17,7 @@ from borsa_bot.scanner import Scanner
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Borsa Al/Sat Sinyal Botu")
+    parser = argparse.ArgumentParser(description="HSC Borsa Analiz")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_scan = sub.add_parser("scan", help="Tum sembolleri tara ve sinyal uret")

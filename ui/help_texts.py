@@ -133,6 +133,11 @@ TOOLTIPS: dict[str, str] = {
     ),
     "net_r": "Kapanan tüm sinyallerin R çarpanlarının toplamı. Pozitif değer toplam kâr, negatif değer toplam zarar anlamına gelir.",
     "expectancy": "Her sinyalde ortalama kaç R kazanıldığı. Kazanma oranı ve kazanma/kayıp oranını birleştirir; stratejinin uzun vadeli ümidini gösterir.",
+    "journal_costs": (
+        "Performans defterinde komisyon, alış-satış makası (spread) ve kayma (slippage) "
+        "varsayımlarının düşülüp düşülmeyeceği. Varsayılanlar ayarlardaki risk ayarlarından gelir; "
+        "bunlar gerçek dolum garantisi değil, kurgusal maliyet varsayımlarıdır."
+    ),
     "signal_ledger": (
         "Kapanan her kurgusal sinyalin giriş, stop, hedef, çıkış, R çarpanı ve gerekçesiyle "
         "kaydedildiği şeffaf defter. Kazananlar ve kaybedenler aynı yöntemle hesaplanır; "

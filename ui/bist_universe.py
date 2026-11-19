@@ -9,6 +9,7 @@ Böylece arayüz sabit bir listeyle sınırlı kalmaz; 800+ hissenin tamamı ara
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -59,7 +60,8 @@ def load_companies() -> dict[str, str]:
             json.dumps(universe, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         return universe
-    except Exception:
+    except Exception as exc:
+        logging.warning("BIST şirket listesi alınamadı, yedek liste kullanılıyor: %s", exc)
         return _fallback()
 
 

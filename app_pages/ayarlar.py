@@ -165,6 +165,17 @@ target_pct = r5.slider(
     "Take-profit %", 1, 40, int(float(risk.get("take_profit_pct", 0.10)) * 100),
     help=h("take_profit"),
 ) / 100.0
+c1, c2 = st.columns(2)
+journal_costs = c1.toggle(
+    "Performans defterinde maliyetleri düş",
+    value=bool(risk.get("journal_costs", True)),
+    help=h("journal_costs"),
+)
+spread_pct = c2.slider(
+    "Spread varsayımı %", 0.0, 0.5,
+    float(risk.get("spread_pct", 0.001)) * 100, step=0.05,
+    help=h("journal_costs"),
+) / 100.0
 
 # ---- İşlem koruma kuralları ----
 st.subheader("İşlem koruma kuralları", divider="gray")
@@ -350,6 +361,8 @@ with st.container(horizontal=True):
                     "position_size_pct": position_pct,
                     "stop_loss_pct": stop_pct,
                     "take_profit_pct": target_pct,
+                    "journal_costs": journal_costs,
+                    "spread_pct": spread_pct,
                 },
                 "guards": {
                     **guard_cfg,

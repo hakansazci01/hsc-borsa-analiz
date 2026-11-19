@@ -31,23 +31,39 @@ if not summary:
     )
     st.stop()
 
-# ---- Özet KPI'lar ----
-profit_factor_text = (
-    "∞" if summary["profit_factor"] == float("inf") else f"{summary['profit_factor']:.2f}"
+# ---- Maliyet modu (komisyon + spread + kayma) ----
+use_costs = st.toggle(
+    "Maliyetleri dahil et (komisyon + spread + kayma)",
+    value=True, key="perf_cost_mode",
+    help=h("journal_costs"),
 )
+costly = use_costs and bool(summary.get("costs_applied"))
+if use_costs and not summary.get("costs_applied"):
+    st.caption("Bu kayıtlar maliyet alanı olmadan oluşturulmuş; maliyetli sonuç brüt ile aynı.")
+
+# ---- Özet KPI'lar ----
+def _pf(value: float) -> str:
+    return "∞" if value == float("inf") else f"{value:.2f}"
+
+
 with st.container(horizontal=True):
     st.metric("Kapanan sinyal", summary["total"], border=True,
               icon=":material/leaderboard:", help=h("signal_ledger"))
-    st.metric("Kazanma oranı", f"%{summary['win_rate_pct']}", border=True,
-              icon=":material/emoji_events:", help=h("win_rate"))
-    st.metric("Net R", f"{summary['net_r']:+.2f}R", border=True,
-              icon=":material/trending_up:", help=h("net_r"))
-    st.metric("Ortalama R", f"{summary['avg_r']:+.3f}R", border=True,
-              icon=":material/equalizer:", help=h("r_multiple"))
-    st.metric("Kâr faktörü", profit_factor_text, border=True,
-              help=h("profit_factor"))
-    st.metric("Maks. düşüş", f"{summary['max_drawdown_r']:.2f}R", border=True,
-              help=h("max_drawdown"))
+    st.metric("Kazanma oranı",
+              f"%{summary['win_rate_after_costs_pct'] if costly else summary['win_rate_pct']}",
+              border=True, icon=":material/emoji_events:", help=h("win_rate"))
+    st.metric("Net R",
+              f"{summary['net_r_after_costs'] if costly else summary['net_r']:+.2f}R",
+              border=True, icon=":material/trending_up:", help=h("net_r"))
+    st.metric("Ortalama R",
+              f"{summary['avg_r_after_costs'] if costly else summary['avg_r']:+.3f}R",
+              border=True, icon=":material/equalizer:", help=h("r_multiple"))
+    st.metric("Kâr faktörü",
+              _pf(summary["profit_factor_after_costs"] if costly else summary["profit_factor"]),
+              border=True, help=h("profit_factor"))
+    st.metric("Maks. düşüş",
+              f"{summary['max_drawdown_after_costs_r'] if costly else summary['max_drawdown_r']:.2f}R",
+              border=True, help=h("max_drawdown"))
 
 st.caption(
     f"**{summary['wins']} kâr / {summary['losses']} zarar / {summary['breakeven']} başa baş** · "
@@ -57,6 +73,10 @@ st.caption(
     f"Seri **{summary['current_streak']:+d}** "
     f"(en uzun kâr {summary['best_win_streak']}, zarar {summary['best_loss_streak']})"
 )
+if costly:
+    st.caption(f"Toplam varsayımsal işlem maliyeti: **{summary['total_costs']:,.2f} ₺** · "
+               f"Maliyet sonrası kazanma oranı **%{summary['win_rate_after_costs_pct']}** · "
+               f"Maliyet sonrası kâr faktörü **{_pf(summary['profit_factor_after_costs'])}**")
 
 # ---- Kümülatif R eğrisi ve drawdown ----
 curve = pd.DataFrame(summary["curve"])
@@ -113,6 +133,8 @@ with st.container(border=True):
             "Hedef": rec.get("target"),
             "Çıkış": rec.get("exit"),
             "R": rec.get("r_multiple"),
+            "Net R": rec.get("net_r_multiple", rec.get("r_multiple")),
+            "Maliyet ₺": rec.get("cost_amount", 0),
             "K/Z %": rec.get("pnl_pct"),
             "Güven": rec.get("confidence"),
             "Sonuç": rec.get("outcome", "—"),
@@ -122,6 +144,12 @@ with st.container(border=True):
     table = pd.DataFrame(rows)
 
     def _color(value: object) -> str:
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            if value > 0:
+                return "background-color: #065F46; color: white; font-weight: 600;"
+            if value < 0:
+                return "background-color: #991B1B; color: white; font-weight: 600;"
+            return ""
         text = str(value)
         if "KÂR" in text or text.startswith("+"):
             return "background-color: #065F46; color: white; font-weight: 600;"
@@ -129,7 +157,9 @@ with st.container(border=True):
             return "background-color: #991B1B; color: white; font-weight: 600;"
         return ""
 
-    styled = table.style.map(_color, subset=["Sonuç", "R"])
+    shown = table if use_costs else table.drop(columns=["Net R", "Maliyet ₺"])
+    color_cols = ["Sonuç", "R"] + (["Net R"] if use_costs else [])
+    styled = shown.style.map(_color, subset=color_cols)
     st.dataframe(
         styled,
         hide_index=True,

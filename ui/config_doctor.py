@@ -151,29 +151,22 @@ def check_secrets() -> dict[str, str]:
             "secrets.toml", STATUS_ERROR, f"TOML hatası: {str(exc)[:120]}",
             "Denetim sayfasındaki anahtar düzenleyici ile yeniden kaydedin.",
         )
-    expected = {
-        "finnhub": ("api_key",),
-        "gemini": ("api_key", "model"),
-        "alpaca_paper": ("key_id", "secret_key", "base_url"),
-        "twilio": ("account_sid", "auth_token", "from_number"),
-        "inngest": ("signing_key", "event_key"),
-    }
-    missing: list[str] = []
-    for section, keys in expected.items():
-        values = data.get(section, {})
-        if not isinstance(values, dict):
-            missing.append(section)
-            continue
-        for key in keys:
-            if not values.get(key):
-                missing.append(f"{section}.{key}")
-    if missing:
+    # Tüm harici servisler opsiyoneldir: eksik anahtar hata veya uyarı değildir.
+    configured = [
+        name for name in ("finnhub", "gemini", "alpaca_paper", "twilio", "inngest", "alerts")
+        if isinstance(data.get(name), dict) and any(data[name].values())
+    ]
+    if not configured:
         return _result(
-            "secrets.toml", STATUS_WARN,
-            f"Eksik anahtarlar: {', '.join(missing[:8])}",
-            "Denetim > Veri kaynakları ve API anahtarları bölümünden ekleyin.",
+            "secrets.toml", STATUS_OK,
+            "Opsiyonel servis anahtarı yok; uygulama anahtarsız çalışır.",
+            "Bildirim veya AI yorumu isterseniz Denetim > API rehberini kullanın.",
         )
-    return _result("secrets.toml", STATUS_OK, "Tüm servis bölümleri tanımlı.")
+    return _result(
+        "secrets.toml", STATUS_OK,
+        f"Yapılandırılan opsiyonel servisler: {', '.join(configured)}. "
+        "Eksik servisler opsiyoneldir, hata değildir.",
+    )
 
 
 def _validate_json_file(path: Path, schema: dict[str, Any], label: str) -> dict[str, str]:

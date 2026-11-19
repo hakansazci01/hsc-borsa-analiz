@@ -1,12 +1,12 @@
 # HSC Borsa Analiz — Detaylı Denetim Raporu
 
 Tarih: 18.11.2026
-Kapsam: `borsa_bot/` (11 modül), `ui/` (17 modül), `app_pages/` (8 sayfa), `streamlit_app.py`, `config.yaml`.
+Kapsam: `borsa_bot/` (12 modül), `ui/` (46 modül), `app_pages/` (16 sayfa), `streamlit_app.py`, `config.yaml`.
 
 Yöntem:
 1. Tüm dosyaların satır satır statik incelemesi (iki bağımsız denetim turu)
 2. `compileall` + tüm modüllerin temiz Python sürecinde import edilmesi
-3. AppTest ile 8 sayfa ve 40+ etkileşim (buton, seçim, kaydet/sıfırla, bot, indirme)
+3. AppTest ile 16 sayfa ve 40+ etkileşim (buton, seçim, kaydet/sıfırlama, bot, indirme)
 4. Uç durum testleri: boş izleme listesi, 800+ sembol havuzundan seçim, BIST100
 5. Çalışan uygulamada Agent API ile tüm sayfalar + konsol uyarı takibi
 6. Widget anahtarı çakışması taraması (30 anahtar, 0 çakışma)
@@ -97,7 +97,7 @@ Performans: backtest sinyal hesabı O(n²)'den O(n)'e indirildi (5 backtest: ~3,
 2. **Örneklem küçük** (1-3 işlem). İstatistiksel anlamlılık yok.
 3. **THYAO beklentisi negatif** (önceki denetimde −%5,1). Strateji bu hisse için işlem önermiyor.
 4. **Haber duyarımı sözlük tabanlı**; yorum hatası olabilir.
-5. **Walk-forward doğrulama yok.**
+5. ~~Walk-forward doğrulama yok.~~ **Giderildi:** `ui/validation.py` ve `ui/scientific.py` içindeki purged/embargo'lu walk-forward, Strateji laboratuvarı sayfasında sunuluyor.
 6. **Aracı kurum emir iletimi yok** ve olmayacak; manuel emir taslağı üretiliyor.
 7. **Günlük bar içinde stop/hedef sırası bilinmiyor**; stop önce kabul ediliyor (temkinli varsayım).
 8. **yfinance kısmi gün barı** bazen geçerli Close ile gelebiliyor (düşük olasılık).
@@ -109,8 +109,8 @@ Performans: backtest sinyal hesabı O(n²)'den O(n)'e indirildi (5 backtest: ~3,
 | Kontrol | Sonuç |
 |---|---|
 | `compileall` (tüm paketler) | ✅ |
-| 26 modülün temiz import'u | ✅ |
-| 8 sayfa + 40+ etkileşim (AppTest) | ✅ 0 istisna |
+| 46 modülün temiz import'u | ✅ |
+| 16 sayfa + 40+ etkileşim (AppTest) | ✅ 0 istisna |
 | Uç durumlar (boş liste, 800+ sembol, BIST100) | ✅ |
 | Widget anahtar çakışması (30 anahtar) | ✅ 0 |
 | Agent API — tüm sayfalar + bot | ✅ `ready`, 0 exception |

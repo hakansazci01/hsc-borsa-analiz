@@ -1,5 +1,5 @@
 # ==============================================================================
-# BORSA AL/SAT SINYAL BOTU - YAPILANDIRMA DOSYASI
+# HSC BORSA ANALİZ - YAPILANDIRMA DOSYASI
 # ==============================================================================
 
 # Izlenecek hisse senedi sembolleri (Yahoo Finance formatinda)
@@ -61,6 +61,8 @@ risk:
   max_positions: 5               # Ayni anda acik en fazla pozisyon
   commission_pct: 0.0015         # Islem ucreti %%0.15
   slippage_pct: 0.0010           # Gercekci kayma (yurume) payi %%0.1 - backtestte giris/cikisa uygulanir
+  spread_pct: 0.0010             # Alis-satis makasi %%0.1 - performans defterinde varsayim olarak
+  journal_costs: true            # Performans defterinde maliyetleri dus (komisyon + spread + kayma)
   stop_loss_pct: 0.05            # %%5 zarar kesme
   take_profit_pct: 0.10          # %%10 kar al
   trailing_stop_pct: 0.03        # %%3 kayan stop (istegsiz bagli)
@@ -68,7 +70,6 @@ risk:
 # Geriye donuk test (backtest)
 backtest:
   execution: next_close          # next_close (gunun kapanisi ile ertesi gun kapanisi)
-  allow_short: false             # Kisa pozisyon (short) izin verilsin mi? (su an desteklenmiyor)
 
 # Islem koruma kurallari (frekans / riskkit benzeri)
 guards:
@@ -101,4 +102,3 @@ visualize:
   save_charts: true
   chart_dir: "charts"
   show_plot: false
-  panel_count: 3                 # Fiyat, RSI, MACD

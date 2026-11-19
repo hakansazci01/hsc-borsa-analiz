@@ -222,7 +222,7 @@ def _render_panel(symbol: str, strategy: str, news_weight: int, risk: dict) -> N
                 )
     with right:
         with st.container(border=True):
-            st.subheader("Internet verileri · KAP haberleri", divider="gray")
+            st.subheader("İnternet verileri · KAP haberleri", divider="gray")
             news_items = decision["news"]["items"]
             if news_items:
                 news_df = pd.DataFrame(news_items)[["date", "title", "tone"]]

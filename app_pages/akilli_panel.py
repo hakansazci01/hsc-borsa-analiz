@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import logging
+
 import streamlit as st
 
-from ui import glossary, guide_ui, insights, paper, performance, smart_guide, visual
+from ui import data_freshness, glossary, guide_ui, insights, paper, performance, smart_guide, visual
 from ui.bist_universe import load_companies, ordered_symbols
 from ui.components import real_money_warning
 from ui.core import analysis_args, analyze_symbol
@@ -182,7 +184,8 @@ with st.container(border=True, key="hsc_decision_card"):
         rec = insights.recommendation(
             info, bt, str(settings.get("profile", "Dengeli")), settings.get("risk", {})
         )
-    except Exception:
+    except Exception as exc:
+        logging.exception("Akıllı Panel analiz hatası: %s", exc)
         info, rec = None, None
 
     if not rec:
@@ -205,6 +208,8 @@ with st.container(border=True, key="hsc_decision_card"):
         m2.metric("Stop", f"{rec['stop']:,.2f} ₺", help=h("stop_loss"))
         m3.metric("Hedef", f"{rec['target']:,.2f} ₺", help=h("take_profit"))
         m4.metric("Önerilen pay", f"%{rec['size_pct']}", help=h("position_size"))
+
+        data_freshness.freshness_badges(symbol)
 
         session = session_status()
         b1, b2 = st.columns([1.1, 1], gap="medium")
@@ -246,7 +251,8 @@ with st.container(border=True, key="hsc_pnl_panel"):
     )
     try:
         open_positions = paper.evaluate(user, settings)
-    except Exception:
+    except Exception as exc:
+        logging.exception("Akıllı Panel portföy değerleme hatası: %s", exc)
         open_positions = []
     summary = performance.summarize(performance.read_records(user))
     p1, p2, p3, p4 = st.columns(4)

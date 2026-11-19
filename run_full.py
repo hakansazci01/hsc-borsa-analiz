@@ -16,7 +16,7 @@ def main():
     symbols = cfg.symbols
 
     print("=" * 70)
-    print(" BORSA AL/SAT SINYAL BOTU - TAM CALISMA TESTI")
+    print(" HSC BORSA ANALİZ - TAM CALISMA TESTI")
     print("=" * 70)
     print()
     print("[AYARLAR]")
@@ -47,7 +47,7 @@ def main():
     neutrals = [r for r in results if r["signal"] == "NEUTRAL"]
     print(f"  AL sinyali  : {len(buys)} hisse -> {[b['symbol'] for b in buys]}")
     print(f"  SAT sinyali : {len(sells)} hisse -> {[s['symbol'] for s in sells]}")
-    print(f"  NUTRAL      : {len(neutrals)} hisse -> {[n['symbol'] for n in neutrals]}")
+    print(f"  NÖTR      : {len(neutrals)} hisse -> {[n['symbol'] for n in neutrals]}")
     print()
 
     print("[DOSYALAR]")

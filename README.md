@@ -20,7 +20,8 @@ HSC Borsa Analiz; bir komut satırı sinyal botundan evrilen, tarayıcıdan kull
 - **Bilimsel doğrulama:** Deflated Sharpe Ratio, PBO/CSCV, permütasyon testi, purge+embargo'lu walk-forward, Brier kalibrasyonu
 - **Bildirimler:** ntfy.sh (hesapsız), Telegram ve e-posta; yalnızca karar **değiştiğinde** tek seferlik bildirim
 - **Kullanıcı hesapları:** PBKDF2 hash'li şifre, kullanıcıya özel ayarlar / kurgusal portföy / sinyal geçmişi
-- **Şeffaf sinyal performans defteri:** Kapanan her kurgusal sinyal giriş / stop / hedef / çıkış ve **R çarpanı**yla kaydedilir; kazananlar *ve* kaybedenler aynı tabloda, kümülatif R eğrisi, drawdown, kazanma oranı, kâr faktörü ve beklentiyle birlikte gösterilir
+- **Şeffaf sinyal performans defteri:** Kapanan her kurgusal sinyal giriş / stop / hedef / çıkış ve **R çarpanı**yla kaydedilir; kazananlar *ve* kaybedenler aynı tabloda, kümülatif R eğrisi, drawdown, kazanma oranı, kâr faktörü ve beklentiyle birlikte gösterilir. Komisyon / spread / kayma varsayımlarıyla **maliyet sonrası R** ayrıca hesaplanır
+- **Veri kaynağı ve tazelik:** Akıllı Panel'de kotasyon kaynağı, veri yaşı ve ~15 dk gecikme uyarısı rozetlerle gösterilir; eski veri ayrıca işaretlenir
 - **Risk merkezi:** Rejim tespiti, Kelly boyutu, Monte Carlo zarar olasılığı, korelasyon ve çeşitlendirme
 
 ## Ekran görüntüleri
@@ -66,7 +67,7 @@ streamlit run streamlit_app.py
 1. Python 3.10+ kurulu olmalı (kurulumda **Add Python to PATH** işaretli olmalı): https://www.python.org/downloads/
 2. Depoyu indirip `calistir.bat` dosyasına **çift tıklayın**
 
-İlk çalıştırmada.bat sanal ortamı ve gerekli paketleri otomatik yükler (internet gerekir). İkinci çalıştırmada doğrudan açılır. Tarayıcı otomatik açılmazsa `http://localhost:8501` adresine gidin.
+İlk çalıştırmada .bat sanal ortamı ve gerekli paketleri otomatik yükler (İnternet gerekir). İkinci çalıştırmada doğrudan açılır. Tarayıcı otomatik açılmazsa `http://localhost:8501` adresine gidin.
 
 > Mac/Linux için elle kurulum gerekir: `python3 -m venv .venv`, `source .venv/bin/activate`, `pip install -r requirements.txt`, `streamlit run streamlit_app.py`.
 
@@ -124,7 +125,7 @@ Kapanan her kurgusal pozisyon otomatik olarak `users/<kullanici>/performance.jso
 - Tüm kapanan sinyallerin tablosu (kayıplar dahil), CSV olarak indirilebilir
 - Hisse ve yön bazında performans dökümü
 
-> Bu defter kurgusal sinyallerin kaydıdır; spread, komisyon, swap ve kayma dahil **değildir**. Geçmiş performans gelecek sonuçların güvenilir göstergesi değildir. Yüksek kazanma oranı tek başına yeterli değildir; kâr faktörü ve beklentiyle birlikte okunmalıdır.
+> Bu defter kurgusal sinyallerin kaydıdır. Yeni kayıtlarda **komisyon, spread ve kayma varsayımları** (Ayarlar → Risk) maliyet olarak düşülür ve "Maliyetleri dahil et" anahtarıyla brüt/net arasında geçiş yapılabilir. Eski kayıtlarda maliyet alanı yoksa net = brüt kabul edilir. Swap/finansman maliyeti modellenmez; bunlar gerçek dolum garantisi değildir. Geçmiş performans gelecek sonuçların güvenilir göstergesi değildir. Yüksek kazanma oranı tek başına yeterli değildir; kâr faktörü ve beklentiyle birlikte okunmalıdır.
 
 ## Akıllı Panel ve sadeleştirilmiş menü
 
@@ -134,7 +135,7 @@ Açılış sayfası **Akıllı Panel**'dir. Amaç teknik karmaşıklığı kulla
 2. **Tek net karar:** Seçilen hisse için AL / BEKLE / SAT, güven skoru, 2 cümlelik sade gerekçe ve giriş/stop/hedef seviyeleri tek kartta toplanır. "Bugün ne yapmalı?" önerisi izleme listesinin tamamını tarayıp tek aday çıkarır; aday yoksa açıkça **BEKLE** der.
 3. **Kurgusal portföy:** Açık pozisyon, açık K/Z, kapanan sinyal ve net R birlikte görünür.
 
-Üst menüde sadece 7 ana araç görünür; tarayıcı, bot, risk merkezi, laboratuvar, denetim, piyasa analizi, hisse detayı ve portföy testi **"Gelişmiş analizler"** başlıklı açılır grupta toplanır. **Hiçbir sayfa kaldırılmadı.** Panelin altındaki **"Teknik terimler sade dille"** bölümü 20 terimi günlük dille açıklar.
+Üst menüde sadece 7 ana araç görünür; tarayıcı, bot, canlı işlem, risk merkezi, laboratuvar, denetim, piyasa analizi, hisse detayı ve portföy testi **"Gelişmiş analizler"** başlıklı açılır grupta toplanır. **Hiçbir sayfa kaldırılmadı.** Panelin altındaki **"Teknik terimler sade dille"** bölümü 20 terimi günlük dille açıklar.
 
 ### Yönlendirici yardım ve animasyonlar
 
@@ -161,7 +162,7 @@ Fintech arayüz ilkeleri (güven sinyalleri, okunabilir büyük rakamlar, tutarl
 | "Yayınla / Deploy" penceresi nedir? | Streamlit'in uygulamayı kendi bulutuna (Community Cloud / Snowflake / kendi sunucunuz) yükleme teklifidir. Bu proje **yerelde çalışan paper-only** bir karar destek uygulaması olduğu için bu düğme kaldırılmıştır; yanlışlıkla açılsa bile pencere tamamen Türkçe çevrilir. |
 | Uygulama açılmıyor | Python 3.10+ kurulu ve PATH'de mi? `calistir.bat` sanal ortamı/paketleri otomatik kurar; internet gerekir. |
 | Tarayıcı açılmadı | `http://localhost:8501` adresine gidin. Port doluysa `streamlit run streamlit_app.py --server.port 8502`. |
-| Fiyat/sinyal gelmiyor | Internet bağlantısını ve seans durumunu kontrol edin. Ücretsiz veri ~15 dk gecikmelidir. |
+| Fiyat/sinyal gelmiyor | İnternet bağlantısını ve seans durumunu kontrol edin. Ücretsiz veri ~15 dk gecikmelidir. |
 | Bildirim gelmiyor | ntfy için konuya abone olunduğundan ve Ayarlar'da kanalın açık olduğundan emin olun. Bildirim yalnızca karar değiştiğinde gönderilir. |
 | API anahtarı şart mı? | Hayır. Tüm servisler opsiyoneldir; anahtarsız da çalışır. |
 | Gerçek emir veriliyor mu? | Hayır. Sistem yalnızca kurgusal (paper) işlem yapar, aracı kuruma bağlanmaz. |

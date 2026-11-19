@@ -30,12 +30,12 @@ def _score(
     w = float(weights.get("rsi", 1.5))
     if rsi < rsi_os:
         score += w
-        details["RSI"] = f"ASIRI DUSUK ({rsi:.1f}) -> AL"
+        details["RSI"] = f"AŞIRI DÜŞÜK ({rsi:.1f}) → AL"
     elif rsi > rsi_ob:
         score -= w
-        details["RSI"] = f"ASIRI YUKSEK ({rsi:.1f}) -> SAT"
+        details["RSI"] = f"AŞIRI YÜKSEK ({rsi:.1f}) → SAT"
     else:
-        details["RSI"] = f"Nutral ({rsi:.1f})"
+        details["RSI"] = f"Nötr ({rsi:.1f})"
 
     # ---- MACD ----
     macd = float(last.get("MACD", 0)) if pd.notna(last.get("MACD")) else 0.0
@@ -44,18 +44,18 @@ def _score(
     w = float(weights.get("macd", 1.5))
     if bool(last.get("MACD_Cross_Up", False)):
         score += w
-        details["MACD"] = "Kirdagi yukari kesti -> AL"
+        details["MACD"] = "MACD çizgisi yukarı kesti → AL"
     elif bool(last.get("MACD_Cross_Down", False)):
         score -= w
-        details["MACD"] = "Kirdagi asagi kesti -> SAT"
+        details["MACD"] = "MACD çizgisi aşağı kesti → SAT"
     elif macd_hist > 0:
         score += w * 0.33
-        details["MACD"] = f"Histogram pozitif ({macd_hist:.4f}) -> AL yonu"
+        details["MACD"] = f"Histogram pozitif ({macd_hist:.4f}) → AL yönü"
     elif macd_hist < 0:
         score -= w * 0.33
-        details["MACD"] = f"Histogram negatif ({macd_hist:.4f}) -> SAT yonu"
+        details["MACD"] = f"Histogram negatif ({macd_hist:.4f}) → SAT yönü"
     else:
-        details["MACD"] = "Nutral"
+        details["MACD"] = "Nötr"
 
     # ---- Trend (SMA duzeni) ----
     close = float(last["Close"])
@@ -64,41 +64,41 @@ def _score(
     w = float(weights.get("trend", 1.0))
     if bool(last.get("Trend_Bullish", False)):
         score += w
-        details["Trend"] = "Fiyat > SMA50 > SMA200 -> Yukselis"
+        details["Trend"] = "Fiyat > SMA50 > SMA200 -> Yükseliş"
     elif bool(last.get("Trend_Bearish", False)):
         score -= w
-        details["Trend"] = "Fiyat < SMA50 < SMA200 -> Duselis"
+        details["Trend"] = "Fiyat < SMA50 < SMA200 -> Düşüş"
     else:
-        details["Trend"] = "Karisik / Nutral"
+        details["Trend"] = "Karışık / Nötr"
 
     # ---- Bollinger (ortalama donus) ----
     bb_pctb = float(last.get("BB_PercentB", 0.5)) if pd.notna(last.get("BB_PercentB")) else 0.5
     w = float(weights.get("bollinger", 1.0))
     if bb_pctb < 0:
         score += w
-        details["Bollinger"] = f"Alt banda (%B={bb_pctb:.2f}) -> AL (donus)"
+        details["Bollinger"] = f"Alt banda (%B={bb_pctb:.2f}) → AL (donus)"
     elif bb_pctb > 1:
         score -= w
-        details["Bollinger"] = f"Ust banda (%B={bb_pctb:.2f}) -> SAT (donus)"
+        details["Bollinger"] = f"Üst banda (%B={bb_pctb:.2f}) → SAT (donus)"
     else:
-        details["Bollinger"] = f"Bantlar icinde (%B={bb_pctb:.2f})"
+        details["Bollinger"] = f"Bantlar içinde (%B={bb_pctb:.2f})"
     # ---- Stokastik ----
     stoch_k = float(last.get("Stoch_K", 50)) if pd.notna(last.get("Stoch_K")) else 50.0
     w = float(weights.get("stochastic", 1.0))
     if bool(last.get("Stoch_Cross_Up", False)) and stoch_k < 20:
         score += w
-        details["Stochastic"] = f"ASIRI DUSUK & yukari kesis ({stoch_k:.1f}) -> AL"
+        details["Stochastic"] = f"AŞIRI DÜŞÜK & yukarı kesiş ({stoch_k:.1f}) → AL"
     elif bool(last.get("Stoch_Cross_Down", False)) and stoch_k > 80:
         score -= w
-        details["Stochastic"] = f"ASIRI YUKSEK & asagi kesis ({stoch_k:.1f}) -> SAT"
+        details["Stochastic"] = f"AŞIRI YÜKSEK & aşağı kesiş ({stoch_k:.1f}) → SAT"
     elif stoch_k < 20:
         score += w * 0.5
-        details["Stochastic"] = f"Asiri dusuk ({stoch_k:.1f}) -> AL yonu"
+        details["Stochastic"] = f"Aşırı düşük ({stoch_k:.1f}) → AL yönü"
     elif stoch_k > 80:
         score -= w * 0.5
-        details["Stochastic"] = f"Asiri yuksek ({stoch_k:.1f}) -> SAT yonu"
+        details["Stochastic"] = f"Aşırı yüksek ({stoch_k:.1f}) → SAT yönü"
     else:
-        details["Stochastic"] = f"Nutral ({stoch_k:.1f})"
+        details["Stochastic"] = f"Nötr ({stoch_k:.1f})"
 
     # ---- OBV (hacim onay) ----
     obv_rising = bool(last.get("OBV_Rising", False))
@@ -124,12 +124,12 @@ def _score(
         w = float(weights.get("vwap", 0.5))
         if close > vwap:
             score += w * 0.5
-            details["VWAP"] = f"Fiyat > VWAP ({vwap:.2f}) -> AL yonu"
+            details["VWAP"] = f"Fiyat > VWAP ({vwap:.2f}) → AL yönü"
         elif close < vwap:
             score -= w * 0.5
-            details["VWAP"] = f"Fiyat < VWAP ({vwap:.2f}) -> SAT yonu"
+            details["VWAP"] = f"Fiyat < VWAP ({vwap:.2f}) → SAT yönü"
         else:
-            details["VWAP"] = "VWAP ustunde/ustunde nutral"
+            details["VWAP"] = "VWAP üzerinde / altında nötr"
     else:
         details["VWAP"] = "Veri yok"
 

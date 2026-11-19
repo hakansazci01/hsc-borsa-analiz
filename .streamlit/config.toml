@@ -2,9 +2,10 @@
 
 [client]
 # Streamlit menüsü görünür kalsın; İngilizce etiketler ui/tr_ui.py içindeki
-# tarayıcı tarafı çevirici ile Türkçe'ye dönüştürülür. Böylece Rerun /
-# Clear cache / Print / Record screen / Deploy işlevleri korunur ve menü
-# içeriği Türkçe olur.
+# tarayıcı tarafı çeviriciyle Türkçe'ye dönüştürülür (Yeniden çalıştır,
+# Önbelleği temizle, Yazdır, Ekranı kaydet). Deploy/Yayınla düğmesi paper-only
+# uygulamada gereksiz olduğu için gizlenir; toolbar modu yine de "developer"
+# kalır ki diğer seçenekler erişilebilir olsun.
 toolbarMode = "developer"
 
 [theme]
