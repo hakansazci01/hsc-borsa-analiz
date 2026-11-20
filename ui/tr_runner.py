@@ -60,8 +60,9 @@ def _acquire_lock() -> bool:
 
 def _release_lock() -> None:
     try:
-        LOCK.unlink(missing_ok=True)
-    except OSError:
+        if LOCK.exists() and int(LOCK.read_text(encoding="utf-8").strip() or 0) == os.getpid():
+            LOCK.unlink(missing_ok=True)
+    except (OSError, ValueError):
         pass
 
 
@@ -87,6 +88,10 @@ def run_forever() -> None:
     try:
         while True:
             try:
+                # Kilit baskasina gectiyse bu ornek cikar (cift emir riski).
+                if int(LOCK.read_text(encoding="utf-8").strip() or 0) != os.getpid():
+                    _log("Kilit baska PID'de — cift emir riski, çıkıyorum")
+                    return
                 if tr_scalper.STOP_FILE.exists():
                     RUN_FLAG.unlink(missing_ok=True)
                     _log("Durdurma sinyali alındı — güvenle çıkılıyor")
