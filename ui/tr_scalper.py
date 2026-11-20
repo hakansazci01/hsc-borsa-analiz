@@ -32,7 +32,8 @@ STOP_FILE = auth.USERS_DIR / "TR_SCALPER_STOP"
 MAX_ORDER_TRY = 10.0       # baslangic emir boyutu
 MAX_ORDER_GROW = 20.0      # karla buyume ust siniri
 MAX_LOSS_TRY = 3.0
-MAX_TRADES = 3
+MAX_TRADES = 50            # surekli calisma: islem sayisi siniri yok (zarar siniri yeterli)
+MAX_HOLD_SEC = 900        # 15 dk'dan uzun suren durgun pozisyonu serbest birak
 TAKE_PROFIT = 0.0080       # kazananlari kos: hedef %0.80
 STOP_LOSS = 0.0035
 TRAIL_ACTIVATE = 0.0040    # %0.40 ustunde trailing baslar
@@ -152,17 +153,21 @@ def _order(symbol: str, side: int, qty: float) -> dict[str, Any]:
     return {"ok": True, "data": data}
 
 
-def available_try() -> float:
-    """Gercek kullanilabilir TRY bakiyesi (karla buyume icin)."""
+def asset_balance(asset: str) -> float:
+    """Gercek kullanilabilir bakiye (komisyon dusulmus)."""
     ok, data = _request("/open/v1/account/spot", signed=True)
     if ok and isinstance(data, dict) and data.get("code") in (0, None):
         for a in (data.get("data", {}).get("accountAssets") or []):
-            if a.get("asset") == "TRY":
+            if a.get("asset") == asset:
                 try:
                     return float(a.get("free", 0) or 0)
                 except (TypeError, ValueError):
                     return 0.0
     return 0.0
+
+
+def available_try() -> float:
+    return asset_balance("TRY")
 
 
 def buy(symbol: str, qty_override: float | None = None) -> dict[str, Any]:
@@ -184,8 +189,10 @@ def buy(symbol: str, qty_override: float | None = None) -> dict[str, Any]:
     if res.get("ok"):
         st = _load()
         body = (res.get("data") or {}).get("data") or {}
+        # Komisyon base varliktan kesilir: gercek alinan miktari oku.
+        actual = asset_balance(symbol.split("_")[0]) or qty
         st["position"] = {
-            "symbol": symbol, "qty": qty, "entry": px,
+            "symbol": symbol, "qty": actual, "entry": px,
             "time": time.strftime("%Y-%m-%d %H:%M:%S"),
             "entry_ts": time.time(),
             "tp": round(px * (1 + TAKE_PROFIT), 6),
@@ -199,7 +206,23 @@ def buy(symbol: str, qty_override: float | None = None) -> dict[str, Any]:
 
 
 def sell(symbol: str, qty: float, reason: str = "manuel") -> dict[str, Any]:
-    res = _order(symbol, 1, qty)  # 1 = SAT
+    # Komisyon ve stepSize nedeniyle adet ile satis reddedilebilir.
+    # quoteOrderQty (TL tutari ile piyasa satis) her zaman calisir.
+    px = price(symbol) or 0
+    actual = asset_balance(symbol.split("_")[0])
+    if actual > 0:
+        qty = min(qty, actual)
+    res: dict[str, Any]
+    if px and qty > 0:
+        quote = round(px * qty * 0.9995, 4)
+        payload = {"symbol": symbol, "side": 1, "type": 2, "quoteOrderQty": str(quote)}
+        ok, data = _request("/open/v1/orders", payload, signed=True, method="POST")
+        if ok and isinstance(data, dict) and data.get("code") in (0, None):
+            res = {"ok": True, "data": data}
+        else:
+            res = {"ok": False, "reason": f"quoteOrderQty: {str(data)[:150]}"}
+    else:
+        res = {"ok": False, "reason": "fiyat veya bakiye yok"}
     if res.get("ok"):
         st = _load()
         hist = st.get("history", [])
@@ -233,6 +256,31 @@ def kill_switch() -> bool:
     st = _load()
     return (float(st.get("realized_pnl", 0)) <= -MAX_LOSS_TRY or
             len(st.get("history", [])) >= MAX_TRADES)
+
+
+def tradeable_pairs() -> tuple[str, ...]:
+    """Bakiyeye uygun (minNotional <= bakiye) tum TRY ciftlerini keşfet."""
+    import urllib.request
+
+    bal = available_try()
+    try:
+        with urllib.request.urlopen(
+            "https://www.binance.tr/open/v1/common/symbols", timeout=12
+        ) as r:
+            data = json.loads(r.read().decode())
+        out: list[str] = []
+        for s in data.get("data", {}).get("list", []):
+            sym = s.get("symbol", "")
+            if not sym.endswith("_TRY") or sym == "FORM_TRY":
+                continue
+            for f in s.get("filters", []):
+                if f.get("filterType") == "NOTIONAL":
+                    if float(f.get("minNotional", 999)) <= bal + 0.5:
+                        out.append(sym)
+                    break
+        return tuple(out[:40]) or PAIRS
+    except Exception:
+        return PAIRS
 
 
 def _snapshot(pos: dict[str, Any] | None) -> None:
@@ -303,6 +351,12 @@ def cycle() -> list[str]:
                 logs.append(f"SAT {sym} {'OK' if res.get('ok') else 'HATA'} "
                             f"getiri={ret*100:+.2f}% neden=trailing/breakeven")
                 return logs
+            held = time.time() - float(pos.get("entry_ts", time.time()))
+            if held >= MAX_HOLD_SEC:
+                res = sell(sym, float(pos["qty"]), "zaman/sermaye serbest")
+                logs.append(f"SAT {sym} {'OK' if res.get('ok') else 'HATA'} "
+                            f"getiri={ret*100:+.2f}% neden=zaman ({int(held//60)} dk)")
+                return logs
             logs.append(
                 f"Pozisyon {sym}: {ret*100:+.2f}% · zirve {peak_ret*100:+.2f}% · "
                 f"kilit stop {effective_sl:,.5f} · hedef +{TAKE_PROFIT*100:.2f}%"
@@ -310,7 +364,7 @@ def cycle() -> list[str]:
             return logs
     _snapshot(None)
     best = None
-    for sym in PAIRS:
+    for sym in tradeable_pairs():
         s = signal(sym)
         if s.get("decision") == "AL":
             best = (sym, s)

@@ -143,7 +143,8 @@ def test_tr_scalper_bounds() -> None:
 
     assert t.MAX_ORDER_TRY == 10.0
     assert t.MAX_LOSS_TRY == 3.0
-    assert t.MAX_TRADES == 3
+    assert t.MAX_TRADES >= 50
+    assert t.MAX_HOLD_SEC == 900
     assert t.TAKE_PROFIT > t.STOP_LOSS > 0
     assert t._round_qty(0.2063, 0.1, 0.1) == 0.2
     assert t._round_qty(0.05, 0.1, 0.1) == 0.1

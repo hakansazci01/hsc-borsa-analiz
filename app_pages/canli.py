@@ -566,7 +566,8 @@ with st.expander("CANLI ANALİZ — anlık alım/satım, kâr, süre, zarar", ic
     st.caption(
         "**Kâr odaklı, sürekli çalışır:** hedef %0,80 · %0,40 üzerinde trailing stop · "
         "komisyonu kurtaran kilit stop · kârla büyüen pozisyon (₺20'ye kadar) · "
-        "azami ₺3 zarar / 3 işlem. Panel **5 saniyede bir yenilenir**; tüm sayılar gerçek "
+        "15 dk'dan uzun durgun pozisyon serbest bırakılır · azami ₺3 zarar. "
+        "Panel **5 saniyede bir yenilenir**; tüm sayılar gerçek "
         "Binance TR API'sinden gelir, tahmin/simülasyon değildir."
     )
     from pathlib import Path as _Path
@@ -608,9 +609,14 @@ with st.expander("CANLI ANALİZ — anlık alım/satım, kâr, süre, zarar", ic
         else:
             st.info("Açık pozisyon yok — motor AL sinyali bekliyor.", icon=":material/info:")
 
-        st.markdown("##### Tüm çiftlerin anlık durumu")
+        st.markdown("##### Bakiyeye uygun tüm çiftlerin anlık durumu")
+
+        @st.cache_data(ttl=60)
+        def _live_pairs():
+            return tr_scalper.tradeable_pairs()
+
         rows = []
-        for sym in tr_scalper.PAIRS:
+        for sym in _live_pairs():
             sig = tr_scalper.signal(sym)
             rows.append({
                 "Çift": sym, "Fiyat": sig.get("price"),
@@ -648,7 +654,7 @@ with st.expander("CANLI ANALİZ — anlık alım/satım, kâr, süre, zarar", ic
         g4.metric("Ort. süre", f"{s['avg_seconds']:.0f} sn")
         st.caption(
             f"En iyi işlem **{s['best']:+.2f} ₺** · en kötü işlem **{s['worst']:+.2f} ₺** · "
-            f"azami zarar sınırı ₺3, azami 3 işlem."
+            f"azami zarar sınırı ₺3, işlem sayısı sınırı yok (sürekli çalışır)."
         )
 
     _live_panel()
