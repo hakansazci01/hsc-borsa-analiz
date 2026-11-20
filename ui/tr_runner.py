@@ -9,6 +9,7 @@ Kalıcı Binance TR kâr odaklı çalışma döngüsü.
 
 from __future__ import annotations
 
+import os
 import time
 from pathlib import Path
 
@@ -16,7 +17,43 @@ from ui import auth, tr_scalper
 
 LOG = auth.USERS_DIR / "tr_scalper.log"
 RUN_FLAG = auth.USERS_DIR / "TR_SCALPER_RUN"
+LOCK = auth.USERS_DIR / "TR_SCALPER_LOCK"
 INTERVAL = 15
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        import psutil
+
+        return psutil.pid_exists(pid) and psutil.Process(pid).is_running()
+    except Exception:
+        try:
+            import os
+
+            os.kill(pid, 0)
+            return True
+        except Exception:
+            return False
+
+
+def _acquire_lock() -> bool:
+    """Aynı anda birden fazla motorun emir atmasını engelle."""
+    try:
+        if LOCK.exists():
+            old = int(LOCK.read_text(encoding="utf-8").strip() or 0)
+            if old and old != os.getpid() and _pid_alive(old):
+                return False
+    except Exception:
+        pass
+    LOCK.write_text(str(os.getpid()), encoding="utf-8")
+    return True
+
+
+def _release_lock() -> None:
+    try:
+        LOCK.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def _log(msg: str) -> None:
@@ -32,20 +69,26 @@ def _log(msg: str) -> None:
 
 def run_forever() -> None:
     RUN_FLAG.parent.mkdir(parents=True, exist_ok=True)
+    if not _acquire_lock():
+        _log("ZATEN ÇALIŞAN MOTOR VAR — bu örnek çıkıyor (çift emir riski)")
+        return
     RUN_FLAG.write_text("running", encoding="utf-8")
     tr_scalper.STOP_FILE.unlink(missing_ok=True)
     _log("KALICI MOTOR BAŞLADI — kâr odaklı, 15 sn tur, self-healing")
-    while True:
-        try:
-            if tr_scalper.STOP_FILE.exists():
-                RUN_FLAG.unlink(missing_ok=True)
-                _log("Durdurma sinyali alındı — güvenle çıkılıyor")
-                return
-            for line in tr_scalper.cycle():
-                _log(line)
-        except Exception as exc:  # self-healing: tek hata tüm sistemi öldürmez
-            _log(f"HATA ({type(exc).__name__}): {str(exc)[:150]} — devam ediliyor")
-        time.sleep(INTERVAL)
+    try:
+        while True:
+            try:
+                if tr_scalper.STOP_FILE.exists():
+                    RUN_FLAG.unlink(missing_ok=True)
+                    _log("Durdurma sinyali alındı — güvenle çıkılıyor")
+                    return
+                for line in tr_scalper.cycle():
+                    _log(line)
+            except Exception as exc:  # self-healing: tek hata tüm sistemi öldürmez
+                _log(f"HATA ({type(exc).__name__}): {str(exc)[:150]} — devam ediliyor")
+            time.sleep(INTERVAL)
+    finally:
+        _release_lock()
 
 
 if __name__ == "__main__":

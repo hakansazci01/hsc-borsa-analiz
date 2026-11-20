@@ -676,8 +676,10 @@ with st.expander("CANLI ANALİZ — anlık alım/satım, kâr, süre, zarar", ic
         from pathlib import Path as _P
 
         root = _P(__file__).resolve().parent.parent
+        venv_py = root / ".venv" / "Scripts" / "python.exe"
+        exe = str(venv_py) if venv_py.exists() else sys.executable
         subprocess.Popen(
-            [sys.executable, "-m", "ui.tr_runner"], cwd=str(root),
+            [exe, "-m", "ui.tr_runner"], cwd=str(root),
             creationflags=0x00000008 | 0x00000200,  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
