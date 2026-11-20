@@ -29,9 +29,9 @@ PAIRS = ("XRP_TRY", "DOGE_TRY", "ADA_TRY", "TRX_TRY", "LTC_TRY", "LINK_TRY", "FO
 STATE = auth.USERS_DIR / "tr_scalper_state.json"
 STOP_FILE = auth.USERS_DIR / "TR_SCALPER_STOP"
 
-MAX_ORDER_TRY = 10.0       # baslangic emir boyutu
-MAX_ORDER_GROW = 20.0      # karla buyume ust siniri
-MAX_LOSS_TRY = 3.0
+MAX_ORDER_TRY = 50.0       # taban emir boyutu (buyuk sermayeye gore)
+MAX_ORDER_GROW = 100.0     # ust sinir: bakiyenin %15'i veya 100 TL
+MAX_LOSS_TRY = 15.0        # toplam zarar kilidi (sermayenin ~%3'u)
 MAX_TRADES = 50            # surekli calisma: islem sayisi siniri yok (zarar siniri yeterli)
 MAX_HOLD_SEC = 900        # 15 dk'dan uzun suren durgun pozisyonu serbest birak
 TAKE_PROFIT = 0.0080       # kazananlari kos: hedef %0.80
@@ -179,9 +179,9 @@ def buy(symbol: str, qty_override: float | None = None) -> dict[str, Any]:
     if qty_override is not None:
         qty = qty_override
     else:
-        # Kar odakli buyume: kullanilabilir bakiyenin %85'i, ust sinir 20 TRY.
+        # Kar odakli buyume: bakiyenin %15'i, taban 50 TL, ust sinir 100 TL.
         bal = available_try()
-        budget = min(MAX_ORDER_GROW, max(MAX_ORDER_TRY, bal * 0.85))
+        budget = min(MAX_ORDER_GROW, max(MAX_ORDER_TRY, bal * 0.15))
         need = max(budget, flt["min_notional"] + 0.5) / px
         qty = round(int(need / step + 0.999999) * step, 8)
     qty = max(qty, flt["min_qty"])

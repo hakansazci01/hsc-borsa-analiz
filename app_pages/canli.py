@@ -569,7 +569,8 @@ with st.expander("CANLI ANALİZ — anlık alım/satım, kâr, süre, zarar", ic
     st.caption(
         "**Kâr odaklı, sürekli çalışır:** hedef %0,80 · %0,40 üzerinde trailing stop · "
         "komisyonu kurtaran kilit stop · kârla büyüen pozisyon (₺20'ye kadar) · "
-        "15 dk'dan uzun durgun pozisyon serbest bırakılır · azami ₺3 zarar. "
+        "15 dk'dan uzun durgun pozisyon serbest bırakılır · azami ₺15 zarar · "
+        "bakiyeye göre ₺50–100 pozisyon. "
         "Panel **5 saniyede bir yenilenir**; tüm sayılar gerçek "
         "Binance TR API'sinden gelir, tahmin/simülasyon değildir."
     )
@@ -665,7 +666,7 @@ with st.expander("CANLI ANALİZ — anlık alım/satım, kâr, süre, zarar", ic
         g4.metric("Ort. süre", f"{s['avg_seconds']:.0f} sn")
         st.caption(
             f"En iyi işlem **{s['best']:+.2f} ₺** · en kötü işlem **{s['worst']:+.2f} ₺** · "
-            f"azami zarar sınırı ₺3, işlem sayısı sınırı yok (sürekli çalışır)."
+            f"azami zarar sınırı ₺15, işlem sayısı sınırı yok (sürekli çalışır)."
         )
 
     _live_panel()

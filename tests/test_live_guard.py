@@ -143,8 +143,9 @@ def test_tr_scalper_bounds() -> None:
     """Mikro alsat motorunun saf fonksiyonlari ve risk sinirlari."""
     from ui import tr_scalper as t
 
-    assert t.MAX_ORDER_TRY == 10.0
-    assert t.MAX_LOSS_TRY == 3.0
+    assert t.MAX_ORDER_TRY == 50.0
+    assert t.MAX_ORDER_GROW == 100.0
+    assert t.MAX_LOSS_TRY == 15.0
     assert t.MAX_TRADES >= 50
     assert t.MAX_HOLD_SEC == 900
     assert t.TAKE_PROFIT > t.STOP_LOSS > 0

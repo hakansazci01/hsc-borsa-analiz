@@ -112,7 +112,7 @@ binance:
 binance_tr:
   enabled: false            # once test sinyaliyle dogrulayin, sonra acin
   allowed_symbols: ["BTC_USDT", "ETH_USDT"]
-  max_order_usdt: 50        # tek emir ust siniri (kucuk tutarla pilot)
+  max_order_usdt: 150       # tek emir ust siniri (bakiyeye gore olceklenir)
   confirmation_phrase: "HSC-BINANCE-TR-ARM"
   # Canli emir icin HSC_BINANCE_TR_LIVE=YES ve HSC_BINANCE_TR_ARMED=YES gerekir.
 
