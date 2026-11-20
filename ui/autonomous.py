@@ -206,15 +206,21 @@ def apply(decision: dict[str, Any]) -> None:
 
 
 def run_once() -> dict[str, Any]:
+    previous = _load().get("last_decision", {}).get("decision")
     d = decide()
     apply(d)
     try:
-        from ui import tr_journal
+        from ui import trade_notify, tr_journal
 
         tr_journal.append(
             [f"KARAR={d['decision']} | " + ("; ".join(d.get("reasons", [])) or "edge doğrulandı")],
             None, "karar",
         )
+        # Sadece gerçek değişimde bildir (CLOSED->OPEN veya OPEN->CLOSED).
+        if d["decision"] != previous:
+            trade_notify.decision_alert(
+                d["decision"], d.get("reasons", []), d.get("robust", 0), accuracy(_load())
+            )
     except Exception:
         pass
     return d

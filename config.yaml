@@ -93,8 +93,8 @@ alerts:
   telegram_enabled: false
   telegram_bot_token: "BOT_TOKEN_BURAYA"
   telegram_chat_id: "CHAT_ID_BURAYA"
-  ntfy_enabled: false            # Hesapsiz push bildirim (ntfy.sh)
-  ntfy_topic: ""                 # Ornegin: borsa-xxxxxxxxxxxx
+  ntfy_enabled: true             # Gerçek emir/karar bildirimleri açık
+  ntfy_topic: "borsa-hsc-tr-2026" # ntfy.sh abonelik konusu (degistirilebilir)
   email_enabled: false           # Gmail SMTP (uygulama sifresi gerekir)
 
 # BINANCE - varsayilan TESTNET (sanal para). Gercek anahtar siz ekleyene kadar kapali.

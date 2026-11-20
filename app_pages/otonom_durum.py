@@ -137,6 +137,24 @@ def _dashboard():
     else:
         st.caption("Henüz kayıt yok.")
 
+    st.divider()
+    st.subheader("Bildirimler", divider="gray")
+    from ui import notify
+    from ui.core import default_settings
+
+    topic = str(default_settings().get("alerts", {}).get("ntfy_topic", "") or "")
+    if topic:
+        st.caption(
+            f"Gerçek emir/karar değişiminde telefonunuza push gider. "
+            f"Abone olmak için: **https://ntfy.sh/{topic}** (tarayıcıda açın, "
+            "ntfy uygulamasıyla QR okutun)."
+        )
+        if st.button("Test bildirimi gönder", key="ntfy_test_btn"):
+            ok, msg = notify.send_ntfy("HSC test bildirimi — sistem çalışıyor.", topic)
+            st.caption(("✅ " if ok else "❌ ") + msg)
+    else:
+        st.caption("Bildirim konusu tanımlı değil.")
+
     if st.button("ŞİMDİ ANALİZ ET VE KARAR VER", icon=":material/refresh:", key="status_run"):
         with st.spinner("Gerçek veriler analiz ediliyor..."):
             d = autonomous.run_once()

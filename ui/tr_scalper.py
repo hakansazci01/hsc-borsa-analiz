@@ -147,10 +147,21 @@ def _order(symbol: str, side: int, qty: float) -> dict[str, Any]:
     payload = {"symbol": symbol, "side": side, "type": 2, "quantity": str(qty)}
     ok, data = _request("/open/v1/orders", payload, signed=True, method="POST")
     if not ok:
-        return {"ok": False, "reason": str(data)[:200]}
-    if isinstance(data, dict) and data.get("code") not in (0, None):
-        return {"ok": False, "reason": f"{data.get('code')}: {data.get('msg')}"}
-    return {"ok": True, "data": data}
+        res = {"ok": False, "reason": str(data)[:200]}
+    elif isinstance(data, dict) and data.get("code") not in (0, None):
+        res = {"ok": False, "reason": f"{data.get('code')}: {data.get('msg')}"}
+    else:
+        res = {"ok": True, "data": data}
+    try:
+        from ui.trade_notify import order_alert
+
+        side_name = "AL" if side == 0 else "SAT"
+        body = (res.get("data") or {}).get("data") or {} if isinstance(res.get("data"), dict) else {}
+        detail = f"orderId={body.get('orderId') or body.get('id')}" if body else str(res.get("reason", ""))[:160]
+        order_alert(symbol, side_name, qty, payload.get("price", 0) or 0, bool(res.get("ok")), detail)
+    except Exception:
+        pass
+    return res
 
 
 def asset_balance(asset: str) -> float:
