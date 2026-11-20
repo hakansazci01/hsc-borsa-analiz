@@ -1,0 +1,52 @@
+"""
+Kalıcı Binance TR kâr odaklı çalışma döngüsü.
+
+- Bilgisayar açık olduğu sürece çalışır; STOP dosyası oluşturulana kadar durmaz.
+- Her turda beklenmeyen hata oluşsa bile loglar ve devam eder (self-healing).
+- Kâr odaklı: TP'ye/zirve-stop'a/breakeven'e erişince satar, kârla pozisyon büyütür.
+- Durdurma: ui.tr_scalper.STOP_FILE oluşturmak (paneldeki düğme).
+"""
+
+from __future__ import annotations
+
+import time
+from pathlib import Path
+
+from ui import auth, tr_scalper
+
+LOG = auth.USERS_DIR / "tr_scalper.log"
+RUN_FLAG = auth.USERS_DIR / "TR_SCALPER_RUN"
+INTERVAL = 15
+
+
+def _log(msg: str) -> None:
+    line = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}"
+    print(line, flush=True)
+    try:
+        LOG.parent.mkdir(parents=True, exist_ok=True)
+        with LOG.open("a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+    except OSError:
+        pass
+
+
+def run_forever() -> None:
+    RUN_FLAG.parent.mkdir(parents=True, exist_ok=True)
+    RUN_FLAG.write_text("running", encoding="utf-8")
+    tr_scalper.STOP_FILE.unlink(missing_ok=True)
+    _log("KALICI MOTOR BAŞLADI — kâr odaklı, 15 sn tur, self-healing")
+    while True:
+        try:
+            if tr_scalper.STOP_FILE.exists():
+                RUN_FLAG.unlink(missing_ok=True)
+                _log("Durdurma sinyali alındı — güvenle çıkılıyor")
+                return
+            for line in tr_scalper.cycle():
+                _log(line)
+        except Exception as exc:  # self-healing: tek hata tüm sistemi öldürmez
+            _log(f"HATA ({type(exc).__name__}): {str(exc)[:150]} — devam ediliyor")
+        time.sleep(INTERVAL)
+
+
+if __name__ == "__main__":
+    run_forever()

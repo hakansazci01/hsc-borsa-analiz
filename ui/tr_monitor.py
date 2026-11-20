@@ -94,6 +94,8 @@ def live_metrics() -> dict[str, Any]:
         "pct": round(pct, 3),
         "tp": tp,
         "sl": sl,
+        "effective_sl": float(pos.get("effective_sl", sl) or sl),
+        "peak": float(pos.get("peak", entry) or entry),
         "progress": round(progress, 3),
         "order_id": pos.get("order_id", "—"),
         "fee_est": round(entry * qty * TAKER_FEE, 4),

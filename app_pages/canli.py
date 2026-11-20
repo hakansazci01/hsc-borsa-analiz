@@ -564,9 +564,15 @@ with st.expander("Binance TR botu (gerçek borsa — emirler kilitli)", icon=":m
 # ---- BINANCE TR mikro-alsat motoru (CANLI ANALİZ) ----
 with st.expander("CANLI ANALİZ — anlık alım/satım, kâr, süre, zarar", icon=":material/analytics:", expanded=True):
     st.caption(
-        "Aşağıdaki panel **5 saniyede bir otomatik yenilenir**. Tüm sayılar gerçek Binance TR "
-        "API'sinden ve yerel emir kayıtlarından gelir; tahmin veya simülasyon değildir."
+        "**Kâr odaklı, sürekli çalışır:** hedef %0,80 · %0,40 üzerinde trailing stop · "
+        "komisyonu kurtaran kilit stop · kârla büyüen pozisyon (₺20'ye kadar) · "
+        "azami ₺3 zarar / 3 işlem. Panel **5 saniyede bir yenilenir**; tüm sayılar gerçek "
+        "Binance TR API'sinden gelir, tahmin/simülasyon değildir."
     )
+    from pathlib import Path as _Path
+
+    _running = tr_scalper.STOP_FILE.exists() is False
+    st.caption("Motor durumu: **" + ("ÇALIŞIYOR ♻️" if _running else "DURDURULDU ⏹") + "**")
 
     @st.fragment(run_every="5s")
     def _live_panel():
@@ -596,7 +602,8 @@ with st.expander("CANLI ANALİZ — anlık alım/satım, kâr, süre, zarar", ic
                 f"tahmini komisyon {pos['fee_est']:.3f} ₺"
             )
             st.progress(pos["progress"], text=(
-                f"STOP {pos['sl']:,.4f}  ◀──  giriş {pos['entry']:,.4f}  ──▶  HEDEF {pos['tp']:,.4f}"
+                f"KİLİTLİ STOP {pos['effective_sl']:,.4f}  ◀──  giriş {pos['entry']:,.4f}  "
+                f"──▶  HEDEF {pos['tp']:,.4f}  · zirve {pos['peak']:,.4f}"
             ))
         else:
             st.info("Açık pozisyon yok — motor AL sinyali bekliyor.", icon=":material/info:")
@@ -646,8 +653,25 @@ with st.expander("CANLI ANALİZ — anlık alım/satım, kâr, süre, zarar", ic
 
     _live_panel()
 
-    if st.button("MOTORU DURDUR", icon=":material/stop:", key="scalper_stop",
-                 type="primary", disabled=tr_scalper.STOP_FILE.exists()):
+    ctrl1, ctrl2 = st.columns(2)
+    if ctrl1.button("MOTORU BAŞLAT (kalıcı)", icon=":material/play_arrow:", key="scalper_start",
+                    disabled=tr_scalper.STOP_FILE.exists() is False and
+                    (tr_scalper.STOP_FILE.parent / "TR_SCALPER_RUN").exists()):
+        import subprocess
+        import sys
+        from pathlib import Path as _P
+
+        root = _P(__file__).resolve().parent.parent
+        subprocess.Popen(
+            [sys.executable, "-m", "ui.tr_runner"], cwd=str(root),
+            creationflags=0x00000008 | 0x00000200,  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        st.success("Kalıcı motor başlatıldı. Bilgisayar açık olduğu sürece çalışır.",
+                   icon=":material/check:")
+        st.rerun()
+    if ctrl2.button("MOTORU DURDUR", icon=":material/stop:", key="scalper_stop",
+                    type="primary", disabled=tr_scalper.STOP_FILE.exists()):
         tr_scalper.STOP_FILE.parent.mkdir(parents=True, exist_ok=True)
         tr_scalper.STOP_FILE.write_text("stopped", encoding="utf-8")
         st.warning("Durdurma sinyali verildi. Motor bir sonraki 15 saniyelik turda duracak.",

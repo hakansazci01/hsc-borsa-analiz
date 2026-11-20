@@ -29,11 +29,15 @@ PAIRS = ("XRP_TRY", "DOGE_TRY", "ADA_TRY", "TRX_TRY", "LTC_TRY", "LINK_TRY", "FO
 STATE = auth.USERS_DIR / "tr_scalper_state.json"
 STOP_FILE = auth.USERS_DIR / "TR_SCALPER_STOP"
 
-MAX_ORDER_TRY = 10.0
+MAX_ORDER_TRY = 10.0       # baslangic emir boyutu
+MAX_ORDER_GROW = 20.0      # karla buyume ust siniri
 MAX_LOSS_TRY = 3.0
 MAX_TRADES = 3
-TAKE_PROFIT = 0.0045
+TAKE_PROFIT = 0.0080       # kazananlari kos: hedef %0.80
 STOP_LOSS = 0.0035
+TRAIL_ACTIVATE = 0.0040    # %0.40 ustunde trailing baslar
+TRAIL_DISTANCE = 0.0035    # zirveden %0.35 geri cekilince sat
+BREAKEVEN = 0.0022         # komisyonu kurtaran kilit seviyesi
 
 
 def _load() -> dict[str, Any]:
@@ -148,15 +152,33 @@ def _order(symbol: str, side: int, qty: float) -> dict[str, Any]:
     return {"ok": True, "data": data}
 
 
-def buy(symbol: str) -> dict[str, Any]:
+def available_try() -> float:
+    """Gercek kullanilabilir TRY bakiyesi (karla buyume icin)."""
+    ok, data = _request("/open/v1/account/spot", signed=True)
+    if ok and isinstance(data, dict) and data.get("code") in (0, None):
+        for a in (data.get("data", {}).get("accountAssets") or []):
+            if a.get("asset") == "TRY":
+                try:
+                    return float(a.get("free", 0) or 0)
+                except (TypeError, ValueError):
+                    return 0.0
+    return 0.0
+
+
+def buy(symbol: str, qty_override: float | None = None) -> dict[str, Any]:
     px = price(symbol)
     if not px:
         return {"ok": False, "reason": "fiyat yok"}
     flt = _filters(symbol)
     step = flt["step"] or 0.00000001
-    # Minimum notional'i garanti etmek icin miktari step katina YUKARI yuvarla.
-    need = max(MAX_ORDER_TRY, flt["min_notional"] + 0.5) / px
-    qty = round(int(need / step + 0.999999) * step, 8)
+    if qty_override is not None:
+        qty = qty_override
+    else:
+        # Kar odakli buyume: kullanilabilir bakiyenin %85'i, ust sinir 20 TRY.
+        bal = available_try()
+        budget = min(MAX_ORDER_GROW, max(MAX_ORDER_TRY, bal * 0.85))
+        need = max(budget, flt["min_notional"] + 0.5) / px
+        qty = round(int(need / step + 0.999999) * step, 8)
     qty = max(qty, flt["min_qty"])
     res = _order(symbol, 0, qty)  # 0 = AL
     if res.get("ok"):
@@ -249,15 +271,42 @@ def cycle() -> list[str]:
         sym = pos["symbol"]
         px = price(sym)
         if px:
-            ret = (px - float(pos["entry"])) / float(pos["entry"])
+            entry = float(pos["entry"])
+            ret = (px - entry) / entry
+            peak = max(float(pos.get("peak", entry)), px)
+            pos["peak"] = peak
+            peak_ret = (peak - entry) / entry
+            base_sl = float(pos.get("sl", entry * (1 - STOP_LOSS)))
+            # Kar kilitleri: once komisyonu kurtar, sonra zirveden trail et.
+            if peak_ret >= BREAKEVEN:
+                effective_sl = max(base_sl, entry * (1 + BREAKEVEN))
+            else:
+                effective_sl = base_sl
+            if peak_ret >= TRAIL_ACTIVATE:
+                effective_sl = max(effective_sl, peak * (1 - TRAIL_DISTANCE))
+            pos["effective_sl"] = round(effective_sl, 8)
+            st["position"] = pos
+            _save(st)
             _snapshot(pos)
-            if ret >= TAKE_PROFIT or ret <= -STOP_LOSS:
-                reason = "kar hedefi" if ret >= TAKE_PROFIT else "stop loss"
-                res = sell(sym, float(pos["qty"]), reason)
+            if ret >= TAKE_PROFIT:
+                res = sell(sym, float(pos["qty"]), "kar hedefi")
                 logs.append(f"SAT {sym} {'OK' if res.get('ok') else 'HATA'} "
-                            f"getiri={ret*100:+.2f}% neden={reason}")
+                            f"getiri={ret*100:+.2f}% neden=kar hedefi")
                 return logs
-            logs.append(f"Pozisyon {sym}: {ret*100:+.2f}% (hedef +{TAKE_PROFIT*100:.2f}% / stop -{STOP_LOSS*100:.2f}%)")
+            if ret <= STOP_LOSS * -1 and peak_ret < BREAKEVEN:
+                res = sell(sym, float(pos["qty"]), "stop loss")
+                logs.append(f"SAT {sym} {'OK' if res.get('ok') else 'HATA'} "
+                            f"getiri={ret*100:+.2f}% neden=stop loss")
+                return logs
+            if px <= effective_sl and peak_ret >= BREAKEVEN:
+                res = sell(sym, float(pos["qty"]), "trailing/breakeven")
+                logs.append(f"SAT {sym} {'OK' if res.get('ok') else 'HATA'} "
+                            f"getiri={ret*100:+.2f}% neden=trailing/breakeven")
+                return logs
+            logs.append(
+                f"Pozisyon {sym}: {ret*100:+.2f}% · zirve {peak_ret*100:+.2f}% · "
+                f"kilit stop {effective_sl:,.5f} · hedef +{TAKE_PROFIT*100:.2f}%"
+            )
             return logs
     _snapshot(None)
     best = None
