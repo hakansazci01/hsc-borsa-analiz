@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pandas as pd
+
 from ui import auth, live_bot, live_guard
 from ui.core import default_settings
 
@@ -151,6 +153,22 @@ def test_tr_scalper_bounds() -> None:
     assert t._round_qty(1.234, 0.0, 0.0) == 1.234
     assert set(t.PAIRS).issubset({"XRP_TRY", "DOGE_TRY", "ADA_TRY",
                                   "TRX_TRY", "LTC_TRY", "LINK_TRY", "FORM_TRY"})
+
+
+def test_quant_lab_verdict_logic() -> None:
+    """Arastirma karari: dogrulanmis strateji yoksa ISLEM YOK demeli."""
+    from ui import quant_lab
+
+    assert quant_lab.FEE == 0.001
+    assert len(quant_lab.SYMBOLS) >= 5
+    assert len(quant_lab.TIMEFRAMES) >= 3
+    frame = pd.DataFrame({
+        "Open": [1.0] * 120, "High": [1.1] * 120,
+        "Low": [0.9] * 120, "Close": [1.0] * 120, "Volume": [1.0] * 120,
+    })
+    r = quant_lab.regime(frame)
+    assert r["name"] in ("YUKARI (bull)", "ASAGI (bear)")
+    assert quant_lab.backtest(frame, "ema_cross", (9, 50)) == []
 
 
 def test_readiness_checklist() -> None:

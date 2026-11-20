@@ -9,7 +9,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from ui import binance_bot, binance_tr_bot, broker, components, live_bot, live_guard, tr_monitor, tr_scalper
+from ui import binance_bot, binance_tr_bot, broker, components, live_bot, live_guard, quant_lab, tr_monitor, tr_scalper
 from ui.bist_universe import load_companies, ordered_symbols, search_symbols
 from ui.components import real_money_warning
 from ui.help_texts import h
@@ -693,6 +693,42 @@ with st.expander("CANLI ANALİZ — anlık alım/satım, kâr, süre, zarar", ic
         st.warning("Durdurma sinyali verildi. Motor bir sonraki 15 saniyelik turda duracak.",
                    icon=":material/warning:")
         st.rerun()
+
+# ---- KANTİTATİF ARAŞTIRMA ----
+with st.expander("Kantitatif doğrulama — gerçek veride edge var mı?", icon=":material/science:"):
+    st.caption(
+        "7 coin × 3 zaman diliminde gerçek Binance verisi, %0,2 komisyon, "
+        "iç/dış örneklem ayrımı. Eğitimde iyi çıkıp testte çöken stratejiler "
+        "**doğrulanmış sayılmaz**. Sonuç iddia değil ölçümdür."
+    )
+
+    q = st.session_state.get("quant_result")
+    if st.button("Araştırmayı çalıştır", key="quant_run", icon=":material/play_arrow:"):
+        with st.spinner("Gerçek veriler taranıyor..."):
+            st.session_state["quant_result"] = quant_lab.research()
+        q = st.session_state["quant_result"]
+    if q is None:
+        st.info("Henüz çalıştırılmadı. Yukarıdaki düğmeyle gerçek verileri tarayın.",
+                icon=":material/info:")
+    elif not q.get("ok"):
+        st.warning(q.get("reason", "Veri yok"), icon=":material/warning:")
+    else:
+        r = q["regime"]
+        st.metric("Piyasa rejimi (BTC 4s)", r.get("name", "—"),
+                  delta=f"{r.get('dist_pct', 0):+.1f}% EMA100'den" if r.get("price") else None)
+        a, b, c = st.columns(3)
+        a.metric("Gerçek seri", q["series"])
+        b.metric("Test edilen kombinasyon", q["combinations"])
+        c.metric("Doğrulanmış kârlı", q["robust_count"])
+        best = q["best_train"]
+        st.caption(
+            f"Eğitimde en iyi: **{best['key']}** → eğitim **%{best['train']:+.2f}**, "
+            f"dış örneklem **%{best['test']:+.2f}**"
+        )
+        if q["robust_count"] == 0:
+            st.error("**Karar: " + q["verdict"] + ".** Motor kapalı kalır.", icon=":material/block:")
+        else:
+            st.warning("Karar: " + q["verdict"], icon=":material/warning:")
 
 # ---- BIST hızlı tarama ----
 with st.expander("BIST hızlı tarama (günlük teknik sinyal)", icon=":material/radar:"):
