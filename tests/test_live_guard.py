@@ -137,6 +137,21 @@ def test_binance_tr_adapter_locked() -> None:
         _clean()
 
 
+def test_tr_scalper_bounds() -> None:
+    """Mikro alsat motorunun saf fonksiyonlari ve risk sinirlari."""
+    from ui import tr_scalper as t
+
+    assert t.MAX_ORDER_TRY == 10.0
+    assert t.MAX_LOSS_TRY == 3.0
+    assert t.MAX_TRADES == 3
+    assert t.TAKE_PROFIT > t.STOP_LOSS > 0
+    assert t._round_qty(0.2063, 0.1, 0.1) == 0.2
+    assert t._round_qty(0.05, 0.1, 0.1) == 0.1
+    assert t._round_qty(1.234, 0.0, 0.0) == 1.234
+    assert set(t.PAIRS).issubset({"XRP_TRY", "DOGE_TRY", "ADA_TRY",
+                                  "TRX_TRY", "LTC_TRY", "LINK_TRY"})
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

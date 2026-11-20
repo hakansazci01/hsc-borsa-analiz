@@ -9,7 +9,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from ui import binance_bot, binance_tr_bot, broker, components, live_bot, live_guard
+from ui import binance_bot, binance_tr_bot, broker, components, live_bot, live_guard, tr_scalper
 from ui.bist_universe import load_companies, ordered_symbols, search_symbols
 from ui.components import real_money_warning
 from ui.help_texts import h
@@ -559,6 +559,38 @@ with st.expander("Binance TR botu (gerçek borsa — emirler kilitli)", icon=":m
             st.success("Emir iletildi (GERÇEK borsa, gerçek bakiye).", icon=":material/check:")
         else:
             st.warning(result.get("reason", "Emir gönderilmedi."), icon=":material/warning:")
+        st.rerun()
+
+# ---- BINANCE TR mikro-alsat motoru (canli takip) ----
+with st.expander("Mikro alsat motoru — canlı takip", icon=":material/analytics:"):
+    st.caption(
+        "Gerçek 1-dk veriyle 6 TRY çiftini tarar. AL sinyali gelince **₺10** pilot emir atar, "
+        "+%0,45'te satar, -%0,35'te stop olur. Azami **₺3 zarar** ve **3 işlem** sınırı vardır. "
+        "Bu bir deneydir; kâr garantisi yoktur."
+    )
+    _st = tr_scalper._load()
+    _pos = _st.get("position")
+    _hist = _st.get("history", [])
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Gerçekleşen K/Z", f"{float(_st.get('realized_pnl', 0)):+.2f} ₺")
+    c2.metric("Tamamlanan işlem", len(_hist))
+    c3.metric("Açık pozisyon", _pos.get("symbol", "—") if _pos else "—")
+    if _pos:
+        st.caption(
+            f"Açık: {_pos.get('symbol')} · miktar {_pos.get('qty')} · giriş "
+            f"{_pos.get('entry')} · {_pos.get('time')}"
+        )
+    if _hist:
+        st.dataframe(pd.DataFrame(_hist).tail(8), use_container_width=True, hide_index=True)
+    st.caption(
+        "Durdurmak için aşağıdaki düğmeye basın (motor bir sonraki turda güvenle durur)."
+    )
+    if st.button("MOTORU DURDUR", icon=":material/stop:", key="scalper_stop",
+                 type="primary", disabled=tr_scalper.STOP_FILE.exists()):
+        tr_scalper.STOP_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tr_scalper.STOP_FILE.write_text("stopped", encoding="utf-8")
+        st.warning("Durdurma sinyali verildi. Motor bir sonraki 15 saniyelik turda duracak.",
+                   icon=":material/warning:")
         st.rerun()
 
 # ---- BIST hızlı tarama ----
