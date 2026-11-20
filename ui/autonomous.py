@@ -208,6 +208,15 @@ def apply(decision: dict[str, Any]) -> None:
 def run_once() -> dict[str, Any]:
     d = decide()
     apply(d)
+    try:
+        from ui import tr_journal
+
+        tr_journal.append(
+            [f"KARAR={d['decision']} | " + ("; ".join(d.get("reasons", [])) or "edge doğrulandı")],
+            None, "karar",
+        )
+    except Exception:
+        pass
     return d
 
 

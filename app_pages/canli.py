@@ -12,7 +12,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from ui import autonomous, binance_bot, binance_tr_bot, broker, components, live_bot, live_guard, quant_lab, tr_monitor, tr_scalper
+from ui import autonomous, binance_bot, binance_tr_bot, broker, components, live_bot, live_guard, quant_lab, tr_journal, tr_monitor, tr_scalper
 from ui.bist_universe import load_companies, ordered_symbols, search_symbols
 from ui.components import real_money_warning
 from ui.help_texts import h
@@ -697,6 +697,37 @@ with st.expander("CANLI ANALİZ — anlık alım/satım, kâr, süre, zarar", ic
         st.warning("Durdurma sinyali verildi. Motor bir sonraki 15 saniyelik turda duracak.",
                    icon=":material/warning:")
         st.rerun()
+
+# ---- İŞLEM DEFTERİ ----
+with st.expander("İŞLEM DEFTERİ — ne alındı / ne satıldı / neden işlem yok", icon=":material/receipt:"):
+    st.caption(
+        "Her 15 saniyelik tarama turunun **gerçek** kaydı. `AL`/`SAT` satırları gerçek "
+        "emirleri, `BEKLE` satırları ise işlem açılmama nedenini gösterir. Hiçbir kayıt "
+        "uydurulmaz; emir reddi bile olduğu gibi yazılır."
+    )
+    records = tr_journal.recent(80)
+    if not records:
+        st.info("Henüz kayıt yok — motor bir tur tamamladığında burada görünecek.",
+                icon=":material/info:")
+    else:
+        order_rows = [r for r in records if r.get("kind") == "emir"]
+        st.caption(f"Son {len(records)} tur · **{len(order_rows)}** emirsatırı")
+        table = []
+        for r in reversed(records[-25:]):
+            table.append({
+                "Zaman": r.get("at", "—"),
+                "Tür": r.get("kind", "—"),
+                "Olay": " | ".join(r.get("events", [])[:3])[:220],
+                "Pozisyon": r.get("position") or "—",
+            })
+        st.dataframe(pd.DataFrame(table), use_container_width=True, hide_index=True)
+        if order_rows:
+            st.markdown("##### Gerçek emirler")
+            st.dataframe(pd.DataFrame([
+                {"Zaman": r.get("at"), "Kayıtlar": " | ".join(r.get("events", []))}
+                for r in reversed(order_rows[-10:])
+            ]), use_container_width=True, hide_index=True)
+        st.caption("Ham kayıt: `users/tr_decision_journal.jsonl`")
 
 # ---- OTONOM YÖNETİCİ ----
 with st.expander("OTONOM YÖNETİCİ — sürekli analiz, kendini test eder", icon=":material/psychology:"):

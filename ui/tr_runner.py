@@ -96,8 +96,19 @@ def run_forever() -> None:
                     RUN_FLAG.unlink(missing_ok=True)
                     _log("Durdurma sinyali alındı — güvenle çıkılıyor")
                     return
-                for line in tr_scalper.cycle():
+                lines = tr_scalper.cycle()
+                for line in lines:
                     _log(line)
+                try:
+                    from ui import tr_journal
+
+                    pos = tr_scalper._load().get("position")
+                    kind = "emir" if any(
+                        x.startswith("AL ") or x.startswith("SAT ") for x in lines
+                    ) else "tarama"
+                    tr_journal.append(lines, pos, kind)
+                except Exception:
+                    pass
             except Exception as exc:  # self-healing: tek hata tüm sistemi öldürmez
                 _log(f"HATA ({type(exc).__name__}): {str(exc)[:150]} — devam ediliyor")
             time.sleep(INTERVAL)
