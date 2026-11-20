@@ -190,33 +190,48 @@ def run_once() -> dict[str, Any]:
 
 
 def run_forever() -> None:
+    # Windows named mutex — süreçler arası tek-instance garantisi (dosya kilidi
+    # yerine çekirdek seviyesinde kilit; yarış durumu olmaz).
+    mutex = None
+    try:
+        import ctypes
+
+        mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "HSCAutonomousGovernor")
+        if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+            _log("Zaten çalışan otonom yönetici var (mutex) — çıkıyorum")
+            return
+    except Exception:
+        mutex = None
     LOCK.parent.mkdir(parents=True, exist_ok=True)
     try:
         fd = os.open(LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         os.write(fd, str(os.getpid()).encode())
         os.close(fd)
     except FileExistsError:
-        try:
-            old = int(LOCK.read_text(encoding="utf-8").strip() or 0)
-            if old and tr_runner._pid_alive(old):
-                _log("Zaten çalışan otonom yönetici var — çıkıyorum")
-                return
-        except Exception:
-            pass
-        LOCK.unlink(missing_ok=True)
-        run_forever()
-        return
-    _log(f"OTONOM YÖNETİCİ BAŞLADI — {INTERVAL_MIN} dk tur, self-test açık")
+        pass
+    # Başlangıçta sahiplik doğrula: yarışlı çift başlatmada fazlası hemen çıkar.
+    time.sleep(2)
+    try:
+        if int(LOCK.read_text(encoding="utf-8").strip() or 0) != os.getpid():
+            _log("Kilit başka PID'de — çıkıyorum")
+            return
+    except Exception:
+        pass
+    _log(f"OTONOM YÖNETİCİ BAŞLADI — {INTERVAL_MIN} dk analiz, 60 sn güvenlik kontrolü")
+    last_research = 0.0
     try:
         while True:
             try:
                 if int(LOCK.read_text(encoding="utf-8").strip() or 0) != os.getpid():
                     _log("Kilit başka PID'de — çıkıyorum")
                     return
-                run_once()
+                now = time.time()
+                if now - last_research >= INTERVAL_MIN * 60:
+                    run_once()
+                    last_research = now
             except Exception as exc:
                 _log(f"HATA ({type(exc).__name__}): {str(exc)[:150]} — devam ediliyor")
-            time.sleep(INTERVAL_MIN * 60)
+            time.sleep(60)
     finally:
         try:
             if LOCK.exists() and int(LOCK.read_text(encoding="utf-8").strip() or 0) == os.getpid():
