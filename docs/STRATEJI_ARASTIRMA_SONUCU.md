@@ -42,10 +42,41 @@ FORM_TRY'de teorik edge var, **ama uygulanamıyor**:
 spread'i ödeyerek satış yapılır; maker edge'i kaybolur. Limit emirde `quoteOrderQty`
 API tarafından kabul edilmiyor (400).
 
+## İkinci tur: uzun zaman dilimi + dış örneklem doğrulaması
+
+21 gerçek seri (7 coin × 15d/1s/4s), 1000'er mum. 4 strateji ailesi
+(EMA kesişimi, breakout, RSI dönüşü, trend pullback), 83 kombinasyon.
+İlk %60 eğitim, son %40 test ayrıldı; eğitimde seçilen parametre testte doğrulandı.
+
+| Sonuç | Değer |
+|---|---|
+| Eğitim ve testi **ikisi de pozitif** | **0 / 83** |
+| Test'te pozitif | 6 / 83 (eğitimde çoğu negatif) |
+| En iyi eğitim sonucu | +%3,17 → test **-%2,93** (klasik overfitting) |
+
+### Piyasa rejimi (kritik)
+
+Son 30 günün gerçek verisi — **tüm coin'ler %26–34 düştü**:
+
+| Coin | 30 günlük al-sat-tut |
+|---|---|
+| BTC | -%26,0 |
+| ETH | -%29,5 |
+| XRP | -%29,5 |
+| DOGE | -%30,6 |
+| ADA | -%34,2 |
+| LINK | -%29,1 |
+
+Binance TR **spot** hesabında short (kısa) pozisyon yok. Yani mevcut ayı piyasasında
+**long-only bir stratejinin kâr etmesi matematiksel olarak çok zor.** Test edilen
+hiçbir strateji bu rejimde pozitif çıkmadı.
+
 ## Karar
 
-Zararlı beklentisi kanıtlanmış stratejiyle **canlı işlem durduruldu**. Daha fazla para
-yatırmadan önce şunlar gerekir:
+**Motor açılmıyor.** Kullanıcının açık talebi: "gerçek veride kârlı çıkarsa tekrar aç".
+Kârlı çıkmadı — bu yüzden kapalı kalıyor. Bu, iddia değil ölçülmüş sonuçtur.
+
+Daha fazla para yatırmadan önce şunlar gerekir:
 
 1. **BNB ile komisyon ödeme** hesap ayarından açılmalı (komisyon %0,1 → %0,075;
    hâlâ tek başına yeterli değil).
@@ -53,6 +84,9 @@ yatırmadan önce şunlar gerekir:
    (₺7 yerine en az birkaç yüz TL).
 3. Farklı bir edge: hacim/volatilite rejimi filtresi, daha uzun tutuş, veya
    doğrulanmış bir strateji — **backtest pozitif çıkmadan canlıya alınmamalı**.
+4. Piyasa rejimi değişimi: ayı piyasasında spot long-only yerine ya nakitte kalınmalı
+   ya da short/futures için ayrı (ve çok riskli) bir altyapı kurulmalı. Bu proje
+   şu an yalnızca spot long içerir.
 
 Bu dosya, "kar odaklı" iddiasının dürüst karşılığıdır: şu an elimizde kârlı bir
 strateji **yok**; olduğunu söylemek yanlış olur.
