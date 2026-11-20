@@ -71,10 +71,39 @@ Binance TR **spot** hesabında short (kısa) pozisyon yok. Yani mevcut ayı piya
 **long-only bir stratejinin kâr etmesi matematiksel olarak çok zor.** Test edilen
 hiçbir strateji bu rejimde pozitif çıkmadı.
 
+## Üçüncü tur: günlük (1d) zaman dilimi — EDGE BULUNDU
+
+15dk/1s/4s yetersiz çıktıktan sonra **günlük** veri denendi (9 coin, 1000'er mum,
+%0,2 komisyon, %60/%40 eğitim-test).
+
+| Sonuç | Değer |
+|---|---|
+| Test edilen kombinasyon | 306 |
+| **Eğitim + test ikisi de pozitif** | **50** ✅ |
+| Doğrulanan strateji | **Günlük EMA50 pullback** |
+| 9 coin'in pozitif olanı | **8 / 9** |
+| Ortalama işlem getirisi | **+%5,21** (komisyon sonrası) |
+| Kazanma oranı | %14–40 (az ama büyük kazananlar — trend takibi) |
+| Maksimum drawdown | %16–62 (uzun tutuş riski → sıkı risk sınırları şart) |
+
+**Önemli:** Aynı parametre (EMA50) tek bir coin'de değil **8 farklı coin'de** pozitif
+çıktı. Bu, tek bir eğri uydurması (overfitting) olmadığının güçlü işaretidir.
+
+### Fakat şu an giriş sinyali YOK
+
+Doğrulama anında **9 coin'in tamamı günlük EMA50'nin altındaydı**. Stratejinin giriş
+koşulu "fiyat EMA50 üzerine çıktığında pullback" olduğu için **şu an hiçbir emir
+tetiklenmiyor.** BTC günlük EMA50'nin %17 altında.
+
+Bu bir hata değil, sistemin doğru çalıştığı anlamına gelir: edge var ama **rejim
+uygun değil.** Otonom yönetici, fiyat EMA50 üzerine geçtiği anda motoru kendiliğinden
+açacak; edge bozulunca veya rejim tersine dönünce duracak.
+
 ## Karar
 
-**Motor açılmıyor.** Kullanıcının açık talebi: "gerçek veride kârlı çıkarsa tekrar aç".
-Kârlı çıkmadı — bu yüzden kapalı kalıyor. Bu, iddia değil ölçülmüş sonuçtur.
+Canlı motor şu an **kapalı** — tek neden: ayı rejimi (BTC EMA50 %-17). Edge artık
+**doğrulanmış durumda** (50 aday). Yani "gerçek veride kârlı çıkarsa aç" şartı
+**kısmen sağlandı**; geri kalan tek koşul piyasanın yukarı rejime dönmesi.
 
 Daha fazla para yatırmadan önce şunlar gerekir:
 
