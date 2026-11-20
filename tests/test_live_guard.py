@@ -171,6 +171,24 @@ def test_quant_lab_verdict_logic() -> None:
     assert quant_lab.backtest(frame, "ema_cross", (9, 50)) == []
 
 
+def test_autonomous_selftest_logic() -> None:
+    """Öngörü self-test'i gerçek fiyat yönüne göre puanlanmalı."""
+    from ui import autonomous
+
+    prev = {"at": "test", "prediction": "up", "btc_price": 100.0}
+    up = autonomous._score(prev, 102.0)
+    down = autonomous._score(prev, 98.0)
+    assert up is not None and up["correct"] is True
+    assert down is not None and down["correct"] is False
+
+    prev2 = {"at": "test", "prediction": "down_flat", "btc_price": 100.0}
+    assert autonomous._score(prev2, 99.0)["correct"] is True
+    assert autonomous._score(prev2, 103.0)["correct"] is False
+    assert autonomous._score({}, 100.0) is None
+    acc = autonomous.accuracy({"prediction_tests": [up, down]})
+    assert acc["n"] == 2 and acc["rate"] == 50.0
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

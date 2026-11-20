@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
+from pathlib import Path
 
 import altair as alt
 import pandas as pd
 import streamlit as st
 
-from ui import binance_bot, binance_tr_bot, broker, components, live_bot, live_guard, quant_lab, tr_monitor, tr_scalper
+from ui import autonomous, binance_bot, binance_tr_bot, broker, components, live_bot, live_guard, quant_lab, tr_monitor, tr_scalper
 from ui.bist_universe import load_companies, ordered_symbols, search_symbols
 from ui.components import real_money_warning
 from ui.help_texts import h
@@ -692,6 +693,75 @@ with st.expander("CANLI ANALİZ — anlık alım/satım, kâr, süre, zarar", ic
         tr_scalper.STOP_FILE.write_text("stopped", encoding="utf-8")
         st.warning("Durdurma sinyali verildi. Motor bir sonraki 15 saniyelik turda duracak.",
                    icon=":material/warning:")
+        st.rerun()
+
+# ---- OTONOM YÖNETİCİ ----
+with st.expander("OTONOM YÖNETİCİ — sürekli analiz, kendini test eder", icon=":material/psychology:"):
+    st.caption(
+        "Saatte bir gerçek veriyi tarar, öngörüsünü gerçekleşen fiyatla karşılaştırır. "
+        "**Yalnızca** doğrulanmış kârlı edge + yukarı rejim + yeterli isabet varsa motoru "
+        "kendiliğinden açar; aksi halde kapalı tutar. Sizin müdahaleniz gerekmez."
+    )
+    _as = autonomous._load()
+    _last = _as.get("last_decision", {})
+    _acc = autonomous.accuracy(_as)
+    _gov_alive = autonomous.LOCK.exists() and autonomous.tr_runner._pid_alive(
+        int(autonomous.LOCK.read_text(encoding="utf-8").strip() or 0)
+    ) if autonomous.LOCK.exists() else False
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Yönetici", "ÇALIŞIYOR ♻️" if _gov_alive else "DURDU ⏹")
+    m2.metric("Son karar", _last.get("decision", "—"))
+    m3.metric("Öngörü isabeti", f"%{_acc['rate']}" if _acc["rate"] is not None else "—",
+              help=f"{_acc['n']} test")
+    if _last:
+        st.caption(
+            f"Son analiz **{_last.get('at', '—')}** · rejim **{_last.get('regime', '—')}** · "
+            f"doğrulanmış edge **{_last.get('robust', 0)}**"
+        )
+        if _last.get("reasons"):
+            st.caption("Kapalı kalma nedenleri: " + " · ".join(_last["reasons"]))
+    tests = _as.get("prediction_tests", [])
+    if tests:
+        st.markdown("##### Öngörü self-test (gerçekleşen fiyata göre)")
+        st.dataframe(pd.DataFrame(tests).tail(8), use_container_width=True, hide_index=True)
+    hgit = _as.get("decisions", [])
+    if hgit:
+        st.caption(f"Toplam {len(hgit)} otonom karar kaydedildi.")
+    gc1, gc2 = st.columns(2)
+    if gc1.button("YÖNETİCİYİ BAŞLAT", key="autonomous_start", icon=":material/play_arrow:"):
+        import subprocess
+
+        root = Path(__file__).resolve().parent.parent
+        exe = str(root / ".venv" / "Scripts" / "python.exe")
+        if not Path(exe).exists():
+            exe = sys.executable
+        subprocess.Popen(
+            [exe, "-m", "ui.autonomous_runner"], cwd=str(root),
+            creationflags=0x00000008 | 0x00000200,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        st.success("Otonom yönetici başlatıldı.", icon=":material/check:")
+        st.rerun()
+    if gc2.button("YÖNETİCİYİ DURDUR", key="autonomous_stop", icon=":material/stop:"):
+        from pathlib import Path as _P2
+
+        lk = _P2(autonomous.LOCK)
+        if lk.exists():
+            try:
+                pid = int(lk.read_text(encoding="utf-8").strip() or 0)
+                if pid:
+                    import psutil
+
+                    psutil.Process(pid).terminate()
+            except Exception:
+                pass
+            lk.unlink(missing_ok=True)
+        st.warning("Otonom yönetici durduruldu.", icon=":material/warning:")
+        st.rerun()
+    if st.button("ŞİMDİ ANALİZ ET", key="autonomous_now", icon=":material/refresh:"):
+        with st.spinner("Gerçek veriler analiz ediliyor..."):
+            d = autonomous.run_once()
+        st.caption(f"Karar: **{d['decision']}** — " + ("; ".join(d["reasons"]) or "edge doğrulandı"))
         st.rerun()
 
 # ---- KANTİTATİF ARAŞTIRMA ----
