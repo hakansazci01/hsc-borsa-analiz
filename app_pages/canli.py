@@ -574,6 +574,14 @@ with st.expander("CANLI ANALİZ — anlık alım/satım, kâr, süre, zarar", ic
 
     _running = tr_scalper.STOP_FILE.exists() is False
     st.caption("Motor durumu: **" + ("ÇALIŞIYOR ♻️" if _running else "DURDURULDU ⏹") + "**")
+    st.warning(
+        "⚠️ **Doğrulama sonucu:** 7 gerçek çift üzerinde 228 parametre kombinasyonunun "
+        "**hiçbiri** komisyon sonrası pozitif çıkmadı (en iyisi -%0,098/işlem). "
+        "Canlı pilot da **-₺0,069** net zarar verdi. Bu yüzden motor durduruldu; "
+        "kârlı bir strateji doğrulanmadan parasını yatırmak risklidir. "
+        "Detay: `docs/STRATEJI_ARASTIRMA_SONUCU.md`.",
+        icon=":material/warning:",
+    )
 
     @st.fragment(run_every="5s")
     def _live_panel():
