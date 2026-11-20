@@ -1,0 +1,509 @@
+{
+  "last_prediction": {
+    "at": "2026-11-20 15:47:42",
+    "ts": 1795178862.0940185,
+    "prediction": "down_flat",
+    "btc_price": 61602.54,
+    "regime": "ASAGI (bear)",
+    "robust": 50,
+    "decision": "CLOSED",
+    "reasons": [
+      "ayı rejimi (-17.48%)"
+    ],
+    "best_train": {
+      "key": "XRPUSDT 1d breakout (10, 1.6)",
+      "train": 57.41,
+      "test": -2.72
+    }
+  },
+  "prediction_tests": [
+    {
+      "at": "2026-11-20 06:04:27",
+      "prediction": "down_flat",
+      "realized_pct": -0.08,
+      "correct": true
+    },
+    {
+      "at": "2026-11-20 06:05:54",
+      "prediction": "down_flat",
+      "realized_pct": 0.08,
+      "correct": true
+    },
+    {
+      "at": "2026-11-20 06:06:48",
+      "prediction": "down_flat",
+      "realized_pct": -0.42,
+      "correct": true
+    },
+    {
+      "at": "2026-11-20 06:11:06",
+      "prediction": "down_flat",
+      "realized_pct": -0.01,
+      "correct": true
+    },
+    {
+      "at": "2026-11-20 06:12:33",
+      "prediction": "down_flat",
+      "realized_pct": 0.25,
+      "correct": true
+    },
+    {
+      "at": "2026-11-20 06:15:10",
+      "prediction": "down_flat",
+      "realized_pct": 0.24,
+      "correct": true
+    },
+    {
+      "at": "2026-11-20 06:21:39",
+      "prediction": "down_flat",
+      "realized_pct": 0.03,
+      "correct": true
+    },
+    {
+      "at": "2026-11-20 06:22:44",
+      "prediction": "down_flat",
+      "realized_pct": -0.02,
+      "correct": true
+    },
+    {
+      "at": "2026-11-20 06:29:17",
+      "prediction": "down_flat",
+      "realized_pct": -0.67,
+      "correct": true
+    },
+    {
+      "at": "2026-11-20 07:23:07",
+      "prediction": "down_flat",
+      "realized_pct": -0.23,
+      "correct": true
+    },
+    {
+      "at": "2026-11-20 08:23:30",
+      "prediction": "down_flat",
+      "realized_pct": 0.56,
+      "correct": false
+    },
+    {
+      "at": "2026-11-20 09:23:55",
+      "prediction": "down_flat",
+      "realized_pct": -0.59,
+      "correct": true
+    },
+    {
+      "at": "2026-11-20 12:40:00",
+      "prediction": "down_flat",
+      "realized_pct": 0.28,
+      "correct": true
+    },
+    {
+      "at": "2026-11-20 12:50:25",
+      "prediction": "down_flat",
+      "realized_pct": 0.82,
+      "correct": false
+    },
+    {
+      "at": "2026-11-20 13:40:23",
+      "prediction": "down_flat",
+      "realized_pct": -0.72,
+      "correct": true
+    },
+    {
+      "at": "2026-11-20 14:33:14",
+      "prediction": "down_flat",
+      "realized_pct": -0.06,
+      "correct": true
+    },
+    {
+      "at": "2026-11-20 14:34:24",
+      "prediction": "down_flat",
+      "realized_pct": -0.55,
+      "correct": true
+    },
+    {
+      "at": "2026-11-20 15:13:57",
+      "prediction": "down_flat",
+      "realized_pct": 0.31,
+      "correct": true
+    },
+    {
+      "at": "2026-11-20 15:33:45",
+      "prediction": "down_flat",
+      "realized_pct": -0.0,
+      "correct": true
+    }
+  ],
+  "last_decision": {
+    "at": "2026-11-20 15:47:42",
+    "ts": 1795178862.0940185,
+    "prediction": "down_flat",
+    "btc_price": 61602.54,
+    "regime": "ASAGI (bear)",
+    "robust": 50,
+    "decision": "CLOSED",
+    "reasons": [
+      "ayı rejimi (-17.48%)"
+    ],
+    "best_train": {
+      "key": "XRPUSDT 1d breakout (10, 1.6)",
+      "train": 57.41,
+      "test": -2.72
+    }
+  },
+  "decisions": [
+    {
+      "at": "2026-11-20 06:04:27",
+      "ts": 1795143867.3119872,
+      "prediction": "down_flat",
+      "btc_price": 62090.01,
+      "regime": "ASAGI (bear)",
+      "robust": 0,
+      "decision": "CLOSED",
+      "reasons": [
+        "doğrulanmış kârlı strateji yok",
+        "ayı rejimi (-10.93%)"
+      ],
+      "best_train": {
+        "key": "ADAUSDT 4h trend_pullback (50, -0.01)",
+        "train": 4.854,
+        "test": -3.369
+      }
+    },
+    {
+      "at": "2026-11-20 06:05:54",
+      "ts": 1795143954.6933694,
+      "prediction": "down_flat",
+      "btc_price": 62042.58,
+      "regime": "ASAGI (bear)",
+      "robust": 0,
+      "decision": "CLOSED",
+      "reasons": [
+        "doğrulanmış kârlı strateji yok",
+        "ayı rejimi (-11.0%)"
+      ],
+      "best_train": {
+        "key": "ADAUSDT 4h trend_pullback (50, -0.01)",
+        "train": 4.854,
+        "test": -3.369
+      }
+    },
+    {
+      "at": "2026-11-20 06:06:48",
+      "ts": 1795144008.7946446,
+      "prediction": "down_flat",
+      "btc_price": 62094.0,
+      "regime": "ASAGI (bear)",
+      "robust": 0,
+      "decision": "CLOSED",
+      "reasons": [
+        "doğrulanmış kârlı strateji yok",
+        "ayı rejimi (-10.93%)"
+      ],
+      "best_train": {
+        "key": "ADAUSDT 4h trend_pullback (50, -0.01)",
+        "train": 4.854,
+        "test": -3.369
+      }
+    },
+    {
+      "at": "2026-11-20 06:11:06",
+      "ts": 1795144266.4977593,
+      "prediction": "down_flat",
+      "btc_price": 61832.01,
+      "regime": "ASAGI (bear)",
+      "robust": 0,
+      "decision": "CLOSED",
+      "reasons": [
+        "doğrulanmış kârlı strateji yok",
+        "ayı rejimi (-11.29%)"
+      ],
+      "best_train": {
+        "key": "ADAUSDT 4h trend_pullback (50, -0.01)",
+        "train": 4.854,
+        "test": -3.369
+      }
+    },
+    {
+      "at": "2026-11-20 06:12:33",
+      "ts": 1795144353.602948,
+      "prediction": "down_flat",
+      "btc_price": 61824.0,
+      "regime": "ASAGI (bear)",
+      "robust": 0,
+      "decision": "CLOSED",
+      "reasons": [
+        "doğrulanmış kârlı strateji yok",
+        "ayı rejimi (-11.3%)"
+      ],
+      "best_train": {
+        "key": "ADAUSDT 4h trend_pullback (50, -0.01)",
+        "train": 4.854,
+        "test": -3.369
+      }
+    },
+    {
+      "at": "2026-11-20 06:15:10",
+      "ts": 1795144510.3205838,
+      "prediction": "down_flat",
+      "btc_price": 61980.05,
+      "regime": "ASAGI (bear)",
+      "robust": 0,
+      "decision": "CLOSED",
+      "reasons": [
+        "doğrulanmış kârlı strateji yok",
+        "ayı rejimi (-11.08%)"
+      ],
+      "best_train": {
+        "key": "ADAUSDT 4h trend_pullback (50, -0.01)",
+        "train": 4.854,
+        "test": -3.369
+      }
+    },
+    {
+      "at": "2026-11-20 06:21:39",
+      "ts": 1795144899.4646943,
+      "prediction": "down_flat",
+      "btc_price": 62130.01,
+      "regime": "ASAGI (bear)",
+      "robust": 0,
+      "decision": "CLOSED",
+      "reasons": [
+        "doğrulanmış kârlı strateji yok",
+        "ayı rejimi (-10.87%)"
+      ],
+      "best_train": {
+        "key": "ADAUSDT 4h trend_pullback (50, -0.01)",
+        "train": 4.854,
+        "test": -3.369
+      }
+    },
+    {
+      "at": "2026-11-20 06:22:44",
+      "ts": 1795144964.7520995,
+      "prediction": "down_flat",
+      "btc_price": 62146.0,
+      "regime": "ASAGI (bear)",
+      "robust": 0,
+      "decision": "CLOSED",
+      "reasons": [
+        "doğrulanmış kârlı strateji yok",
+        "ayı rejimi (-10.86%)"
+      ],
+      "best_train": {
+        "key": "ADAUSDT 4h trend_pullback (50, -0.01)",
+        "train": 4.854,
+        "test": -3.369
+      }
+    },
+    {
+      "at": "2026-11-20 06:29:17",
+      "ts": 1795145357.6339312,
+      "prediction": "down_flat",
+      "btc_price": 62136.0,
+      "regime": "ASAGI (bear)",
+      "robust": 0,
+      "decision": "CLOSED",
+      "reasons": [
+        "doğrulanmış kârlı strateji yok",
+        "ayı rejimi (-10.86%)"
+      ],
+      "best_train": {
+        "key": "ADAUSDT 4h trend_pullback (50, -0.01)",
+        "train": 4.854,
+        "test": -3.369
+      }
+    },
+    {
+      "at": "2026-11-20 07:23:07",
+      "ts": 1795148587.7154038,
+      "prediction": "down_flat",
+      "btc_price": 61719.62,
+      "regime": "ASAGI (bear)",
+      "robust": 0,
+      "decision": "CLOSED",
+      "reasons": [
+        "doğrulanmış kârlı strateji yok",
+        "ayı rejimi (-11.27%)"
+      ],
+      "best_train": {
+        "key": "ADAUSDT 4h trend_pullback (50, -0.01)",
+        "train": 4.854,
+        "test": -3.369
+      }
+    },
+    {
+      "at": "2026-11-20 08:23:30",
+      "ts": 1795152210.374785,
+      "prediction": "down_flat",
+      "btc_price": 61575.86,
+      "regime": "ASAGI (bear)",
+      "robust": 0,
+      "decision": "CLOSED",
+      "reasons": [
+        "doğrulanmış kârlı strateji yok",
+        "ayı rejimi (-11.48%)"
+      ],
+      "best_train": {
+        "key": "ADAUSDT 4h trend_pullback (50, -0.01)",
+        "train": 4.854,
+        "test": -3.369
+      }
+    },
+    {
+      "at": "2026-11-20 09:23:55",
+      "ts": 1795155835.1119592,
+      "prediction": "down_flat",
+      "btc_price": 61923.68,
+      "regime": "ASAGI (bear)",
+      "robust": 0,
+      "decision": "CLOSED",
+      "reasons": [
+        "doğrulanmış kârlı strateji yok",
+        "ayı rejimi (-10.98%)"
+      ],
+      "best_train": {
+        "key": "ADAUSDT 4h trend_pullback (50, -0.01)",
+        "train": 4.854,
+        "test": -3.369
+      }
+    },
+    {
+      "at": "2026-11-20 12:40:00",
+      "ts": 1795167600.1290786,
+      "prediction": "down_flat",
+      "btc_price": 61557.86,
+      "regime": "ASAGI (bear)",
+      "robust": 0,
+      "decision": "CLOSED",
+      "reasons": [
+        "doğrulanmış kârlı strateji yok",
+        "ayı rejimi (-11.3%)"
+      ],
+      "best_train": {
+        "key": "ADAUSDT 4h trend_pullback (50, -0.01)",
+        "train": 4.854,
+        "test": -3.369
+      }
+    },
+    {
+      "at": "2026-11-20 12:50:25",
+      "ts": 1795168225.9774327,
+      "prediction": "down_flat",
+      "btc_price": 61727.49,
+      "regime": "ASAGI (bear)",
+      "robust": 50,
+      "decision": "CLOSED",
+      "reasons": [
+        "ayı rejimi (-17.32%)"
+      ],
+      "best_train": {
+        "key": "XRPUSDT 1d breakout (10, 1.6)",
+        "train": 57.41,
+        "test": -2.72
+      }
+    },
+    {
+      "at": "2026-11-20 13:40:23",
+      "ts": 1795171223.8159802,
+      "prediction": "down_flat",
+      "btc_price": 62233.61,
+      "regime": "ASAGI (bear)",
+      "robust": 0,
+      "decision": "CLOSED",
+      "reasons": [
+        "doğrulanmış kârlı strateji yok",
+        "ayı rejimi (-10.34%)"
+      ],
+      "best_train": {
+        "key": "ADAUSDT 4h trend_pullback (50, -0.01)",
+        "train": 4.854,
+        "test": -3.369
+      }
+    },
+    {
+      "at": "2026-11-20 14:33:14",
+      "ts": 1795174394.0615184,
+      "prediction": "down_flat",
+      "btc_price": 61784.83,
+      "regime": "ASAGI (bear)",
+      "robust": 50,
+      "decision": "CLOSED",
+      "reasons": [
+        "ayı rejimi (-17.23%)"
+      ],
+      "best_train": {
+        "key": "XRPUSDT 1d breakout (10, 1.6)",
+        "train": 57.41,
+        "test": -2.72
+      }
+    },
+    {
+      "at": "2026-11-20 14:34:24",
+      "ts": 1795174464.2014215,
+      "prediction": "down_flat",
+      "btc_price": 61750.04,
+      "regime": "ASAGI (bear)",
+      "robust": 50,
+      "decision": "CLOSED",
+      "reasons": [
+        "ayı rejimi (-17.28%)"
+      ],
+      "best_train": {
+        "key": "XRPUSDT 1d breakout (10, 1.6)",
+        "train": 57.41,
+        "test": -2.72
+      }
+    },
+    {
+      "at": "2026-11-20 15:13:57",
+      "ts": 1795176837.1797426,
+      "prediction": "down_flat",
+      "btc_price": 61411.78,
+      "regime": "ASAGI (bear)",
+      "robust": 50,
+      "decision": "CLOSED",
+      "reasons": [
+        "ayı rejimi (-17.72%)"
+      ],
+      "best_train": {
+        "key": "XRPUSDT 1d breakout (10, 1.6)",
+        "train": 57.41,
+        "test": -2.72
+      }
+    },
+    {
+      "at": "2026-11-20 15:33:45",
+      "ts": 1795178025.8507273,
+      "prediction": "down_flat",
+      "btc_price": 61604.81,
+      "regime": "ASAGI (bear)",
+      "robust": 50,
+      "decision": "CLOSED",
+      "reasons": [
+        "ayı rejimi (-17.47%)"
+      ],
+      "best_train": {
+        "key": "XRPUSDT 1d breakout (10, 1.6)",
+        "train": 57.41,
+        "test": -2.72
+      }
+    },
+    {
+      "at": "2026-11-20 15:47:42",
+      "ts": 1795178862.0940185,
+      "prediction": "down_flat",
+      "btc_price": 61602.54,
+      "regime": "ASAGI (bear)",
+      "robust": 50,
+      "decision": "CLOSED",
+      "reasons": [
+        "ayı rejimi (-17.48%)"
+      ],
+      "best_train": {
+        "key": "XRPUSDT 1d breakout (10, 1.6)",
+        "train": 57.41,
+        "test": -2.72
+      }
+    }
+  ],
+  "updated_at": "2026-11-20 15:47:42"
+}
