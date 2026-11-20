@@ -128,6 +128,10 @@ def signal(symbol: str) -> dict[str, Any]:
     if up and r < 72 and breakout and vol_last > vol_avg * 1.15:
         return {"decision": "AL", "rsi": round(r, 1), "price": float(c.iloc[-1]),
                 "reason": "1dk EMA yukari + kirilim + hacim"}
+    # Asiri satimdan ilk yukselis (mean-reversion scalp): sıkı stop ile.
+    if r < 34 and float(c.iloc[-1]) > float(c.iloc[-2]) and vol_last > vol_avg * 0.7:
+        return {"decision": "AL", "rsi": round(r, 1), "price": float(c.iloc[-1]),
+                "reason": "1dk asiri satim (RSI<34) + ilk yukselis"}
     if (not up and r > 55 and breakdown) or r > 78:
         return {"decision": "SAT", "rsi": round(r, 1), "price": float(c.iloc[-1]),
                 "reason": "1dk EMA asagi / asiri alim"}
