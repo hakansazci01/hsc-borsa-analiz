@@ -37,16 +37,25 @@ def _pid_alive(pid: int) -> bool:
 
 
 def _acquire_lock() -> bool:
-    """Aynı anda birden fazla motorun emir atmasını engelle."""
-    try:
-        if LOCK.exists():
-            old = int(LOCK.read_text(encoding="utf-8").strip() or 0)
-            if old and old != os.getpid() and _pid_alive(old):
+    """Atomik kilit: aynı anda birden fazla motorun emir atmasını engelle."""
+    for attempt in range(2):
+        try:
+            fd = os.open(LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, str(os.getpid()).encode("utf-8"))
+            os.close(fd)
+            return True
+        except FileExistsError:
+            try:
+                old = int(LOCK.read_text(encoding="utf-8").strip() or 0)
+            except Exception:
+                old = 0
+            if old and _pid_alive(old):
                 return False
-    except Exception:
-        pass
-    LOCK.write_text(str(os.getpid()), encoding="utf-8")
-    return True
+            try:
+                LOCK.unlink(missing_ok=True)
+            except OSError:
+                return False
+    return False
 
 
 def _release_lock() -> None:
