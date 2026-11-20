@@ -230,7 +230,14 @@ def run_forever() -> None:
         os.write(fd, str(os.getpid()).encode())
         os.close(fd)
     except FileExistsError:
-        pass
+        # Bayat kilit (önceki süreç öldüyse) yeni süreci engellemesin.
+        try:
+            old = int(LOCK.read_text(encoding="utf-8").strip() or 0)
+        except Exception:
+            old = 0
+        if not old or not tr_runner._pid_alive(old):
+            LOCK.write_text(str(os.getpid()), encoding="utf-8")
+            _log(f"Bayat kilit temizlendi (eski PID={old})")
     # Başlangıçta sahiplik doğrula: yarışlı çift başlatmada fazlası hemen çıkar.
     time.sleep(2)
     try:
