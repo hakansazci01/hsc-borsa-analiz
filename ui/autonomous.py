@@ -28,6 +28,7 @@ from ui import auth, quant_lab, tr_runner, tr_scalper
 STATE = auth.USERS_DIR / "tr_autonomous_state.json"
 LOCK = auth.USERS_DIR / "TR_AUTONOMOUS_LOCK"
 LOG = auth.USERS_DIR / "tr_autonomous.log"
+HEARTBEAT = auth.USERS_DIR / "tr_autonomous_heartbeat.json"
 INTERVAL_MIN = 60
 MIN_ACCURACY = 40.0
 MIN_SAMPLES = 4
@@ -44,6 +45,27 @@ def _load() -> dict[str, Any]:
 def _save(data: dict[str, Any]) -> None:
     STATE.parent.mkdir(parents=True, exist_ok=True)
     STATE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def heartbeat(extra: dict[str, Any] | None = None) -> None:
+    """Her turda güncellenir: 'şu an gerçekten çalışıyor' kanıtı."""
+    state = _load()
+    rec = {
+        "at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "ts": time.time(),
+        "pid": os.getpid(),
+        "last_decision": state.get("last_decision", {}).get("decision"),
+        "last_analysis": state.get("last_decision", {}).get("at"),
+        "accuracy": accuracy(state),
+        "robot_running": _runner_alive(),
+    }
+    if extra:
+        rec.update(extra)
+    try:
+        HEARTBEAT.parent.mkdir(parents=True, exist_ok=True)
+        HEARTBEAT.write_text(json.dumps(rec, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        pass
 
 
 def _log(msg: str) -> None:
@@ -225,6 +247,7 @@ def run_forever() -> None:
                 if int(LOCK.read_text(encoding="utf-8").strip() or 0) != os.getpid():
                     _log("Kilit başka PID'de — çıkıyorum")
                     return
+                heartbeat()
                 now = time.time()
                 if now - last_research >= INTERVAL_MIN * 60:
                     run_once()

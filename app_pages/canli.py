@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import os
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -708,11 +710,24 @@ with st.expander("OTONOM YÖNETİCİ — sürekli analiz, kendini test eder", ic
     _gov_alive = autonomous.LOCK.exists() and autonomous.tr_runner._pid_alive(
         int(autonomous.LOCK.read_text(encoding="utf-8").strip() or 0)
     ) if autonomous.LOCK.exists() else False
-    m1, m2, m3 = st.columns(3)
+    m1, m2, m3, m4 = st.columns(4)
     m1.metric("Yönetici", "ÇALIŞIYOR ♻️" if _gov_alive else "DURDU ⏹")
     m2.metric("Son karar", _last.get("decision", "—"))
     m3.metric("Öngörü isabeti", f"%{_acc['rate']}" if _acc["rate"] is not None else "—",
               help=f"{_acc['n']} test")
+    try:
+        _hb = json.loads(autonomous.HEARTBEAT.read_text(encoding="utf-8"))
+        _age = int(time.time() - float(_hb.get("ts", 0)))
+    except Exception:
+        _hb, _age = {}, 999999
+    m4.metric("Son nabız", f"{_age} sn önce",
+              help="Sistem her 60 saniyede nabız atar; 300 sn üstü = sorun")
+    if _age > 300:
+        st.error("⚠️ Yönetici nabzı 5 dakikadan eski — sistem çalışmıyor olabilir. "
+                 "Paneldeki **YÖNETİCİYİ BAŞLAT** düğmesine basın.", icon=":material/error:")
+    else:
+        st.caption(f"✅ Canlı nabız: **{_hb.get('at', '—')}** · PID **{_hb.get('pid', '—')}** · "
+                   f"son analiz **{_hb.get('last_analysis', '—')}**")
     if _last:
         st.caption(
             f"Son analiz **{_last.get('at', '—')}** · rejim **{_last.get('regime', '—')}** · "
