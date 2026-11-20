@@ -194,6 +194,12 @@ with st.sidebar:
 page = st.navigation(
     [
         st.Page(
+            "app_pages/otonom_durum.py",
+                title="OTONOM DURUM",
+                icon=":material/monitoring:",
+                help="Sistemin gerçek durumu: yönetici nabzı, son karar, bakiye, açık pozisyon ve işlem defteri. 10 sn'de bir yenilenir.",
+            ),
+        st.Page(
             "app_pages/akilli_panel.py",
                 title="Akıllı Panel",
                 icon=":material/auto_awesome:",
