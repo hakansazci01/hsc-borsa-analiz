@@ -247,6 +247,41 @@ def render_gateio_editor() -> None:
                     st.rerun()
 
 
+def render_binance_tr_editor() -> None:
+    """Binance TR anahtarları için maskeli yerel giriş formu ([binance_tr])."""
+    with st.expander("Binance TR API anahtarını buraya girin", icon=":material/key:"):
+        st.caption(
+            "Binance TR, global Binance'den **ayrı bir borsadır**. Yalnızca "
+            "www.binance.tr → API Management ekranındaki **API Key / Secret Key** "
+            "değerlerini girin; giriş şifrenizi asla yazmayın. Withdrawal (para çekme) "
+            "izni vermeyin. Değerler yerel secrets.toml dosyasına kaydedilir, depoya gitmez."
+        )
+        with st.form("binance_tr_key_editor", border=False):
+            api_key = st.text_input(
+                "API Key", type="password", key="btr_api_key_input",
+                placeholder="Binance TR API Key",
+            )
+            secret_key = st.text_input(
+                "Secret Key", type="password", key="btr_secret_input",
+                placeholder="Binance TR Secret Key",
+            )
+            if st.form_submit_button("Yerel olarak kaydet", type="primary"):
+                if not api_key or not secret_key:
+                    st.warning("İki alan da gerekli.", icon=":material/warning:")
+                else:
+                    data = _read_secrets()
+                    data.setdefault("binance_tr", {}).update({
+                        "api_key": api_key, "secret_key": secret_key,
+                    })
+                    _write_secrets(data)
+                    st.success(
+                        "Binance TR anahtarı yerel secrets.toml dosyasına kaydedildi "
+                        "(depoya gitmez). Önbellek temizleniyor.", icon=":material/check:",
+                    )
+                    st.cache_data.clear()
+                    st.rerun()
+
+
 def render_binance_editor() -> None:
     """Binance API anahtarını doğrudan bot panelinden girmek için küçük form.
 

@@ -9,7 +9,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from ui import binance_bot, broker, components, live_bot, live_guard
+from ui import binance_bot, binance_tr_bot, broker, components, live_bot, live_guard
 from ui.bist_universe import load_companies, ordered_symbols, search_symbols
 from ui.components import real_money_warning
 from ui.help_texts import h
@@ -486,6 +486,77 @@ with st.expander("Gate.io botu (erişilebilir — TESTNET / sanal para)", icon="
         )
         if result.get("ok"):
             st.success("Emir iletildi (testnet/sanal bakiye).", icon=":material/check:")
+        else:
+            st.warning(result.get("reason", "Emir gönderilmedi."), icon=":material/warning:")
+        st.rerun()
+
+# ---- BINANCE TR (gercek borsa, imza dogrulandi; emirler kilitle bloklu) ----
+with st.expander("Binance TR botu (gerçek borsa — emirler kilitli)", icon=":material/smart_toy:"):
+    from ui.api_keys import render_binance_tr_editor
+
+    render_binance_tr_editor()
+    trcfg = binance_tr_bot.cfg(settings)
+    st.caption(
+        "Binance TR, global Binance'den **ayrı borsadır** (`www.binance.tr`). "
+        "Anahtarınız imzalı hesap sorgusunda **doğrulandı** (code 0). "
+        "Fiyatlar ve mumlar **gerçek**; bakiye sizin hesabınızın gerçek bakiyesidir. "
+        "Emir göndermek için aşağıdaki tüm kilitleri açmanız gerekir."
+    )
+    st.caption(
+        "Durum: "
+        + ("✅ açık" if trcfg.get("enabled") else "❌ kapalı (binance_tr.enabled)")
+        + " · " + ("✅ anahtar var" if binance_tr_bot.configured() else "❌ anahtar yok")
+        + " · " + ("✅ hesap doğrulandı" if binance_tr_bot.account_status().get("ok") else "❌ hesap sorgusu başarısız")
+    )
+    if st.button("Hesap durumunu sorgula (salt okunur)", key="btr_account"):
+        status = binance_tr_bot.account_status()
+        if status.get("ok"):
+            st.success("Hesap bağlantısı OK. Gerçek bakiye bilgisi panelde gösterilmez.", icon=":material/check:")
+            st.caption(f"Hesap alanları: {', '.join(status.get('fields', []))}")
+        else:
+            st.warning(status.get("reason", "Sorgu başarısız."), icon=":material/warning:")
+    tr_symbol = st.selectbox(
+        "Sembol", [str(s).upper() for s in trcfg.get("allowed_symbols", ["BTC_USDT"])],
+        key="btr_symbol",
+    )
+    if st.button("15m sinyal al", icon=":material/flash_on:", key="btr_signal"):
+        st.session_state["btr_last_signal"] = binance_tr_bot.quick_signal(tr_symbol)
+    trsig = st.session_state.get("btr_last_signal")
+    if trsig:
+        st.caption(
+            f"Sinyal: **{trsig.get('decision')}** · fiyat {trsig.get('price', 0):,.4f} USDT · "
+            f"RSI {trsig.get('rsi', '—')} · {trsig.get('reason', '')}"
+        )
+    tr_phrase = st.text_input("Onay ifadesi", key="btr_phrase", type="password")
+    tr_local = st.checkbox(
+        "Ortam kilidini yerel olarak aç", value=binance_tr_bot.is_local_armed(), key="btr_local_armed"
+    )
+    if tr_local != binance_tr_bot.is_local_armed():
+        binance_tr_bot.set_local_armed(tr_local)
+        st.rerun()
+    tr_session = st.checkbox("Oturumu Binance TR emri için onaylıyorum", key="btr_session")
+    st.caption(
+        "Canlı emir için ayrıca `HSC_BINANCE_TR_LIVE=YES` ortam değişkeni gerekir. "
+        "Bu kilit kasıtlıdır; shortcuts ile başlatırken yerel kilit kutusunu kullanın."
+    )
+    tr_qty = st.number_input("Miktar", min_value=0.0, value=0.0, step=0.0001, key="btr_qty")
+    tr_price = float((trsig or {}).get("price") or 0)
+    tr_ok, tr_reasons, _ = binance_tr_bot.guard(
+        tr_symbol, tr_qty, tr_price, tr_phrase, tr_session, settings
+    )
+    if tr_reasons:
+        st.caption("Eksik kilitler: " + " · ".join(tr_reasons))
+    tr_side = "buy" if (trsig or {}).get("decision") == "AL" else "sell"
+    if st.button(
+        "BINANCE TR EMIR GONDER", icon=":material/send:", key="btr_send",
+        disabled=not tr_ok or not trsig or trsig.get("decision") == "BEKLE", type="primary",
+    ):
+        result = binance_tr_bot.execute(
+            st.session_state.user, tr_symbol, tr_side, tr_qty, tr_price,
+            tr_phrase, tr_session, settings,
+        )
+        if result.get("ok"):
+            st.success("Emir iletildi (GERÇEK borsa, gerçek bakiye).", icon=":material/check:")
         else:
             st.warning(result.get("reason", "Emir gönderilmedi."), icon=":material/warning:")
         st.rerun()

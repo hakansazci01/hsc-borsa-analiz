@@ -107,6 +107,15 @@ binance:
   max_order_usdt: 50
   confirmation_phrase: "HSC-BINANCE-ARM"
 
+# BINANCE TR - global Binance'den AYRI borsa. Gercek anahtar dogrulandi.
+# Emirler yine KILITLI: asagidaki kilitle birlikte ortam degiskeni de gerekir.
+binance_tr:
+  enabled: false            # once test sinyaliyle dogrulayin, sonra acin
+  allowed_symbols: ["BTC_USDT", "ETH_USDT"]
+  max_order_usdt: 50        # tek emir ust siniri (kucuk tutarla pilot)
+  confirmation_phrase: "HSC-BINANCE-TR-ARM"
+  # Canli emir icin HSC_BINANCE_TR_LIVE=YES ve HSC_BINANCE_TR_ARMED=YES gerekir.
+
 # GATE.IO - bu agda erisilebilen tek borsa. Varsayilan TESTNET (sanal para).
 gateio:
   enabled: false

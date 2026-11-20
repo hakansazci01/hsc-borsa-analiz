@@ -108,6 +108,35 @@ def test_gateio_adapter() -> None:
         _clean()
 
 
+def test_binance_tr_adapter_locked() -> None:
+    from ui import binance_tr_bot
+
+    _clean()
+    binance_tr_bot.set_local_armed(False)
+    try:
+        settings = default_settings()
+        config = binance_tr_bot.cfg(settings)
+        assert "binance_tr" in settings
+        assert config.get("enabled") is False
+        ok, reasons, _ = binance_tr_bot.guard(
+            "BTC_USDT", 0.001, 50000, "", False, settings
+        )
+        assert not ok and reasons
+        assert any("Ortam kilidi" in r for r in reasons)
+        assert any("Onay ifadesi" in r for r in reasons)
+        assert any("HSC_BINANCE_TR_LIVE" in r for r in reasons)
+        with patch("ui.binance_tr_bot._request") as send:
+            result = binance_tr_bot.execute(
+                USER, "BTC_USDT", "buy", 0.001, 50000, settings=settings
+            )
+        assert not result.get("ok")
+        send.assert_not_called()
+        assert binance_tr_bot._symbol("BTCUSDT") == "BTC_USDT"
+        assert binance_tr_bot._symbol("btc-usdt") == "BTC_USDT"
+    finally:
+        _clean()
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

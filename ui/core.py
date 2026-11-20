@@ -62,6 +62,7 @@ def default_settings() -> dict[str, Any]:
         "alerts": cfg.alerts,
         "live_trading": dict(cfg.get("live_trading", default={})),
         "binance": dict(cfg.get("binance", default={})),
+        "binance_tr": dict(cfg.get("binance_tr", default={})),
         "gateio": dict(cfg.get("gateio", default={})),
         "schedule": "Kapalı",
     }

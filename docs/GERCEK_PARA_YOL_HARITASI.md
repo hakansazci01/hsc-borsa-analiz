@@ -123,19 +123,32 @@ tamamı gerekir.
 
 Binance TR, global Binance'den **ayrı bir borsadır**:
 - Base URL: `https://www.binance.tr` (global `api.binance.com` ile karışmaz)
-- Emir yolu `/open/v1/orders`, sembol formatı `BTC_USDT`, yön `0/1` (al/sat) — global API ile uyumlu değildir
-- Bu ortamdan erişim **ISS tarafından engelleniyor**: `http://www.binance.tr` ve
-  `http://api.binance.com` istekleri `guvenliinternet.turktelekom.com.tr/?str=501`
-  adresine yönlendiriliyor (Türk Telekom **Güvenli İnternet** profili). DNS ve TCP
-  çalışıyor; engel TLS/HTTP katmanında. Anahtar/kod sorunu **değildir**.
-- Çözüm yalnızca abone tarafından: Güvenli İnternet profilini kapatmak veya
-  'Geniş/İzinli' profile geçmek; ya da farklı bir operatör/ağ ile test etmek.
-  `api.binance.me` engellenmiyor ancak Binance TR hesabı için kullanılamaz.
+- İmzalı hesap: `GET /open/v1/account/spot` — HMAC SHA256, `X-MBX-APIKEY` başlığı
+- Emir: `POST /open/v1/orders`, sembol `BTC_USDT`, yön `0 AL / 1 SAT`,
+  tip `1 LIMIT / 2 MARKET`, `timeInForce=GTC`
+- Mum verisi: `https://api.binance.me/api/v1/klines` (sembolde `_` kaldırılır)
 
-Eğer sizin tarayıcınızda `https://www.binance.tr` açılıyorsa, uygulamadaki
-**Borsa API erişim testi** panelinde "Binance TR" satırının OK olması gerekir.
-O zaman `ui/binance_tr_bot.py` adapterini bu formata göre yazabiliriz.
-Anahtarları `[binance_tr]` bölümüne girin (global `[binance]` ile karışmasın).
+**Durum (doğrulandı):** Türk Telekom Güvenli İnternet engeli kaldırıldıktan sonra
+`https://www.binance.tr` ve `https://api.binance.com` 200 dönüyor. Sizin API
+anahtarınız imzalı `/open/v1/account/spot` sorgusunda **doğrulandı** (`code 0 Success`,
+gerçek komisyon/bakiye verisi erişilebilir). Daha önceki `3702 Invalid signature`
+hatasının nedeni, secret'ın 12. pozisyonundaki **`4`** karakterinin eksik
+kopyalanmasıydı; düzeltildi.
+
+Adapter: `ui/binance_tr_bot.py` — gerçek fiyat/mum, gerçek hesap sorgusu,
+çoklu kilit, idempotency ve denetim kaydı içerir. Anahtarlar
+`.streamlit/secrets.toml` → `[binance_tr]` bölümündedir (global `[binance]`'dan ayrı).
+
+**Canlı emir için hâlâ gereken kilitler** (kasıtlı olarak kapalıdır):
+1. `config.yaml` → `binance_tr.enabled: true`
+2. `HSC_BINANCE_TR_ARMED=YES` veya panelde "Ortam kilidini yerel olarak aç"
+3. Onay ifadesi: `HSC-BINANCE-TR-ARM`
+4. Oturum onayı kutusu
+5. `HSC_BINANCE_TR_LIVE=YES` ortam değişkeni
+6. İzinli sembol + `max_order_usdt` tutar sınırı
+
+Pilot için önce **çok küçük bir tutar** ile limit emir önerilir. Para çekme (withdrawal)
+izni vermeyin; IP kısıtlaması önerilir. Bu bir yatırım tavsiyesi değildir.
 
 ## Gate.io testnet — bu ağda çalışan yol
 
