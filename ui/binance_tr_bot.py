@@ -109,12 +109,20 @@ def account_status() -> dict[str, Any]:
     if isinstance(data, dict) and data.get("code") not in (0, None):
         return {"ok": False, "reason": f"API {data.get('code')}: {data.get('msg')}"}
     body = (data or {}).get("data") or {}
+    # Binance TR bu alani "balances" degil "accountAssets" olarak dondurur.
+    assets = body.get("accountAssets") or body.get("balances") or []
     balances = [
-        {"asset": b.get("asset"), "free": b.get("free"), "locked": b.get("locked")}
-        for b in (body.get("balances") or [])
-        if float(b.get("free", 0) or 0) > 0 or float(b.get("locked", 0) or 0) > 0
+        {"asset": a.get("asset"), "free": a.get("free"), "locked": a.get("locked")}
+        for a in assets
+        if float(a.get("free", 0) or 0) > 0 or float(a.get("locked", 0) or 0) > 0
     ]
-    return {"ok": True, "balances": balances[:10], "fields": sorted(body.keys())[:12]}
+    return {
+        "ok": True,
+        "balances": balances[:10],
+        "can_trade": bool(body.get("canTrade")),
+        "can_withdraw": bool(body.get("canWithdraw")),
+        "fields": sorted(body.keys())[:12],
+    }
 
 
 def klines(symbol: str, interval: str = "15m", limit: int = 100) -> pd.DataFrame | None:
