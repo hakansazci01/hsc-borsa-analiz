@@ -25,7 +25,7 @@ from ui.binance_tr_bot import _request
 from ui.secrets_access import get
 
 
-PAIRS = ("XRP_TRY", "DOGE_TRY", "ADA_TRY", "TRX_TRY", "LTC_TRY", "LINK_TRY")
+PAIRS = ("XRP_TRY", "DOGE_TRY", "ADA_TRY", "TRX_TRY", "LTC_TRY", "LINK_TRY", "FORM_TRY")
 STATE = auth.USERS_DIR / "tr_scalper_state.json"
 STOP_FILE = auth.USERS_DIR / "TR_SCALPER_STOP"
 

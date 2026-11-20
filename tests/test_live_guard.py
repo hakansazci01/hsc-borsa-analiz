@@ -149,7 +149,7 @@ def test_tr_scalper_bounds() -> None:
     assert t._round_qty(0.05, 0.1, 0.1) == 0.1
     assert t._round_qty(1.234, 0.0, 0.0) == 1.234
     assert set(t.PAIRS).issubset({"XRP_TRY", "DOGE_TRY", "ADA_TRY",
-                                  "TRX_TRY", "LTC_TRY", "LINK_TRY"})
+                                  "TRX_TRY", "LTC_TRY", "LINK_TRY", "FORM_TRY"})
 
 
 def test_readiness_checklist() -> None:
