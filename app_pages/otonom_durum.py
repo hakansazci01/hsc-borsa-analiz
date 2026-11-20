@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from ui import autonomous, tr_journal, tr_monitor, tr_scalper
+from ui import autonomous, quant_lab, tr_journal, tr_monitor, tr_scalper
 
 
 st.title("Otonom durum", icon=":material/monitoring:")
@@ -82,6 +82,46 @@ def _dashboard():
               "para riske atılmaz.",
             icon=":material/info:",
         )
+
+    # --- TAM TETİKLEYİCİ: ne zaman alır / satar ---
+    st.divider()
+    st.subheader("Tam tetikleyici — sistem NE ZAMAN işlem yapar?", divider="gray")
+    st.markdown(
+        """
+        **ALım için üç koşulun hepsi birden gerçekleşmeli:**
+        1. Doğrulanmış edge mevcut (şu an ✅ 50)
+        2. BTC **günlük kapanışı EMA50'nin üstüne geçmeli** (ayı rejimi bitmeli)
+        3. Hedef coin'in günlük kapanışı kendi EMA50'sini geçip pullback yapmalı
+
+        **SATış için:** +%0,80 kâr hedefi, -%0,35 stop, zirveden %0,35 trailing,
+        veya 15 dakikadan uzun durgunluk.
+        """
+    )
+    coins = ("BTCUSDT", "ETHUSDT", "XRPUSDT", "DOGEUSDT",
+             "ADAUSDT", "LINKUSDT", "BNBUSDT", "SOLUSDT")
+    trig_rows = []
+    for sym in coins:
+        frame = quant_lab.fetch(sym, "1d", 200)
+        if frame is None:
+            continue
+        m = quant_lab.ema(frame["Close"], 50)
+        last = float(frame["Close"].iloc[-1])
+        ma = float(m.iloc[-1])
+        dist = (last / ma - 1) * 100
+        trig_rows.append({
+            "Coin": sym.replace("USDT", ""),
+            "Fiyat": round(last, 4),
+            "EMA50": round(ma, 4),
+            "EMA50 mesafesi": f"{dist:+.1f}%",
+            "Giriş": "HAZIR ✅" if dist > 0 else f"%{abs(dist):.1f} yükseliş gerekli",
+        })
+    if trig_rows:
+        st.dataframe(pd.DataFrame(trig_rows), use_container_width=True, hide_index=True)
+    st.caption(
+        "Bu tablo **gerçek günlük veriden** üretilir. 'Giriş' sütunu HAZIR olduğunda "
+        "ve BTC de EMA50 üstüne geçtiğinde motor kendiliğinden emir atar. "
+        "Şu an hiçbiri HAZIR değil — bu yüzden işlem yok."
+    )
 
     # --- işlem defteri ---
     st.divider()
