@@ -161,13 +161,22 @@ def buy(symbol: str) -> dict[str, Any]:
     res = _order(symbol, 0, qty)  # 0 = AL
     if res.get("ok"):
         st = _load()
-        st["position"] = {"symbol": symbol, "qty": qty, "entry": px,
-                          "time": time.strftime("%Y-%m-%d %H:%M:%S")}
+        body = (res.get("data") or {}).get("data") or {}
+        st["position"] = {
+            "symbol": symbol, "qty": qty, "entry": px,
+            "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "entry_ts": time.time(),
+            "tp": round(px * (1 + TAKE_PROFIT), 6),
+            "sl": round(px * (1 - STOP_LOSS), 6),
+            "order_id": body.get("orderId") or body.get("id"),
+            "cost": round(px * qty, 4),
+        }
+        st["fees_paid"] = round(float(st.get("fees_paid", 0)) + px * qty * 0.001, 4)
         _save(st)
     return {**res, "qty": qty, "price": px}
 
 
-def sell(symbol: str, qty: float) -> dict[str, Any]:
+def sell(symbol: str, qty: float, reason: str = "manuel") -> dict[str, Any]:
     res = _order(symbol, 1, qty)  # 1 = SAT
     if res.get("ok"):
         st = _load()
@@ -175,11 +184,22 @@ def sell(symbol: str, qty: float) -> dict[str, Any]:
         pos = st.get("position") or {}
         if pos:
             now_px = price(symbol) or float(pos.get("entry", 0))
-            pnl = (now_px - float(pos.get("entry", 0))) * qty
-            hist.append({**pos, "exit": now_px, "pnl": round(pnl, 4),
-                         "exit_time": time.strftime("%Y-%m-%d %H:%M:%S")})
+            entry = float(pos.get("entry", 0))
+            gross = (now_px - entry) * qty
+            fee = now_px * qty * 0.001 + entry * qty * 0.001
+            net = gross - fee
+            st["fees_paid"] = round(float(st.get("fees_paid", 0)) + now_px * qty * 0.001, 4)
+            hist.append({
+                **pos,
+                "exit": now_px, "gross_pnl": round(gross, 4),
+                "fee": round(fee, 4), "net_pnl": round(net, 4),
+                "pnl": round(net, 4),
+                "exit_time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "duration_sec": round(time.time() - float(pos.get("entry_ts", time.time())), 0),
+                "reason": reason,
+            })
             st["history"] = hist[-20:]
-            st["realized_pnl"] = round(sum(float(h.get("pnl", 0)) for h in hist), 4)
+            st["realized_pnl"] = round(sum(float(h.get("net_pnl", 0)) for h in hist), 4)
         st.pop("position", None)
         _save(st)
     return res
@@ -191,6 +211,31 @@ def kill_switch() -> bool:
     st = _load()
     return (float(st.get("realized_pnl", 0)) <= -MAX_LOSS_TRY or
             len(st.get("history", [])) >= MAX_TRADES)
+
+
+def _snapshot(pos: dict[str, Any] | None) -> None:
+    """Anlık fiyat/kâr görüntüsünü JSONL'e yaz (grafik + denetim için)."""
+    try:
+        from ui.tr_monitor import append_snapshot
+
+        if not pos:
+            append_snapshot({"ts": time.time(), "event": "izleme",
+                             "pnl": 0.0, "pct": 0.0, "price": None})
+            return
+        sym = pos.get("symbol")
+        px = price(sym)
+        entry = float(pos.get("entry", 0) or 0)
+        qty = float(pos.get("qty", 0) or 0)
+        if px and entry:
+            append_snapshot({
+                "ts": time.time(), "event": "pozisyon", "symbol": sym,
+                "price": px, "entry": entry,
+                "pnl": round((px - entry) * qty, 4),
+                "pct": round((px / entry - 1) * 100, 3),
+                "elapsed": round(time.time() - float(pos.get("entry_ts", time.time())), 0),
+            })
+    except Exception:
+        pass
 
 
 def cycle() -> list[str]:
@@ -205,12 +250,16 @@ def cycle() -> list[str]:
         px = price(sym)
         if px:
             ret = (px - float(pos["entry"])) / float(pos["entry"])
+            _snapshot(pos)
             if ret >= TAKE_PROFIT or ret <= -STOP_LOSS:
-                res = sell(sym, float(pos["qty"]))
-                logs.append(f"SAT {sym} {'OK' if res.get('ok') else 'HATA'} getiri={ret*100:+.2f}%")
+                reason = "kar hedefi" if ret >= TAKE_PROFIT else "stop loss"
+                res = sell(sym, float(pos["qty"]), reason)
+                logs.append(f"SAT {sym} {'OK' if res.get('ok') else 'HATA'} "
+                            f"getiri={ret*100:+.2f}% neden={reason}")
                 return logs
             logs.append(f"Pozisyon {sym}: {ret*100:+.2f}% (hedef +{TAKE_PROFIT*100:.2f}% / stop -{STOP_LOSS*100:.2f}%)")
             return logs
+    _snapshot(None)
     best = None
     for sym in PAIRS:
         s = signal(sym)

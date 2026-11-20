@@ -9,7 +9,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from ui import binance_bot, binance_tr_bot, broker, components, live_bot, live_guard, tr_scalper
+from ui import binance_bot, binance_tr_bot, broker, components, live_bot, live_guard, tr_monitor, tr_scalper
 from ui.bist_universe import load_companies, ordered_symbols, search_symbols
 from ui.components import real_money_warning
 from ui.help_texts import h
@@ -561,30 +561,91 @@ with st.expander("Binance TR botu (gerçek borsa — emirler kilitli)", icon=":m
             st.warning(result.get("reason", "Emir gönderilmedi."), icon=":material/warning:")
         st.rerun()
 
-# ---- BINANCE TR mikro-alsat motoru (canli takip) ----
-with st.expander("Mikro alsat motoru — canlı takip", icon=":material/analytics:"):
+# ---- BINANCE TR mikro-alsat motoru (CANLI ANALİZ) ----
+with st.expander("CANLI ANALİZ — anlık alım/satım, kâr, süre, zarar", icon=":material/analytics:", expanded=True):
     st.caption(
-        "Gerçek 1-dk veriyle 6 TRY çiftini tarar. AL sinyali gelince **₺10** pilot emir atar, "
-        "+%0,45'te satar, -%0,35'te stop olur. Azami **₺3 zarar** ve **3 işlem** sınırı vardır. "
-        "Bu bir deneydir; kâr garantisi yoktur."
+        "Aşağıdaki panel **5 saniyede bir otomatik yenilenir**. Tüm sayılar gerçek Binance TR "
+        "API'sinden ve yerel emir kayıtlarından gelir; tahmin veya simülasyon değildir."
     )
-    _st = tr_scalper._load()
-    _pos = _st.get("position")
-    _hist = _st.get("history", [])
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Gerçekleşen K/Z", f"{float(_st.get('realized_pnl', 0)):+.2f} ₺")
-    c2.metric("Tamamlanan işlem", len(_hist))
-    c3.metric("Açık pozisyon", _pos.get("symbol", "—") if _pos else "—")
-    if _pos:
-        st.caption(
-            f"Açık: {_pos.get('symbol')} · miktar {_pos.get('qty')} · giriş "
-            f"{_pos.get('entry')} · {_pos.get('time')}"
+
+    @st.fragment(run_every="5s")
+    def _live_panel():
+        m = tr_monitor.live_metrics()
+        s = tr_monitor.summary()
+        pos = m["position"]
+
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric(
+            "Anlık K/Z (açık)",
+            f"{pos['pnl']:+.2f} ₺" if pos else "—",
+            delta=f"{pos['pct']:+.2f}%" if pos else None,
         )
-    if _hist:
-        st.dataframe(pd.DataFrame(_hist).tail(8), use_container_width=True, hide_index=True)
-    st.caption(
-        "Durdurmak için aşağıdaki düğmeye basın (motor bir sonraki turda güvenle durur)."
-    )
+        k2.metric("Gerçekleşen net K/Z", f"{s['net_pnl']:+.2f} ₺")
+        k3.metric("Geçen süre", pos["elapsed"] if pos else "—")
+        k4.metric("İşlem / Kazanma", f"{s['trades']} / %{s['win_rate']:.0f}")
+
+        if pos:
+            st.markdown(f"#### {pos['symbol']} · açık pozisyon")
+            a, b, c, d = st.columns(4)
+            a.metric("Alınan miktar", f"{pos['qty']}")
+            b.metric("Alış fiyatı", f"{pos['entry']:,.4f} ₺")
+            c.metric("Anlık fiyat", f"{pos['price']:,.4f} ₺" if pos["price"] else "—")
+            d.metric("Maliyet / Değer", f"{pos['cost']:.2f} → {pos['value']:.2f} ₺")
+            st.caption(
+                f"Emir ID **{pos['order_id']}** · başlangıç {pos['entry_time']} · "
+                f"tahmini komisyon {pos['fee_est']:.3f} ₺"
+            )
+            st.progress(pos["progress"], text=(
+                f"STOP {pos['sl']:,.4f}  ◀──  giriş {pos['entry']:,.4f}  ──▶  HEDEF {pos['tp']:,.4f}"
+            ))
+        else:
+            st.info("Açık pozisyon yok — motor AL sinyali bekliyor.", icon=":material/info:")
+
+        st.markdown("##### Tüm çiftlerin anlık durumu")
+        rows = []
+        for sym in tr_scalper.PAIRS:
+            sig = tr_scalper.signal(sym)
+            rows.append({
+                "Çift": sym, "Fiyat": sig.get("price"),
+                "RSI7": sig.get("rsi"), "Karar": sig.get("decision"),
+                "Neden": sig.get("reason"),
+            })
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+        snaps = tr_monitor.recent_snapshots(180)
+        pos_snaps = [x for x in snaps if x.get("symbol")]
+        if len(pos_snaps) > 2:
+            chart = pd.DataFrame([{
+                "Zaman": datetime.fromtimestamp(x["ts"]).strftime("%H:%M:%S"),
+                "Kâr %": x.get("pct", 0),
+            } for x in pos_snaps]).set_index("Zaman")
+            st.line_chart(chart, height=140)
+
+        if m["history"]:
+            st.markdown("##### Kapanmış işlemler (komisyon sonrası)")
+            cols = ["symbol", "qty", "entry", "exit", "gross_pnl", "fee",
+                    "net_pnl", "duration_sec", "reason", "exit_time"]
+            frame = pd.DataFrame(m["history"])
+            frame = frame[[c for c in cols if c in frame.columns]]
+            frame = frame.rename(columns={
+                "symbol": "Çift", "qty": "Adet", "entry": "Alış", "exit": "Satış",
+                "gross_pnl": "Brüt K/Z", "fee": "Komisyon", "net_pnl": "Net K/Z",
+                "duration_sec": "Süre (sn)", "reason": "Neden", "exit_time": "Zaman",
+            })
+            st.dataframe(frame.tail(8), use_container_width=True, hide_index=True)
+
+        g1, g2, g3, g4 = st.columns(4)
+        g1.metric("Kazanan", s["wins"])
+        g2.metric("Kaybeden", s["losses"])
+        g3.metric("Toplam komisyon", f"{s['fees']:.3f} ₺")
+        g4.metric("Ort. süre", f"{s['avg_seconds']:.0f} sn")
+        st.caption(
+            f"En iyi işlem **{s['best']:+.2f} ₺** · en kötü işlem **{s['worst']:+.2f} ₺** · "
+            f"azami zarar sınırı ₺3, azami 3 işlem."
+        )
+
+    _live_panel()
+
     if st.button("MOTORU DURDUR", icon=":material/stop:", key="scalper_stop",
                  type="primary", disabled=tr_scalper.STOP_FILE.exists()):
         tr_scalper.STOP_FILE.parent.mkdir(parents=True, exist_ok=True)
