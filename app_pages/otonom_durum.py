@@ -1,4 +1,4 @@
-"""OTONOM DURUM — tek bakışta sistemin gerçek durumu (10 sn'de bir yenilenir)."""
+"""CANLI İŞLEM AKIŞI — ne alındı, ne satıldı, kâr/zarar, başarı oranları (10 sn yenileme)."""
 
 from __future__ import annotations
 
@@ -12,10 +12,11 @@ import streamlit as st
 from ui import autonomous, quant_lab, summary_report, tr_journal, tr_monitor, tr_scalper
 
 
-st.title("Otonom durum", icon=":material/monitoring:")
+st.title("Canlı işlem akışı", icon=":material/stream:")
 st.caption(
-    "Bu sayfa **10 saniyede bir kendiliğinden yenilenir.** Bütün değerler gerçek "
-    "Binance TR API'sinden ve yerel karar kayıtlarındandır; tahmin/simülasyon değildir."
+    "**Her şey burada, 10 saniyede bir yenilenir.** Ne aldım, ne sattım, kaç ₺ kâr/zarar, "
+    "başarı oranım ne — hepsi gerçek Binance TR API'sinden ve yerel işlem kayıtlarındandır. "
+    "Tahmin, simülasyon veya süsleme yok."
 )
 
 
@@ -33,6 +34,25 @@ def _dashboard():
     state = autonomous._load()
     decision = state.get("last_decision", {})
     acc = autonomous.accuracy(state)
+
+    # --- EN KRİTİK: ne aldım / ne sattım / kârım ne ---
+    st.markdown("##### 📊 Hesabım — anlık net durum")
+    _trades = tr_monitor.summary()
+    _pos = tr_monitor.live_metrics()["position"]
+    _bal = tr_scalper.available_try()
+    n1, n2, n3, n4 = st.columns(4)
+    n1.metric("ALDIĞIM (açık)", _pos["symbol"] if _pos else "YOK",
+              help=f"{_pos['qty']} adet @ {_pos['entry']:,.4f} ₺" if _pos else "Açık pozisyon yok")
+    n2.metric("SATIŞ (tamamlanan)", f"{_trades['trades']} işlem",
+              help=f"Kazanan {_trades['wins']} · Kaybeden {_trades['losses']}")
+    n3.metric("NET KÂR / ZARAR", f"{_trades['net_pnl']:+.2f} ₺",
+              delta=f"{_trades['win_rate']:.0f}% kazanma", delta_color="normal")
+    n4.metric("BAKİYE", f"₺{_bal:,.2f}")
+    if _trades["trades"] == 0:
+        st.info("**Henüz hiç alım-satım yapılmadı.** Sistem yalnızca doğrulanmış edge + "
+                "yukarı rejimde işlem açar; şu an ayı rejimi. Bu bir arıza değil, kasıtlı koruma.",
+                icon=":material/info:")
+    st.divider()
 
     a, b, c, d = st.columns(4)
     a.metric("YÖNETİCİ", "🟢 ÇALIŞIYOR" if alive else "🔴 DURDU",

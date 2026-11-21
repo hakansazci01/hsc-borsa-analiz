@@ -195,9 +195,9 @@ page = st.navigation(
     [
         st.Page(
             "app_pages/otonom_durum.py",
-                title="OTONOM DURUM",
-                icon=":material/monitoring:",
-                help="Sistemin gerçek durumu: yönetici nabzı, son karar, bakiye, açık pozisyon ve işlem defteri. 10 sn'de bir yenilenir.",
+                title="CANLI İŞLEM AKIŞI",
+                icon=":material/stream:",
+                help="Ne aldım, ne sattım, kâr/zarar, başarı oranları, işlem defteri — 10 sn'de bir yenilenen gerçek veri.",
             ),
         st.Page(
             "app_pages/akilli_panel.py",

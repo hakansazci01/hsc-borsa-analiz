@@ -1,15 +1,15 @@
 # Otonom Sistem — Gerçek Durum Özeti
 
-**Son güncelleme:** 2026-11-21 03:31:37  
+**Son güncelleme:** 2026-11-21 03:47:29  
 **Kaynak:** Yerel karar kayıtları, gerçek Binance TR API ve işlem defteri. Tahmin/simülasyon değildir.
 
 ## 1. Sistem sağlığı
 
 | Ölçü | Değer |
 |---|---|
-| Toplam otonom karar | 35 |
+| Toplam otonom karar | 36 |
 | OPEN kararı | 0 |
-| CLOSED kararı | 35 |
+| CLOSED kararı | 36 |
 | Son karar | **CLOSED** |
 | Piyasa rejimi | ASAGI (bear) |
 | Doğrulanmış kârlı edge | 49 |
@@ -35,15 +35,19 @@
 | Toplam komisyon | 0.0057 ₺ |
 | Kullanılabilir bakiye | **506.26 ₺** |
 | Açık pozisyon | Yok |
-| İşlem defteri kaydı | 14 |
+| İşlem defteri kaydı | 15 |
 
 ## 4. Neden işlem yok?
 
-Son kararın gerekçesi: ayı rejimi (-20.1%)
+Son kararın gerekçesi: ayı rejimi (-20.05%)
 
 Sistem yalnızca **doğrulanmış edge + yukarı rejim** birlikte olduğunda işlem açar. Bu koşul sağlanmadığı için para riske atılmaz; bu bir arıza değil, kasıtlı korumadır.
 
-## 5. Ne zaman işlem yapılacak?
+## 5. Sektör araştırması — karlı botlar ne yapıyor?
+
+222M gerçek işlemlik akademik çalışma (2026): karlı botların sırrı doğru tahmin değil **doğru giriş fiyatı** (execution). Perakende %51,3 isabetle kaybederken botlar %49,9 isabetle 133M $ kâr ediyor; ~%70'i erken giriş ve spread ödememekten (limit emir). Bizim sistemde execution, rejim filtresi, disiplin ve doğrulanmış backtest **mevcut**. Eksikler: BNB komisyon indirimi (açılabilir), short/futures (spot long only), kolokasyon (günlük stratejide gerekmez) ve sermaye büyüklüğü.
+
+## 6. Ne zaman işlem yapılacak?
 
 - BTC günlük kapanışı EMA50'nin üstüne geçmeli
 - Hedef coin günlük EMA50 üzerinde pullback yapmalı

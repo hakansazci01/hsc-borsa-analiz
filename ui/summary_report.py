@@ -107,7 +107,17 @@ def to_markdown(r: dict[str, Any]) -> str:
         "Sistem yalnızca **doğrulanmış edge + yukarı rejim** birlikte olduğunda işlem açar. "
         "Bu koşul sağlanmadığı için para riske atılmaz; bu bir arıza değil, kasıtlı korumadır.",
         "",
-        "## 5. Ne zaman işlem yapılacak?",
+        "## 5. Sektör araştırması — karlı botlar ne yapıyor?",
+        "",
+        "222M gerçek işlemlik akademik çalışma (2026): karlı botların sırrı doğru "
+        "tahmin değil **doğru giriş fiyatı** (execution). Perakende %51,3 isabetle "
+        "kaybederken botlar %49,9 isabetle 133M $ kâr ediyor; ~%70'i erken giriş "
+        "ve spread ödememekten (limit emir). Bizim sistemde execution, rejim filtresi, "
+        "disiplin ve doğrulanmış backtest **mevcut**. Eksikler: BNB komisyon indirimi "
+        "(açılabilir), short/futures (spot long only), kolokasyon (günlük stratejide gerekmez) "
+        "ve sermaye büyüklüğü.",
+        "",
+        "## 6. Ne zaman işlem yapılacak?",
         "",
         "- BTC günlük kapanışı EMA50'nin üstüne geçmeli",
         "- Hedef coin günlük EMA50 üzerinde pullback yapmalı",
