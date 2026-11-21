@@ -184,14 +184,15 @@ def _panel():
     )
     st.caption(f"ADX {reg['adx']:.1f} · fiyat {reg['price']:.2f} / EMA50 {reg['ema50']:.2f} — "
                f"{reg['reason']}")
-    mode = tr_scalper._load().get("mode", "BEKLEME")
+    mode = tr_scalper._load().get("mode", "NAKİTTE BEKLEME")
     if reg["range"]:
         mode = "GRID"
     elif reg["bear"]:
-        mode = "BEKLEME"
+        mode = "NAKİTTE BEKLEME"
     else:
         mode = "NORMAL"
-    _mc = {"GRID": "#eab308", "NORMAL": "#22c55e", "BEKLEME": "#ef4444"}[mode]
+    _mc = {"GRID": "#eab308", "NORMAL": "#22c55e",
+           "NAKİTTE BEKLEME": "#ef4444"}[mode]
     st.markdown(
         f'<div style="text-align:center;padding:6px 0 10px 0;">'
         f'<span style="font-size:22px;font-weight:800;color:{_mc};letter-spacing:2px;">'
@@ -206,9 +207,12 @@ def _panel():
                    f"anchor {float(g.get('anchor', 0)):.4f}")
         st.info("YATAY rejim — Grid modu aktif, %1 düşüşte al / %1 yükselişte sat.",
                 icon=":material/grid_on:")
-    elif mode == "BEKLEME":
-        st.warning("AYI rejimi — Grid yapılmaz, tamamen bekleme. Para güvende.",
-                   icon=":material/warning:")
+    elif mode == "NAKİTTE BEKLEME":
+        _pos_now = tr_scalper._load().get("position")
+        cash_pct = 0 if _pos_now else 100
+        st.error("**Strateji: Ayıda Nakitte Kalma Aktif** — alım yok, Grid yok, "
+                 "short/futures/yok. Spot long-only.", icon=":material/warning:")
+        st.metric("Nakit Oranı", f"%{cash_pct}")
     else:
         st.success("BOĞA rejimi — Grid kapalı, normal EMA50 pullback modu.",
                    icon=":material/check:")

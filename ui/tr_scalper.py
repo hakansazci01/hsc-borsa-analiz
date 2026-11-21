@@ -572,7 +572,8 @@ def brakes_block(symbol: str) -> str:
     # REJİM: AYI ise alım yok, YATAY ise Grid modu (ayrı ayarlanır)
     reg = market_regime.regime(symbol)
     if reg["bear"]:
-        return f"rejim AYI — alım yok ({reg['reason']})"
+        return (f"AYI REJİMİ - NAKİTTE KALMA STRATEJİSİ AKTİF, ALIM YOK "
+                f"({reg['reason']})")
     # NOT: MULTI-TIMEFRAME onayı GRID modunda aranmaz — cycle() içinde sadece NORMAL modda uygulanır.
     return ""
 
@@ -656,9 +657,16 @@ def cycle() -> list[str]:
     except Exception as exc:
         logs.append(f"sepet hatası: {type(exc).__name__}")
     # HER CYCLE BAŞINDA REJİM TESPİTİ + LOGA YAZ
+    _cycle_state = _load()
     for sym in SYMBOLS:
         _r = market_regime.regime(sym)
         logs.append(f"REJİM {sym}: {_r['name']} (ADX {_r['adx']:.1f}) — {_r['reason']}")
+        if _r["bear"] and not _cycle_state.get("position"):
+            # Ayı rejimi → resmî NAKİTTE BEKLEME (frenlerden önce kaydet)
+            _cycle_state["mode"] = "NAKİTTE BEKLEME"
+            _cycle_state["bear_cash"] = True
+            _save(_cycle_state)
+            logs.append("AYI REJİMİ - NAKİTTE KALMA STRATEJİSİ AKTİF, ALIM YOK")
     st = _load()
     pos = st.get("position")
     if pos:
@@ -724,8 +732,11 @@ def cycle() -> list[str]:
             continue
         reg = market_regime.regime(sym)
         if reg["bear"]:
-            st["mode"] = "BEKLEME"  # AYI: Grid de yapılmaz, tamamen bekle
+            # AYI REJİMİ — resmî strateji: NAKİTTE BEKLEME (spot long-only, short/futures YOK)
+            st["mode"] = "NAKİTTE BEKLEME"
+            st["bear_cash"] = True
             _save(st)
+            logs.append("AYI REJİMİ - NAKİTTE KALMA STRATEJİSİ AKTİF, ALIM YOK")
             continue
         if reg["range"]:
             # GRID MODU: YATAY rejimde 5 kademe, %1 adım

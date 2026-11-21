@@ -567,7 +567,7 @@ def test_step2_grid_mode() -> None:
 
     # 4) AYI senaryosu: Grid YAPILMAZ (cycle kodu kontrolü)
     src = (Path(__file__).resolve().parent.parent / "ui" / "tr_scalper.py").read_text(encoding="utf-8")
-    assert 'if reg["bear"]:' in src and 'st["mode"] = "BEKLEME"' in src
+    assert 'if reg["bear"]:' in src and 'NAKİTTE BEKLEME' in src
     assert 'if reg["range"]:' in src and 'st["mode"] = "GRID"' in src
     assert 'st["mode"] = "NORMAL"' in src  # BOĞA -> normal
 
@@ -1424,6 +1424,54 @@ def test_manual_intervention_log() -> None:
     panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
     assert "Manuel Müdahaleler" in panel and "manual_log.csv" in panel
     assert "trades.csv SADECE bot işlemleri" in panel
+
+
+def test_bear_cash_strategy() -> None:
+    """Ayı rejiminde resmî NAKİTTE BEKLEME stratejisi, alım/Grid yok, short yok."""
+    from pathlib import Path
+
+    from ui import market_regime as mr, tr_scalper as t
+
+    # Tam izolasyon: önceki testlerin state/phrase kalıntılarını temizle
+    t.set_confirmed_phrase("HSC-BINANCE-TR-ARM")
+    t._save({})
+
+    orig = mr.regime
+    try:
+        mr.regime = lambda s: {"name": "AYI", "bear": True, "range": False,
+                               "adx": 40, "price": 100, "ema50": 120,
+                               "reason": "test ayı"}
+        # 1) brakes_block açık mesaj
+        msg = t.brakes_block("BTCUSDT")
+        assert "AYI REJİMİ - NAKİTTE KALMA STRATEJİSİ AKTİF, ALIM YOK" in msg
+
+        # 2) alım reddediliyor (buy config gate + fren)
+        res = t.buy("BTCUSDT")
+        assert res.get("ok") is False
+
+        # 3) cycle modu ve log mesajı
+        t._save({"mode": "NORMAL"})
+        logs = t.cycle()
+        assert any("AYI REJİMİ - NAKİTTE KALMA STRATEJİSİ AKTİF, ALIM YOK" in x
+                   for x in logs)
+        assert t._load().get("mode") == "NAKİTTE BEKLEME"
+        assert t._load().get("bear_cash") is True
+    finally:
+        mr.regime = orig
+        t._save({})
+
+    # 4) Short/futures kodu YOK
+    src_all = "\n".join(p.read_text(encoding="utf-8", errors="ignore")
+                        for p in (Path(__file__).resolve().parent.parent / "ui").glob("*.py"))
+    assert "def short(" not in src_all.lower()
+    assert "def futures(" not in src_all.lower()
+    assert "def leverage(" not in src_all.lower()
+
+    # 5) Panel
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "Ayıda Nakitte Kalma Aktif" in panel
+    assert "Nakit Oranı" in panel
+    assert "NAKİTTE BEKLEME" in panel
 
 
 def test_readiness_checklist() -> None:
