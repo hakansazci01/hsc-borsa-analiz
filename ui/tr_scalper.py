@@ -87,14 +87,19 @@ def config_gate() -> list[str]:
     return reasons
 
 
+POSITION_PCT = 0.10       # tek işlem = güncel bakiyenin %10'u (bileşik büyüme)
+PROFIT_LOCK_TRY = 50.0    # toplam kâr +50 TL'yi geçince stop giriş üstüne çekilir
+
+
+def position_size_try(balance: float | None = None) -> float:
+    """DİNAMİK işlem boyutu: API bakiyesi * 0.10. Sabit limit yok."""
+    bal = available_try() if balance is None else float(balance)
+    return round(bal * POSITION_PCT, 4)
+
+
 def max_order_usdt() -> float:
-    """config.yaml max_order_try / max_order_usdt — tek işlem üst sınırı."""
-    c = cfg()
-    raw = c.get("max_order_try", c.get("max_order_usdt", 50))
-    try:
-        return float(raw or 50)
-    except (TypeError, ValueError):
-        return 50.0
+    """Dinamik üst sınır (geriye dönük uyumluluk)."""
+    return position_size_try()
 
 
 def _filters(symbol: str) -> dict[str, float]:
@@ -204,9 +209,12 @@ def signal(symbol: str) -> dict[str, Any]:
             "reason": f"fiyat {px:.4f} / EMA50 {ma:.4f} — giriş koşulu yok"}
 
 
-def position_exit(pos: dict[str, Any], px: float, ma: float) -> str:
-    """Açık pozisyon için gerçek çıkış koşulu (backtest ile aynı)."""
+def position_exit(pos: dict[str, Any], px: float, ma: float,
+                  effective_sl: float | None = None) -> str:
+    """Açık pozisyon çıkışı: EMA50 stop, kâr kilidi veya 90 gün."""
     held_days = (time.time() - float(pos.get("entry_ts", time.time()))) / 86400
+    if effective_sl and px <= effective_sl:
+        return f"kâr kilidi: fiyat {px:.4f} ≤ kilitli stop {effective_sl:.4f}"
     if px < ma * EXIT_BELOW_EMA:
         return "stop loss: günlük EMA50 %3 altı"
     if held_days >= MAX_HOLD_DAYS:
@@ -253,13 +261,14 @@ def buy(symbol: str) -> dict[str, Any]:
         return {"ok": False, "reason": "fiyat alınamadı"}
     flt = _filters(symbol)
     step = flt["step"] or 0.00000001
-    cap = max_order_usdt()             # config.yaml -> doğrudan uygulanır
-    budget = min(cap, max(10.0, available_try() * 0.15))
-    need = max(budget, flt["min_notional"] + 0.5) / px
+    # Her alışta güncel bakiyeyi API'den çek -> %10 (bileşik büyüme).
+    current_balance = available_try()
+    cap = position_size_try(current_balance)   # örn 506 TL -> 50.6 TL
+    need = max(cap, flt["min_notional"] + 0.5) / px
     qty = round(int(need / step + 0.999999) * step, 8)
     qty = max(qty, flt["min_qty"])
-    if qty * px > cap:
-        return {"ok": False, "reason": f"tutar config limitini aşıyor (>{cap} TL)"}
+    if qty * px > cap + 0.01:  # yuvarlama payı
+        return {"ok": False, "reason": f"tutar dinamik %10 limitini aşıyor (>{cap:.2f} TL)"}
     res = _order(symbol, 0, qty)
     if res.get("ok"):
         body = (res.get("data") or {}).get("data") or {}
@@ -379,7 +388,15 @@ def cycle() -> list[str]:
             return ["günlük veri yok — pozisyon korunuyor"]
         px = float(vals["Close"].iloc[-1])
         ma = float(quant_lab.ema(vals["Close"], 50).iloc[-1])
-        why = position_exit(pos, px, ma)
+        # KÂR KORUMA: toplam gerçekleşen kâr +50 TL'yi geçtiyse stop'u giriş üstüne çek.
+        realized = float(st.get("realized_pnl", 0) or 0)
+        if realized >= PROFIT_LOCK_TRY:
+            entry = float(pos["entry"])
+            locked = round(entry * (1 + 0.002), 8)  # komisyonu kurtaran +%0,2
+            pos["locked_sl"] = max(float(pos.get("locked_sl", 0)), locked)
+            logs.append(f"KÂR KORUMA: toplam {realized:+.2f} TL ≥ +{PROFIT_LOCK_TRY} TL — "
+                        f"stop {locked:.4f} (giriş üstü, zararla kapanmaz)")
+        why = position_exit(pos, px, ma, effective_sl=pos.get("locked_sl"))
         if why:
             res = sell(sym, float(pos["qty"]), why)
             logs.append(f"SAT {sym} {'OK' if res.get('ok') else 'HATA'} neden={why}")

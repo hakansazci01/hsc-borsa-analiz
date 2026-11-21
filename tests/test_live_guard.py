@@ -198,18 +198,21 @@ def test_step1_daily_engine_and_brakes() -> None:
     assert tr_runner.CYCLE is t.cycle
     assert t.STRATEGY_NAME.startswith("günlük EMA50")
     # fren limitleri
-    assert risk_brakes.DAILY_LOSS_TRY == 50.0
-    assert risk_brakes.BASE_CAPITAL_TRY == 506.26  # gerçek API bakiyesi
-    assert risk_brakes.MAX_DD_PCT == 0.10
-    # %10 drawdown = -50.63 TL (506.26 TL kasa)
-    assert round(risk_brakes.BASE_CAPITAL_TRY * risk_brakes.MAX_DD_PCT, 2) == 50.63
+    assert risk_brakes.DAILY_LOSS_PCT == 0.10
+    assert risk_brakes.TRAILING_DD_PCT == 0.15
+    assert risk_brakes.MAX_DD_PCT == 0.15
+    assert t.POSITION_PCT == 0.10
+    assert t.PROFIT_LOCK_TRY == 50.0
     assert risk_brakes.CRASH_PCT == 0.05
     assert risk_brakes.CRASH_WINDOW_MIN == 5
     assert risk_brakes.CRASH_COOLDOWN_SEC == 1800
     # günlük strateji sabitleri
     assert t.EXIT_BELOW_EMA == 0.97
     assert t.MAX_HOLD_DAYS == 90
-    assert t.max_order_usdt() == 50.0  # config.yaml:115
+    # Dinamik pozisyon: bakiye * 0.10 (sabit limit yok)
+    assert t.position_size_try(506.0) == 50.6
+    assert t.position_size_try(1000.0) == 100.0
+    assert t.position_size_try(300.0) == 30.0
 
 
 def test_confirmation_phrase_gate() -> None:
@@ -283,10 +286,50 @@ def test_fix_audit_gaps() -> None:
     assert not (root / "ui" / "daily_engine.py").exists()
     assert importlib.util.find_spec("ui.daily_engine") is None
 
-    # 4) gerçek bakiye referansı
-    from ui import risk_brakes
+    # 4) dinamik frenler (sabit referans yok)
+    from ui import risk_brakes as rb
 
-    assert risk_brakes.BASE_CAPITAL_TRY == 506.26
+    assert rb.TRAILING_DD_PCT == 0.15
+    assert rb.daily_loss_limit() >= 0
+
+
+def test_dynamic_position_and_limits() -> None:
+    """Kanıt: 506 TL -> 50.6 TL, 1000 TL -> 100 TL; dinamik günlük limit ve kâr kilidi."""
+    import json
+
+    from ui import risk_brakes as rb
+    from ui import tr_scalper as t
+
+    # 1) Pozisyon boyutu: bakiye * 0.10
+    assert round(t.position_size_try(506.26), 2) == 50.63
+    assert t.position_size_try(506.0) == 50.6
+    assert t.position_size_try(1000.0) == 100.0
+    assert t.position_size_try(800.0) == 80.0
+    assert t.position_size_try(200.0) == 20.0
+    for bal in (100, 506.26, 1000, 5000):
+        assert t.position_size_try(bal) <= bal * 0.10 + 1e-9
+
+    # 2) Dinamik günlük limit = gün başı bakiye * 0.10
+    old = rb.STATE.read_text(encoding="utf-8") if rb.STATE.exists() else None
+    try:
+        st = json.loads(old) if old else {}
+        st["day"] = rb.today()
+        st["day_open_balance"] = 506.26
+        st["day_realized_pnl"] = 0.0
+        rb.STATE.write_text(json.dumps(st), encoding="utf-8")
+        assert round(rb.daily_loss_limit(), 2) == 50.63
+        st["day_realized_pnl"] = -50.63
+        rb.STATE.write_text(json.dumps(st), encoding="utf-8")
+        assert rb.daily_loss_breached()[0] is True
+    finally:
+        if old is not None:
+            rb.STATE.write_text(old, encoding="utf-8")
+
+    # 3) Kâr kilidi: kilit stop fiyata gelince zararda olsa bile sat
+    assert t.PROFIT_LOCK_TRY == 50.0
+    pos = {"entry": 100.0, "entry_ts": 0}
+    reason = t.position_exit(pos, 99.0, ma=200.0, effective_sl=100.2)
+    assert "kâr kilidi" in reason
 
 
 def test_readiness_checklist() -> None:

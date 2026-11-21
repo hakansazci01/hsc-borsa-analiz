@@ -22,9 +22,9 @@ from ui import auth, tr_scalper
 
 STATE = auth.USERS_DIR / "risk_brakes_state.json"
 
-DAILY_LOSS_TRY = 50.0        # günlük -50 TL (kasa 500 TL)
-BASE_CAPITAL_TRY = 506.26    # gerçek API bakiyesi (drawdown referansı, %10 = -50.63 TL)
-MAX_DD_PCT = 0.10            # kasa %10 erime -> tam dur
+DAILY_LOSS_PCT = 0.10        # günlük limit = gün başı bakiyenin %10'u (dinamik)
+TRAILING_DD_PCT = 0.15       # trailing drawdown: o günkü ZİRVE bakiyeden %15
+MAX_DD_PCT = TRAILING_DD_PCT # geriye dönük uyumluluk
 CRASH_PCT = 0.05             # 5 dakikada %5 düşüş
 CRASH_WINDOW_MIN = 5
 CRASH_COOLDOWN_SEC = 1800    # 30 dakika bekleme
@@ -76,23 +76,33 @@ def update_from_history(history: list[dict[str, Any]]) -> dict[str, Any]:
     return st
 
 
+def daily_loss_limit() -> float:
+    """DİNAMİK günlük limit = gün başı bakiyenin %10'u."""
+    st = _load()
+    day_open = float(st.get("day_open_balance", 0) or 0)
+    return round(day_open * DAILY_LOSS_PCT, 4)
+
+
 def daily_loss_breached() -> tuple[bool, str]:
     st = _load()
     pnl = float(st.get("day_realized_pnl", 0) or 0)
-    if pnl <= -DAILY_LOSS_TRY:
-        return True, f"günlük zarar {pnl:+.2f} TL ≤ -{DAILY_LOSS_TRY:.0f} TL — yarına kadar bekle"
+    limit = daily_loss_limit()
+    if limit > 0 and pnl <= -limit:
+        return True, f"günlük zarar {pnl:+.2f} TL ≤ -{limit:.2f} TL (gün başı %10) — yarına kadar bekle"
     return False, ""
 
 
 def drawdown_breached(balance: float) -> tuple[bool, str]:
-    """%10 drawdown = 500 TL'lik kasada -50 TL. Referans BASE_CAPITAL_TRY."""
-    reset_daily_if_needed(balance)
-    start = BASE_CAPITAL_TRY
-    loss_try = start - balance
-    stop_at = start * MAX_DD_PCT          # 506.26 * 0.10 = 50.63 TL
-    if loss_try >= stop_at:
-        return True, (f"kasa drawdown {loss_try:+.2f} TL ≥ -{stop_at:.0f} TL "
-                      f"(referans {start:.0f} TL, şu an {balance:.2f} TL) — TAM DUR")
+    """TRAILING drawdown: o günkü en yüksek bakiyeden %15 düşüşte tam dur."""
+    st = reset_daily_if_needed(balance)
+    peak = max(float(st.get("day_peak_balance", 0) or 0), balance)
+    st["day_peak_balance"] = round(peak, 4)
+    _save(st)
+    loss = peak - balance
+    stop_at = peak * TRAILING_DD_PCT
+    if peak > 0 and loss >= stop_at:
+        return True, (f"trailing drawdown {loss:.2f} TL ≥ %{TRAILING_DD_PCT*100:.0f} "
+                      f"({stop_at:.2f} TL) — zirve {peak:.2f} TL, şu an {balance:.2f} TL, TAM DUR")
     return False, ""
 
 
@@ -139,8 +149,10 @@ def status() -> dict[str, Any]:
         "dd_breached": dd, "dd_msg": ddmsg,
         "crash_until": until,
         "crash_remaining": max(0, int(until - time.time())),
-        "daily_limit_try": DAILY_LOSS_TRY,
-        "dd_limit_pct": MAX_DD_PCT * 100,
+        "daily_limit_try": daily_loss_limit(),
+        "daily_limit_pct": DAILY_LOSS_PCT * 100,
+        "day_peak_balance": float(st.get("day_peak_balance", 0) or 0),
+        "dd_limit_pct": TRAILING_DD_PCT * 100,
         "crash_limit_pct": CRASH_PCT * 100,
         "crash_cooldown_min": CRASH_COOLDOWN_SEC // 60,
     }
