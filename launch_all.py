@@ -19,6 +19,10 @@ def main() -> None:
     states = ops.watchdog_once()  # motor + scheduler'ı gerekiyorsa başlatır
     if not states.get("watch_alive") or not ops.process_state("ui.watchdog_runner")[0]:
         ops._start_module("ui.watchdog_runner")
+    # Streamlit uygulaması da ayakta kalsın
+    from launch_app import main as launch_app_main
+
+    launch_app_main()
     ops._log(f"launch_all: motor={states['motor_alive']} scheduler={states['sched_alive']} "
              f"watchdog={states.get('watch_alive')}")
 
