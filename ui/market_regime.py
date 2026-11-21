@@ -85,12 +85,12 @@ def regime(symbol: str) -> dict[str, Any]:
             "adx": round(adx, 2), "price": px, "ema50": ema, "reason": reason}
 
 
-def atr_stop(price: float, symbol: str) -> dict[str, Any]:
-    """Stop mesafesi = 1.5 * ATR(14)."""
-    f = quant_lab.fetch(symbol, "1d", 60)
+def atr_stop(price: float, symbol: str, frame: Any = None) -> dict[str, Any]:
+    """Stop mesafesi = 1.5 * ATR(14). frame verilirse onu kullan (test için)."""
+    f = frame if frame is not None else quant_lab.fetch(symbol, "1d", 60)
     atr = _atr(f) if f is not None else 0.0
     if atr <= 0:
-        atr = price * 0.03  # fallback: mevcut %3 stop
+        atr = price * 0.01  # güvenli fallback (veri yoksa dar stop)
     distance = atr * ATR_MULT
     return {"atr": round(atr, 6), "stop": round(price - distance, 6),
             "distance": round(distance, 6), "pct": round(distance / price * 100, 2)}

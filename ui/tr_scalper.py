@@ -35,7 +35,7 @@ STRATEGY_NAME = "günlük EMA50 pullback (quant_lab)"
 SYMBOLS = ("BTCUSDT", "ETHUSDT", "XRPUSDT", "DOGEUSDT",
            "ADAUSDT", "LINKUSDT", "BNBUSDT", "SOLUSDT")
 MAX_HOLD_DAYS = 90
-EXIT_BELOW_EMA = 0.97   # STOP-LOSS: günlük kapanış EMA50 * 0.97 altına düşerse sat
+# Sabit %3 stop KALDIRILDI — stop mesafesi = 1.5 * ATR(14) (market_regime.atr_stop)
 COMMISSION = 0.001            # Binance TR spot VIP0, her yön
 TAKE_PROFIT_EXPECTED = 0.008  # beklenen işlem getirisi (%0,8) — komisyon filtresi için
 
@@ -220,16 +220,14 @@ def signal(symbol: str) -> dict[str, Any]:
 
 def position_exit(pos: dict[str, Any], px: float, ma: float,
                   effective_sl: float | None = None) -> str:
-    """Açık pozisyon çıkışı: ATR stop, EMA50, kâr kilidi veya 90 gün."""
+    """Açık pozisyon çıkışı: SADECE ATR stop + kâr kilidi + 90 gün. Sabit %3 KALDIRILDI."""
     held_days = (time.time() - float(pos.get("entry_ts", time.time()))) / 86400
     if effective_sl and px <= effective_sl:
         return f"kâr kilidi: fiyat {px:.4f} ≤ kilitli stop {effective_sl:.4f}"
-    # ATR BAZLI STOP: 1.5 * ATR(14), pozisyon açılırken kaydedilir
+    # ATR BAZLI STOP: 1.5 * ATR(14) — NORMAL ve GRID modlarında GEÇERLİ
     atr_sl = float(pos.get("atr_stop", 0) or 0)
     if atr_sl and px <= atr_sl:
         return f"ATR stop: fiyat {px:.4f} ≤ {atr_sl:.4f}"
-    if px < ma * EXIT_BELOW_EMA:
-        return "stop loss: günlük EMA50 %3 altı"
     if held_days >= MAX_HOLD_DAYS:
         return "zaman: 90 gün"
     return ""

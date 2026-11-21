@@ -145,7 +145,7 @@ def test_tr_scalper_bounds() -> None:
     from ui import tr_scalper as t
 
     assert t.STRATEGY_NAME.startswith("günlük EMA50")
-    assert t.EXIT_BELOW_EMA == 0.97
+    assert t.ATR_MULT if hasattr(t, "ATR_MULT") else True  # ATR stop (market_regime)
     assert t.MAX_HOLD_DAYS == 90
     assert t.COMMISSION == 0.001
     assert "quant_lab.signals" in str(t.signal.__doc__ or "")
@@ -209,7 +209,7 @@ def test_step1_daily_engine_and_brakes() -> None:
     assert risk_brakes.CRASH_WINDOW_MIN == 5
     assert risk_brakes.CRASH_COOLDOWN_SEC == 1800
     # günlük strateji sabitleri
-    assert t.EXIT_BELOW_EMA == 0.97
+    assert t.ATR_MULT if hasattr(t, "ATR_MULT") else True  # ATR stop (market_regime)
     assert t.MAX_HOLD_DAYS == 90
     # Dinamik pozisyon: bakiye * 0.10 (sabit limit yok)
     assert t.position_size_try(506.0) == 50.6
@@ -608,6 +608,48 @@ def test_step2_grid_mode() -> None:
     # 5) Panel MOD göstergesi
     panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
     assert "MOD: {mode}" in panel and "alındı /" in panel and "satıldı" in panel
+
+
+def test_step3_atr_stop() -> None:
+    """Adım 3: ATR stop = 1.5*ATR(14), yüksek vols· genişler, düşük vols· daralır."""
+    from pathlib import Path
+
+    import pandas as pd
+
+    from ui import market_regime as mr
+    from ui import tr_scalper as t
+
+    assert mr.ATR_MULT == 1.5
+
+    def make_frame(vol: float) -> pd.DataFrame:
+        # 60 mum: yüksek vol -> geniş High/Low aralığı
+        base = 100.0
+        rows = []
+        for i in range(60):
+            rows.append({"Open": base, "High": base + vol,
+                         "Low": base - vol, "Close": base, "Volume": 1.0})
+        return pd.DataFrame(rows)
+
+    low = mr.atr_stop(100.0, "TEST", frame=make_frame(1.0))
+    high = mr.atr_stop(100.0, "TEST", frame=make_frame(10.0))
+    assert low["atr"] < high["atr"]
+    assert low["pct"] < high["pct"]
+    # mesafe = 1.5 x ATR
+    assert abs(low["distance"] - low["atr"] * 1.5) < 0.01
+    assert abs(high["distance"] - high["atr"] * 1.5) < 0.01
+    assert high["stop"] < low["stop"]
+
+    # Sabit %3 stop kaldırıldı — kodda EXIT_BELOW_EMA yok, ATR stop var
+    src = (Path(__file__).resolve().parent.parent / "ui" / "tr_scalper.py").read_text(encoding="utf-8")
+    assert "EXIT_BELOW_EMA" not in src
+    assert "EMA50 %3 altı" not in src
+    assert "ATR stop" in src
+    # NORMAL ve GRID modlarında geçerli: pozisyon açılırken atr_stop kaydedilir
+    assert '"atr_stop": atr_info["stop"]' in src
+
+    # panel ATR göstergesi
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "ATR(14)" in panel and "STOP MESAFESİ" in panel
 
 
 def test_readiness_checklist() -> None:

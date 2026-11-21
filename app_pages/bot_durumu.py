@@ -212,6 +212,15 @@ def _panel():
     else:
         st.success("BOĞA rejimi — Grid kapalı, normal EMA50 pullback modu.",
                    icon=":material/check:")
+
+    # ATR BAZLI STOP göstergesi
+    atr_info = market_regime.atr_stop(reg["price"], "BTCUSDT")
+    a1, a2 = st.columns(2)
+    a1.metric("ATR(14)", f"{atr_info['atr']:,.2f}")
+    a2.metric("STOP MESAFESİ", f"%{atr_info['pct']:.2f}",
+              help=f"1.5 × ATR = {atr_info['distance']:,.2f} · stop {atr_info['stop']:,.2f}")
+    st.caption("Stop mesafesi = 1.5 × ATR(14) — NORMAL ve GRID modlarında geçerli. "
+               "Sabit %3 stop kaldırıldı.")
     st.caption(
         f"Komisyon filtresi: beklenen kâr ≥ {tr_scalper.MIN_EXPECTED_RR:.0f}× komisyon "
         f"(oran %{tr_scalper.COMMISSION*100:.2f}) · "
