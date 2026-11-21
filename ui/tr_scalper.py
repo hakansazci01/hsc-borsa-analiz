@@ -23,7 +23,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from ui import quant_lab
+from ui import market_regime, quant_lab
 from ui.binance_tr_bot import _request
 
 
@@ -220,10 +220,14 @@ def signal(symbol: str) -> dict[str, Any]:
 
 def position_exit(pos: dict[str, Any], px: float, ma: float,
                   effective_sl: float | None = None) -> str:
-    """Açık pozisyon çıkışı: EMA50 stop, kâr kilidi veya 90 gün."""
+    """Açık pozisyon çıkışı: ATR stop, EMA50, kâr kilidi veya 90 gün."""
     held_days = (time.time() - float(pos.get("entry_ts", time.time()))) / 86400
     if effective_sl and px <= effective_sl:
         return f"kâr kilidi: fiyat {px:.4f} ≤ kilitli stop {effective_sl:.4f}"
+    # ATR BAZLI STOP: 1.5 * ATR(14), pozisyon açılırken kaydedilir
+    atr_sl = float(pos.get("atr_stop", 0) or 0)
+    if atr_sl and px <= atr_sl:
+        return f"ATR stop: fiyat {px:.4f} ≤ {atr_sl:.4f}"
     if px < ma * EXIT_BELOW_EMA:
         return "stop loss: günlük EMA50 %3 altı"
     if held_days >= MAX_HOLD_DAYS:
@@ -255,8 +259,9 @@ def _order(symbol: str, side: int, qty: float) -> dict[str, Any]:
     return res
 
 
-def buy(symbol: str) -> dict[str, Any]:
-    """GERÇEK ALIŞ — tüm kilitler burada uygulanır."""
+def buy(symbol: str, qty_override: float | None = None,
+        grid_part: float | None = None) -> dict[str, Any]:
+    """GERÇEK ALIŞ — tüm kilitler burada uygulanır. Grid parçası toplam limiti aşmaz."""
     gates = config_gate()
     if STOP_FILE.exists():
         gates.append("STOP_FILE etkin")
@@ -279,7 +284,9 @@ def buy(symbol: str) -> dict[str, Any]:
     # Her alışta güncel bakiyeyi API'den çek -> %10 (bileşik büyüme).
     current_balance = available_try()
     cap = position_size_try(current_balance)   # örn 506 TL -> 50.6 TL
-    need = max(cap, flt["min_notional"] + 0.5) / px
+    # Grid modunda sadece 1 parça (10 TL), toplam limit yine %10
+    budget = grid_part if grid_part and grid_part <= cap else cap
+    need = max(budget, flt["min_notional"] + 0.5) / px
     qty = round(int(need / step + 0.999999) * step, 8)
     qty = max(qty, flt["min_qty"])
     if qty * px > cap + 0.01:  # yuvarlama payı
@@ -300,11 +307,14 @@ def buy(symbol: str) -> dict[str, Any]:
             pass
         body = (res.get("data") or {}).get("data") or {}
         st = _load()
+        atr_info = market_regime.atr_stop(px, symbol)
         st["position"] = {
             "symbol": symbol, "qty": qty, "entry": px,
             "entry_ts": time.time(), "time": time.strftime("%Y-%m-%d %H:%M:%S"),
             "order_id": body.get("orderId") or body.get("id"),
             "cost": round(px * qty, 4), "strategy": STRATEGY_NAME,
+            "atr": atr_info["atr"], "atr_stop": atr_info["stop"],
+            "regime": market_regime.regime(symbol)["name"],
         }
         _save(st)
     return res
@@ -336,6 +346,8 @@ def sell(symbol: str, qty: float, reason: str) -> dict[str, Any]:
             "duration_sec": duration_sec, "reason": reason, "strategy": STRATEGY_NAME,
         }])[-50:]
         st["realized_pnl"] = round(sum(float(h.get("net_pnl", 0)) for h in st["history"]), 4)
+        # ARDIŞIK ZARAR SAYACI
+        st["loss_streak"] = (int(st.get("loss_streak", 0) or 0) + 1) if net <= 0 else 0
         st.pop("position", None)
         _save(st)
         try:
@@ -418,6 +430,27 @@ def brakes_block(symbol: str) -> str:
     vol, vol_msg = volatility_block(symbol)
     if vol:
         return vol_msg
+    # ARDIŞIK ZARAR FRENİ: 3 zarar -> 24 saat
+    st = _load()
+    loss, loss_msg = market_regime.loss_streak_block(st)
+    if loss:
+        st["loss_streak_until"] = float(st.get("loss_streak_until", 0) or 0)
+        _save(st)
+        try:
+            from ui import autonomous_ops as ops
+
+            ops._send("HSC ARDIŞIK ZARAR", loss_msg)
+        except Exception:
+            pass
+        return loss_msg
+    # REJİM: AYI ise alım yok, YATAY ise Grid modu (ayrı ayarlanır)
+    reg = market_regime.regime(symbol)
+    if reg["bear"]:
+        return f"rejim AYI — alım yok ({reg['reason']})"
+    # MULTI-TIMEFRAME: günlük + 4s EMA50 ikisi de üstünde olmalı
+    mtf = market_regime.mtf_confirm(symbol)
+    if not mtf["ok"]:
+        return f"multi-timeframe onayı yok — {mtf['reason']}"
     return ""
 
 
@@ -502,12 +535,20 @@ def cycle() -> list[str]:
         if brake:
             logs.append(f"FREN ({sym}): {brake}")
             continue
+        reg = market_regime.regime(sym)
+        if reg["range"]:
+            # GRID MODU: yatay piyasada 5 parça, %1 adımla AL
+            plan = market_regime.grid_plan(available_try())
+            res = buy(sym, qty_override=None, grid_part=plan["part"])
+            logs.append(f"GRID MODU {sym}: {plan['reason']} — "
+                        f"{'OK' if res.get('ok') else res.get('reason', 'HATA')}")
+            return logs
         s = signal(sym)
         if s.get("decision") == "AL":
             res = buy(sym)
             logs.append(f"AL {sym} {'OK' if res.get('ok') else 'HATA'} neden={s.get('reason')}")
             return logs
-        logs.append(f"{sym}: {s.get('decision')} — {s.get('reason')}")
+        logs.append(f"{sym}: REJİM={reg['name']} · {s.get('decision')} — {s.get('reason')}")
     return logs
 
 

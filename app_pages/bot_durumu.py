@@ -172,6 +172,17 @@ def _panel():
     v1.metric("KOMİSYON (son 10 işlem)", f"₺{comm_total:.4f}")
     v2.metric("VOLATİLİTE", "YÜKSEK ⚠️" if vstate["high"] else "Normal ✅",
               help=vstate["reason"])
+    from ui import market_regime
+
+    reg = market_regime.regime("BTCUSDT")
+    grid = market_regime.grid_plan(tr_scalper.available_try())
+    r1, r2 = st.columns(2)
+    r1.metric("REJİM", reg["name"],
+              help=reg["reason"] + f" · ADX {reg.get('adx', '—')}")
+    r2.metric("MOD", "GRID 🔲" if reg["range"] else "EMA50 📈",
+              help=grid["reason"] if reg["range"] else "trend rejimi — EMA50 sinyali")
+    if reg["bear"]:
+        st.warning("AYI rejimi — yeni alım yok, para güvende.", icon=":material/warning:")
     st.caption(
         f"Komisyon filtresi: beklenen kâr ≥ {tr_scalper.MIN_EXPECTED_RR:.0f}× komisyon "
         f"(oran %{tr_scalper.COMMISSION*100:.2f}) · "
