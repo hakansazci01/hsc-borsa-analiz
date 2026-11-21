@@ -564,9 +564,50 @@ def test_regime_grid_atr_and_mtf() -> None:
 
     # panel göstergeleri
     panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
-    assert "REJİM:" in panel and "Grid modu için bekleniyor" in panel
+    assert "REJİM:" in panel and "MOD: {mode}" in panel
     # cycle her turda rejimi logluyor
     assert 'REJİM {sym}:' in (Path(__file__).resolve().parent.parent / "ui" / "tr_scalper.py").read_text(encoding="utf-8")
+
+
+def test_step2_grid_mode() -> None:
+    """Adım 2: YATAY'da Grid 5 kademe alır, AYI'da Grid yapılmaz, BOĞA'da normal mod."""
+    from pathlib import Path
+
+    from ui import market_regime as mr
+    from ui import tr_scalper as t
+
+    # 1) Grid planı: 50 TL = 5 x 10 TL
+    plan = mr.grid_plan(500.0)
+    assert plan["parts"] == 5 and plan["step_pct"] == 1.0
+    assert round(plan["total"], 2) == 50.0
+    assert round(plan["part"], 2) == 10.0
+
+    # 2) Kademe fiyatları: her %1 düşüşte AL
+    levels = mr.grid_levels(100.0, 10.0)
+    assert len(levels) == 5
+    assert levels[0]["buy_price"] == 99.0
+    assert levels[4]["buy_price"] == 95.0
+    assert levels[0]["sell_price"] == 101.0
+
+    # 3) YATAY senaryosu: fiyat %5 düştü -> 5 kademe AL
+    d = mr.grid_decision(95.0, 100.0, bought=0, sold=0)
+    assert d["action"] == "AL" and d["levels"] == 5
+    # kademeli alım: 1. alıştan sonra 4 kademe kaldı
+    d2 = mr.grid_decision(95.0, 100.0, bought=1, sold=0)
+    assert d2["levels"] == 4
+    # %1 yükseliş -> SAT kademesi
+    up = mr.grid_decision(101.0, 100.0, bought=2, sold=0)
+    assert up["action"] == "SAT" and up["levels"] == 1
+
+    # 4) AYI senaryosu: Grid YAPILMAZ (cycle kodu kontrolü)
+    src = (Path(__file__).resolve().parent.parent / "ui" / "tr_scalper.py").read_text(encoding="utf-8")
+    assert 'if reg["bear"]:' in src and 'st["mode"] = "BEKLEME"' in src
+    assert 'if reg["range"]:' in src and 'st["mode"] = "GRID"' in src
+    assert 'st["mode"] = "NORMAL"' in src  # BOĞA -> normal
+
+    # 5) Panel MOD göstergesi
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "MOD: {mode}" in panel and "alındı /" in panel and "satıldı" in panel
 
 
 def test_readiness_checklist() -> None:

@@ -541,9 +541,51 @@ def cycle() -> list[str]:
             continue
         reg = market_regime.regime(sym)
         if reg["bear"]:
-            continue  # AYI: yeni alım yapma, bekle
+            st["mode"] = "BEKLEME"  # AYI: Grid de yapılmaz, tamamen bekle
+            _save(st)
+            continue
         if reg["range"]:
-            continue  # YATAY: yeni alım yok, Grid için bekle (sonraki adım)
+            # GRID MODU: YATAY rejimde 5 kademe, %1 adım
+            st["mode"] = "GRID"
+            plan = market_regime.grid_plan(available_try())
+            st.setdefault("grid", {})
+            g = st["grid"]
+            anchor = float(g.get("anchor", 0) or 0)
+            px_now = price(sym) or reg["price"]
+            if not anchor:
+                g["anchor"] = px_now
+                g["bought"] = 0
+                g["sold"] = 0
+                g["part"] = plan["part"]
+                anchor = px_now
+            dec = market_regime.grid_decision(px_now, anchor,
+                                              int(g.get("bought", 0)),
+                                              int(g.get("sold", 0)))
+            logs.append(f"GRID MODU {sym}: {dec['reason']} · "
+                        f"alınan={g.get('bought', 0)}/{plan['parts']} "
+                        f"satılan={g.get('sold', 0)}/{plan['parts']}")
+            if dec["action"] == "AL":
+                for _ in range(dec["levels"]):
+                    res = buy(sym, grid_part=plan["part"])
+                    if res.get("ok"):
+                        g["bought"] = int(g.get("bought", 0)) + 1
+                    else:
+                        logs.append(f"GRID AL reddedildi: {res.get('reason', '')}")
+                        break
+            elif dec["action"] == "SAT" and g.get("bought", 0) > 0:
+                qty = float(price(sym) and (plan["part"] / price(sym)) or 0)
+                for _ in range(min(dec["levels"], int(g["bought"]))):
+                    res = sell(sym, qty, "grid satış kademesi")
+                    if res.get("ok"):
+                        g["sold"] = int(g.get("sold", 0)) + 1
+                        g["bought"] -= 1
+                    else:
+                        break
+            st["grid"] = g
+            _save(st)
+            return logs
+        st["mode"] = "NORMAL"  # BOĞA: Grid kapat, EMA50 moduna dön
+        _save(st)
         s = signal(sym)
         if s.get("decision") == "AL":
             res = buy(sym)

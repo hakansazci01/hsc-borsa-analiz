@@ -184,13 +184,34 @@ def _panel():
     )
     st.caption(f"ADX {reg['adx']:.1f} · fiyat {reg['price']:.2f} / EMA50 {reg['ema50']:.2f} — "
                f"{reg['reason']}")
+    mode = tr_scalper._load().get("mode", "BEKLEME")
     if reg["range"]:
-        st.info("YATAY rejim — yeni alım yok, Grid modu için bekleniyor (sonraki adım).",
-                icon=":material/info:")
+        mode = "GRID"
     elif reg["bear"]:
-        st.warning("AYI rejimi — yeni alım yok, para güvende.", icon=":material/warning:")
+        mode = "BEKLEME"
     else:
-        st.success("BOĞA rejimi — EMA50 pullback sinyali bekleniyor.", icon=":material/check:")
+        mode = "NORMAL"
+    _mc = {"GRID": "#eab308", "NORMAL": "#22c55e", "BEKLEME": "#ef4444"}[mode]
+    st.markdown(
+        f'<div style="text-align:center;padding:6px 0 10px 0;">'
+        f'<span style="font-size:22px;font-weight:800;color:{_mc};letter-spacing:2px;">'
+        f'MOD: {mode}</span></div>',
+        unsafe_allow_html=True,
+    )
+    g = tr_scalper._load().get("grid", {})
+    if mode == "GRID":
+        st.caption(f"Grid kademeleri: **{int(g.get('bought', 0))} alındı / "
+                   f"{int(g.get('sold', 0))} satıldı** · "
+                   f"parça ₺{float(g.get('part', 0)):.2f} · %1 adım · "
+                   f"anchor {float(g.get('anchor', 0)):.4f}")
+        st.info("YATAY rejim — Grid modu aktif, %1 düşüşte al / %1 yükselişte sat.",
+                icon=":material/grid_on:")
+    elif mode == "BEKLEME":
+        st.warning("AYI rejimi — Grid yapılmaz, tamamen bekleme. Para güvende.",
+                   icon=":material/warning:")
+    else:
+        st.success("BOĞA rejimi — Grid kapalı, normal EMA50 pullback modu.",
+                   icon=":material/check:")
     st.caption(
         f"Komisyon filtresi: beklenen kâr ≥ {tr_scalper.MIN_EXPECTED_RR:.0f}× komisyon "
         f"(oran %{tr_scalper.COMMISSION*100:.2f}) · "

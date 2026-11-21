@@ -117,6 +117,36 @@ def grid_plan(balance: float) -> dict[str, Any]:
             "reason": f"yatay rejim — {GRID_PARTS}x{part} TL, %{GRID_STEP*100} adım"}
 
 
+def grid_levels(base_price: float, part: float, parts: int = GRID_PARTS) -> list[dict[str, Any]]:
+    """Grid kademeleri: her %1 düşüşte AL, her %1 yükselişte SAT."""
+    levels = []
+    for i in range(1, parts + 1):
+        levels.append({
+            "level": i,
+            "buy_price": round(base_price * (1 - GRID_STEP * i), 6),
+            "sell_price": round(base_price * (1 + GRID_STEP * i), 6),
+            "amount": part,
+        })
+    return levels
+
+
+def grid_decision(current_price: float, anchor: float, bought: int, sold: int,
+                  parts: int = GRID_PARTS) -> dict[str, Any]:
+    """Fiyatın kaç kademe düştüğüne/çıktığına göre AL/SAT/BEKLE."""
+    drop = (anchor - current_price) / anchor
+    rise = (current_price - anchor) / anchor
+    target_buys = min(parts, int(drop / GRID_STEP + 1e-9))
+    target_sells = min(parts, int(rise / GRID_STEP + 1e-9))
+    if target_buys > bought:
+        return {"action": "AL", "levels": target_buys - bought,
+                "reason": f"%{drop*100:.2f} düşüş — {target_buys-bought} kademe AL"}
+    if target_sells > sold:
+        return {"action": "SAT", "levels": target_sells - sold,
+                "reason": f"%{rise*100:.2f} yükseliş — {target_sells-sold} kademe SAT"}
+    return {"action": "BEKLE", "levels": 0,
+            "reason": f"düşüş %{drop*100:.2f} / yükseliş %{rise*100:.2f} — kademe yok"}
+
+
 def loss_streak_block(state: dict[str, Any]) -> tuple[bool, str]:
     """Üst üste 3 zarar -> 24 saat dur."""
     until = float(state.get("loss_streak_until", 0) or 0)
