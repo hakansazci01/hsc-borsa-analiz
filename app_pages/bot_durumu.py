@@ -275,6 +275,20 @@ def _panel():
     st.caption(f"Kural: korelasyon > {correlation_guard.CORR_LIMIT} ise aynı anda alım yok · "
                f"son {correlation_guard.CORR_DAYS} günlük kapanış")
 
+    # KISMİ KÂR ALIMI
+    st.divider()
+    st.subheader("Kısmî kâr alımı", divider="gray")
+    _p = tr_scalper._load().get("position") or {}
+    if _p:
+        pp = tr_scalper.partial_profit(_p, _p.get("entry", 0))
+        k1, k2, k3 = st.columns(3)
+        k1.metric("Kısmî Satış", "Yapıldı ✅" if _p.get("partial_done") else "Yapılmadı")
+        k2.metric("Cebe Konan Kâr", f"{float(_p.get('partial_profit', 0)):+.2f} ₺")
+        k3.metric("Kalan Pozisyon", f"₺{float(_p.get('qty', 0)) * float(_p.get('entry', 0)):.2f}")
+        st.caption("%5 karda pozisyonun %50'si satılır, kalanı trailing TP ile devam eder · sadece NORMAL mod")
+    else:
+        st.info("Açık pozisyon yok — kısmî satış pasif.", icon=":material/info:")
+
     # TRAILING TAKE-PROFIT
     st.divider()
     st.subheader("Trailing Take-Profit", divider="gray")

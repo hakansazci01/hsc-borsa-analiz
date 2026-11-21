@@ -218,8 +218,9 @@ def signal(symbol: str) -> dict[str, Any]:
             "reason": f"fiyat {px:.4f} / EMA50 {ma:.4f} — giriş koşulu yok"}
 
 
-TRAIL_TP_ACTIVATE = 0.05   # %5 karda trailing TP devreye girer
+TRAIL_TP_ACTIVATE = 0.05   # %5 karda trailing TP devreye girer + kısmi kâr alınır
 TRAIL_TP_DROP = 0.02       # zirveden %2 geri çekilince sat
+PARTIAL_RATIO = 0.50       # %5 karda pozisyonun %50'si satılır (sadece NORMAL mod)
 
 
 def trailing_tp(pos: dict[str, Any], current_px: float) -> dict[str, Any]:
@@ -238,6 +239,27 @@ def trailing_tp(pos: dict[str, Any], current_px: float) -> dict[str, Any]:
         "active": active, "peak": round(peak, 6), "tp": tp,
         "gain_pct": round(gain * 100, 2), "triggered": triggered,
     }
+
+
+def partial_profit(pos: dict[str, Any], current_px: float) -> dict[str, Any]:
+    """%5 karda pozisyonun %50'sini sat — sadece NORMAL mod (grid bayrağı yoksa).
+
+    Örnek: 50 TL pozisyon 52.50 TL oldu -> 25 TL'lik kısmı sat, 1.25 TL kâr cebe.
+    Kalan 25 TL trailing TP ile devam eder.
+    """
+    entry = float(pos.get("entry", 0) or 0)
+    qty = float(pos.get("qty", 0) or 0)
+    gain = (current_px - entry) / entry if entry > 0 else 0.0
+    done = bool(pos.get("partial_done"))
+    is_grid = bool(pos.get("grid"))
+    if done or is_grid or gain < TRAIL_TP_ACTIVATE or qty <= 0:
+        return {"take": False, "ratio": 0.0, "qty": 0.0, "profit": 0.0,
+                "remaining": qty, "gain_pct": round(gain * 100, 2)}
+    sell_qty = round(qty * PARTIAL_RATIO, 8)
+    profit = (current_px - entry) * sell_qty
+    return {"take": True, "ratio": PARTIAL_RATIO, "qty": sell_qty,
+            "profit": round(profit, 4), "remaining": round(qty - sell_qty, 8),
+            "gain_pct": round(gain * 100, 2)}
 
 
 def position_exit(pos: dict[str, Any], px: float, ma: float,
@@ -377,8 +399,8 @@ def buy(symbol: str, qty_override: float | None = None,
     return res
 
 
-def sell(symbol: str, qty: float, reason: str) -> dict[str, Any]:
-    """GERÇEK SATIŞ + trades.csv kaydı."""
+def sell(symbol: str, qty: float, reason: str, partial: bool = False) -> dict[str, Any]:
+    """GERÇEK SATIŞ + trades.csv kaydı. partial=True ise pozisyonu kapatmaz."""
     actual = asset_balance(symbol.split("_")[0]) or qty
     qty = min(qty, actual)
     px = price(symbol) or 0
@@ -405,7 +427,18 @@ def sell(symbol: str, qty: float, reason: str) -> dict[str, Any]:
         st["realized_pnl"] = round(sum(float(h.get("net_pnl", 0)) for h in st["history"]), 4)
         # ARDIŞIK ZARAR SAYACI
         st["loss_streak"] = (int(st.get("loss_streak", 0) or 0) + 1) if net <= 0 else 0
-        st.pop("position", None)
+        if partial:
+            # Kısmi satış: pozisyonu KAPATMA, kalan miktarı kaydet
+            remaining = round(float(pos.get("qty", qty)) - qty, 8)
+            if remaining > 0:
+                pos["qty"] = remaining
+                pos["partial_done"] = True
+                pos["partial_profit"] = round(float(pos.get("partial_profit", 0)) + net, 4)
+                st["position"] = pos
+            else:
+                st.pop("position", None)
+        else:
+            st.pop("position", None)
         _save(st)
         try:
             from ui.autonomous_ops import trade_notification
@@ -595,6 +628,17 @@ def cycle() -> list[str]:
             return ["günlük veri yok — pozisyon korunuyor"]
         px = float(vals["Close"].iloc[-1])
         ma = float(quant_lab.ema(vals["Close"], 50).iloc[-1])
+        # KISMİ KÂR ALIMI: %5 karda pozisyonun %50'sini sat (sadece NORMAL mod, bir kez)
+        if not pos.get("grid"):
+            pp = partial_profit(pos, px)
+            if pp["take"]:
+                res = sell(sym, pp["qty"], "kısmi kâr alımı (%5, %50)", partial=True)
+                if res.get("ok"):
+                    st = _load()
+                    pos = st.get("position") or pos
+                    logs.append(f"KISMİ SATIŞ: {pp['qty']} adet satıldı · "
+                                f"cebe konan kâr {pp['profit']:+.2f} TL · "
+                                f"kalan {pp['remaining']} adet trailing ile devam")
         # TRAILING TP: zirve fiyatını güncelle (NORMAL mod)
         if not pos.get("grid"):
             ttp = trailing_tp(pos, px)

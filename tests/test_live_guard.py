@@ -1045,6 +1045,43 @@ def test_trailing_take_profit() -> None:
     assert "Trailing TP" in panel and "Zirve Fiyat" in panel and "Trailing Satış Fiyatı" in panel
 
 
+def test_partial_profit() -> None:
+    """%5 karda %50 sat, kalan trailing; %5 altı/GRID'de kısmi satış yok."""
+    from pathlib import Path
+
+    from ui import tr_scalper as t
+
+    assert t.PARTIAL_RATIO == 0.50
+
+    pos = {"entry": 100.0, "qty": 0.5}  # 50 TL pozisyon
+
+    # 1) %5 kara ULAŞMADAN kısmi satış yok
+    r1 = t.partial_profit(pos, 104.0)
+    assert r1["take"] is False and r1["qty"] == 0.0
+
+    # 2) %5 karda %50'sini sat: 0.25 adet, kâr = (105-100)*0.25 = 1.25 TL
+    r2 = t.partial_profit(pos, 105.0)
+    assert r2["take"] is True
+    assert abs(r2["qty"] - 0.25) < 1e-9
+    assert abs(r2["profit"] - 1.25) < 0.001
+    assert abs(r2["remaining"] - 0.25) < 1e-9  # kalan %50
+
+    # 3) Kalan %50 trailing ile devam eder
+    remaining_pos = {"entry": 100.0, "qty": r2["remaining"], "partial_done": True}
+    ttp = t.trailing_tp(remaining_pos, 110.0)
+    assert ttp["active"] is True and abs(ttp["tp"] - 107.80) < 0.01
+    # kısmi satış tekrar tetiklenmez
+    assert t.partial_profit(remaining_pos, 110.0)["take"] is False
+
+    # 4) GRID modunda kısmi satış YOK
+    grid_pos = dict(pos); grid_pos["grid"] = True
+    assert t.partial_profit(grid_pos, 105.0)["take"] is False
+
+    # 5) Panel göstergeleri
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "Kısmî Satış" in panel and "Cebe Konan Kâr" in panel and "Kalan Pozisyon" in panel
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 
