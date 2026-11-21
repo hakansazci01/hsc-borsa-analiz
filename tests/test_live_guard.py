@@ -443,6 +443,7 @@ def test_watchdog_restarts_dead_processes() -> None:
     # process_state gerçek psutil kullanır
     ok, pid, start = ops.process_state("ui.tr_runner")
     assert isinstance(ok, bool)
+    assert ops.process_state("ui.watchdog_runner")[0] is True  # watchdog gerçekten ayakta
     # watchdog_once tek tur çalışır (durmuş süreçleri başlatır)
     result = ops.watchdog_once()
     for key in ("motor_alive", "sched_alive", "motor_pid", "sched_pid", "actions", "at"):

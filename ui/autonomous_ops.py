@@ -225,12 +225,21 @@ def process_state(pattern: str) -> tuple[bool, int | None, str]:
     """GERÇEK süreç listesinden (psutil) kontrol — dosya kilidine güvenmez."""
     import psutil
 
+    import sys as _sys
+
     me = __import__("os").getpid()
-    for p in psutil.process_iter(["pid", "cmdline", "create_time"]):
+    exe = str(ROOT / ".venv" / "Scripts" / "python.exe").lower()
+    for p in psutil.process_iter(["pid", "cmdline", "create_time", "exe"]):
         cmd = " ".join(p.info.get("cmdline") or [])
-        if pattern in cmd and p.info["pid"] != me:
-            start = datetime.fromtimestamp(p.info["create_time"]).strftime("%H:%M:%S")
-            return True, p.info["pid"], start
+        pexe = (p.info.get("exe") or "").lower()
+        # SADECE .venv python'u ve tam '-m <module>' argümanı ile eşleş
+        if p.info["pid"] != me and pattern in cmd and "-m" in cmd:
+            args = p.info.get("cmdline") or []
+            if "-m" in args and args[args.index("-m") + 1] == pattern.split(".")[-1] or \
+               any(a.endswith(pattern) for a in args):
+                if exe in pexe or ".venv" in pexe:
+                    start = datetime.fromtimestamp(p.info["create_time"]).strftime("%H:%M:%S")
+                    return True, p.info["pid"], start
     return False, None, "—"
 
 
@@ -255,6 +264,7 @@ def watchdog_once() -> dict[str, Any]:
     durmuş olanları 60 sn içinde yeniden başlat."""
     motor = process_state("ui.tr_runner")
     sched = process_state("ui.autonomous_scheduler")
+    watch = process_state("ui.watchdog_runner")
     actions: list[str] = []
     if not motor[0]:
         pid = _start_module("ui.tr_runner")
@@ -271,6 +281,7 @@ def watchdog_once() -> dict[str, Any]:
     return {
         "motor_alive": motor[0], "motor_pid": motor[1], "motor_start": motor[2],
         "sched_alive": sched[0], "sched_pid": sched[1], "sched_start": sched[2],
+        "watch_alive": watch[0], "watch_pid": watch[1],
         "actions": actions,
         "at": time.strftime("%Y-%m-%d %H:%M:%S"),
     }

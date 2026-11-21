@@ -43,7 +43,7 @@ def _panel():
     gate = tr_scalper.config_gate()
 
     # GERÇEK süreç durumu (psutil) — dosya kilidine güvenmez
-    w_alive, w_pid, w_start = autonomous_ops.process_state("ui.autonomous_runner")
+    w_alive, w_pid, w_start = autonomous_ops.process_state("ui.watchdog_runner")
     s_alive, s_pid, s_start = autonomous_ops.process_state("ui.autonomous_scheduler")
     r_alive, r_pid, r_start = autonomous_ops.process_state("ui.tr_runner")
 
