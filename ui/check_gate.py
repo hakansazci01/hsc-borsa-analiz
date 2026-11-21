@@ -29,6 +29,7 @@ CHECKS = [
     "bakiye yeterli (%10)",
     "sembol işlem görüyor",
     "balina/haber koruması",
+    "yedek sağlam mı (felaket kurtarma)",
 ]
 
 
@@ -116,6 +117,14 @@ def run(symbol: str, price: float | None = None,
             f"5dk hareket %{wg['move_pct']:.2f} — normal ✅")
     except Exception:
         add(True, "", "balina kontrolü atlandı")
+    # 16) yedek sağlam mı (felaket kurtarma)
+    try:
+        from ui import disaster_recovery
+
+        corrupt = disaster_recovery.block_on_corrupt()
+        add(not corrupt, "YEDEK BOZUK — işlem yapılmıyor", "yedek sağlam ✅")
+    except Exception:
+        pass
 
     passed = sum(1 for r in results if r["ok"])
     return {

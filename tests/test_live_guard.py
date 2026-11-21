@@ -777,7 +777,7 @@ def test_check_gate() -> None:
     # Test izolasyonu: phrase durumunu doğru ayarla
     check_gate.t.set_confirmed_phrase("HSC-BINANCE-TR-ARM")
 
-    assert len(check_gate.CHECKS) == 15
+    assert len(check_gate.CHECKS) == 16
     assert check_gate.CHECKS[0] == "enabled = true"
     assert check_gate.CHECKS[7] == "rejim AYI değil"
     assert check_gate.CHECKS[13] == "sembol işlem görüyor"
@@ -807,15 +807,17 @@ def test_check_gate() -> None:
         import ui.market_regime as mr
         import ui.correlation_guard as cg
         import ui.whale_guard as wg
+        import ui.disaster_recovery as dr
 
         other = {
             "rb_hist": rb.update_from_history, "rb_daily": rb.daily_loss_breached,
             "rb_dd": rb.drawdown_breached, "rb_crash": rb.crash_detected,
             "mr_loss": mr.loss_streak_block, "mr_regime": mr.regime,
             "mr_mtf": mr.mtf_confirm, "cg": cg.guard_entry,
-            "wg": wg.check,
+            "wg": wg.check, "dr": dr.block_on_corrupt,
         }
         wg.check = lambda s: {"blocked": False, "move_pct": 0.5, "reason": ""}
+        dr.block_on_corrupt = lambda: False
         rb.update_from_history = lambda h: {}
         rb.daily_loss_breached = lambda: (False, "")
         rb.drawdown_breached = lambda b: (False, "")
@@ -827,8 +829,8 @@ def test_check_gate() -> None:
 
         r = check_gate.run("BTCUSDT", price=58000.0)
         assert r["ok"] is True
-        assert r["passed"] == 15 and r["total"] == 15
-        assert "15/15 GEÇTİ" in r["summary"]
+        assert r["passed"] == 16 and r["total"] == 16
+        assert "16/16 GEÇTİ" in r["summary"]
 
         # geri yükle
         rb.update_from_history = other["rb_hist"]
@@ -840,6 +842,7 @@ def test_check_gate() -> None:
         mr.mtf_confirm = other["mr_mtf"]
         cg.guard_entry = other["cg"]
         wg.check = other["wg"]
+        dr.block_on_corrupt = other["dr"]
     finally:
         t.cfg = orig["cfg"]
         t.is_phrase_confirmed = orig["phrase"]
@@ -912,7 +915,7 @@ def test_websocket_and_order_book() -> None:
     from ui import check_gate
 
     r = check_gate.run("BTCUSDT", price=58000.0)
-    assert r["total"] == 15
+    assert r["total"] == 16
 
     # 6) Panel göstergeleri
     panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
@@ -1181,7 +1184,7 @@ def test_whale_guard() -> None:
         wg._save({})
 
     # 5) Gate artık 15 kontrol
-    assert len(check_gate.CHECKS) == 15
+    assert len(check_gate.CHECKS) == 16
     assert check_gate.CHECKS[14] == "balina/haber koruması"
 
     # 6) Panel
@@ -1285,6 +1288,75 @@ def test_volatility_position_size() -> None:
 
     panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
     assert "ATR Durumu" in panel and "Pozisyon Boyutu" in panel
+
+
+def test_disaster_recovery() -> None:
+    """Açık pozisyon kurtarma, bozuk yedeke fallback, 3 yere yedek, gate 16."""
+    import json
+    from pathlib import Path
+
+    from ui import check_gate, disaster_recovery as dr, tr_scalper as t
+
+    # 1) 3 yere yedek
+    rec = dr.backup("test")
+    assert rec["ok"] is True and len(rec["files"]) == 3
+    assert any("trades.csv" in f for f in rec["files"])
+    assert any("tr_daily_state.json" in f for f in rec["files"])
+    assert any("config.yaml" in f for f in rec["files"])
+
+    # 2) Açık pozisyon kurtarma: state'e pozisyon yaz, bozuk ana dosya + geçerli yedek
+    original = t.STATE.read_text(encoding="utf-8") if t.STATE.exists() else None
+    original_recovery = dr.RECOVERY.read_text(encoding="utf-8") if dr.RECOVERY.exists() else None
+    try:
+        good = {"position": {"symbol": "BTCUSDT", "qty": 0.1, "entry": 100.0},
+                "history": []}
+        valid = dr.BACKUPS / "20991231_000000_tr_daily_state.json"
+        valid.write_text(json.dumps(good), encoding="utf-8")
+        # Ana dosyayı boz
+        t.STATE.write_text("{BOZUK JSON", encoding="utf-8")
+        r = dr.recover()
+        assert r["ok"] is True
+        assert r["open_position"] == "BTCUSDT"  # pozisyon hatırlandı
+        assert "20991231_000000" in r["restored_from"]
+        valid.unlink()
+    finally:
+        if original is not None:
+            t.STATE.write_text(original, encoding="utf-8")
+        if original_recovery is not None:
+            dr.RECOVERY.write_text(original_recovery, encoding="utf-8")
+
+    # 3) İkisi de bozuksa YEDEK BOZUK + işlem engeli
+    # backups altındaki geçerli state yedeklerini geçici kaldır
+    saved_backups = list(dr.BACKUPS.glob("*_tr_daily_state.json"))
+    for b in saved_backups:
+        b.rename(b.with_suffix(".hold"))
+    try:
+        t.STATE.write_text("{BOZUK", encoding="utf-8")
+        msgs = []
+        orig_send = dr.autonomous_ops._send
+        dr.autonomous_ops._send = lambda title, msg: (msgs.append((title, msg)), True)[1]
+        r2 = dr.recover()
+        assert r2["ok"] is False
+        assert any("YEDEK BOZUK" in m[1] for m in msgs)
+        assert dr.block_on_corrupt() is True
+        dr.autonomous_ops._send = orig_send
+    finally:
+        for b in saved_backups:
+            hold = b.with_suffix(".hold")
+            if hold.exists():
+                hold.rename(b)
+        if original is not None:
+            t.STATE.write_text(original, encoding="utf-8")
+        if original_recovery is not None:
+            dr.RECOVERY.write_text(original_recovery, encoding="utf-8")
+
+    # 4) Gate artık 16 kontrol
+    assert len(check_gate.CHECKS) == 16
+    assert check_gate.CHECKS[15] == "yedek sağlam mı (felaket kurtarma)"
+
+    # 5) Panel
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "Son Yedek" in panel and "Yedek Durumu" in panel and "Kurtarma Testi" in panel
 
 
 def test_readiness_checklist() -> None:

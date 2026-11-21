@@ -423,6 +423,12 @@ def buy(symbol: str, qty_override: float | None = None,
             "regime": market_regime.regime(symbol)["name"],
         }
         _save(st)
+        try:
+            from ui import disaster_recovery
+
+            disaster_recovery.backup("alım sonrası")
+        except Exception:
+            pass
     return res
 
 

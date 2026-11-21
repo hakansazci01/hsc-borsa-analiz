@@ -16,6 +16,10 @@ from ui import autonomous_ops as ops  # noqa: E402
 
 
 def main() -> None:
+    # FELAKET KURTARMA: açılışta en son yedeği yükle (açık pozisyon hatırlanır)
+    from ui import disaster_recovery
+
+    disaster_recovery.recover()
     states = ops.watchdog_once()  # motor + scheduler'ı gerekiyorsa başlatır
     if not states.get("watch_alive") or not ops.process_state("ui.watchdog_runner")[0]:
         ops._start_module("ui.watchdog_runner")

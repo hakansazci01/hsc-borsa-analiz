@@ -275,6 +275,21 @@ def _panel():
     st.caption(f"Kural: korelasyon > {correlation_guard.CORR_LIMIT} ise aynı anda alım yok · "
                f"son {correlation_guard.CORR_DAYS} günlük kapanış")
 
+    # YEDEK + FELAKET KURTARMA
+    st.divider()
+    st.subheader("Yedek + Felaket Kurtarma", divider="gray")
+    from ui import disaster_recovery as dr
+
+    ds = dr.status()
+    d1, d2, d3 = st.columns(3)
+    d1.metric("Son Yedek", ds["last_backup"])
+    d2.metric("Yedek Durumu", ds["status"])
+    d3.metric("Kurtarma Testi", ds["recovery"])
+    if ds["open_position"]:
+        st.caption(f"Kurtarılan açık pozisyon: **{ds['open_position']}** — sıfırdan başlanmadı.")
+    st.caption("Her işlemden sonra trades.csv + state.json + backups/ tarihli kopya · "
+               "bozuksa önceki yedek, ikisi de bozuksa işlem yok")
+
     # VOLATİLİTEYE GÖRE POZİSYON BOYUTU
     st.divider()
     st.subheader("Volatiliteye göre pozisyon boyutu", divider="gray")
