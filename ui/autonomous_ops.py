@@ -266,6 +266,9 @@ def watchdog_once() -> dict[str, Any]:
     sched = process_state("ui.autonomous_scheduler")
     watch = process_state("ui.watchdog_runner")
     actions: list[str] = []
+    if not watch[0]:
+        pid = _start_module("ui.watchdog_runner")
+        actions.append(f"WATCHDOG yeniden başlatıldı (PID {pid})")
     if not motor[0]:
         pid = _start_module("ui.tr_runner")
         actions.append(f"MOTOR yeniden başlatıldı (PID {pid})")
