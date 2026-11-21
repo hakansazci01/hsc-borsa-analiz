@@ -960,6 +960,43 @@ def test_smart_basket() -> None:
     assert "Sepet Sıralaması" in panel and "Seçilen Coin" in panel and "Funding Rate" in panel
 
 
+def test_auto_optimization() -> None:
+    """Haftalık optimizasyon: ATR/Grid sınırlar içinde, korelasyon sabit 0.85."""
+    from pathlib import Path
+
+    from ui import auto_optimize as ao, params
+
+    # 1) Sınırlar
+    assert params.BOUNDS["atr_mult"] == (1.2, 2.0)
+    assert params.BOUNDS["grid_step_pct"] == (0.5, 2.0)
+    assert params.clamp("atr_mult", 5.0) == 2.0
+    assert params.clamp("atr_mult", 0.1) == 1.2
+    assert params.clamp("grid_step_pct", 9.0) == 2.0
+    assert params.clamp("grid_step_pct", 0.1) == 0.5
+
+    # 2) Optimizasyon çalışır, sınırları aşmaz
+    original = params.load()
+    try:
+        params.save({"atr_mult": 1.5, "grid_step_pct": 1.0, "corr_limit": 0.85})
+        r = ao.optimize()
+        assert 1.2 <= r["after"]["atr_mult"] <= 2.0
+        assert 0.5 <= r["after"]["grid_step_pct"] <= 2.0
+        assert r["after"]["corr_limit"] == 0.85  # SABİT
+        assert "Korelasyon eşiği 0.85" in r["msg"]
+        # geçmiş dosyasına yazıldı
+        assert params.HISTORY_FILE.exists()
+    finally:
+        params.save(original)
+
+    # 3) Aşırı senaryoda sınır aşılmaz
+    for atr in (1.2, 1.9, 2.0):
+        assert 1.2 <= params.clamp("atr_mult", atr) <= 2.0
+
+    # 4) Panel göstergeleri
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "Son Optimizasyon" in panel and "Sonraki Optimizasyon" in panel
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

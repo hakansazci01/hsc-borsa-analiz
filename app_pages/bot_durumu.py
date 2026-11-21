@@ -275,6 +275,19 @@ def _panel():
     st.caption(f"Kural: korelasyon > {correlation_guard.CORR_LIMIT} ise aynı anda alım yok · "
                f"son {correlation_guard.CORR_DAYS} günlük kapanış")
 
+    # AUTO-OPTİMİZASYON
+    st.divider()
+    st.subheader("Otomatik optimizasyon", divider="gray")
+    from ui import auto_optimize
+
+    lo = auto_optimize.last_run()
+    o1, o2 = st.columns(2)
+    o1.metric("Son Optimizasyon",
+              f"{lo['at']} — ATR {lo['atr']}, Grid %{lo['grid']}")
+    o2.metric("Sonraki Optimizasyon", auto_optimize.next_run())
+    st.caption(f"Korelasyon eşiği: {lo['corr']} (sabit) · "
+               f"Her Pazar 23:00 · Parametre geçmişi: params_history.csv")
+
     # AKILLI SEPET + FUNDING
     st.divider()
     st.subheader("Akıllı Sepet — 8 coin taranıyor", divider="gray")

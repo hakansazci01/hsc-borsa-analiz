@@ -38,6 +38,13 @@ def run_forever(check_every: int = 30) -> None:
                 ops.weekly_strategy_review()
             if _due("weekly_report", "09:00@mon"):
                 ops.weekly_report()
+            try:
+                from ui import auto_optimize
+
+                if auto_optimize.due():
+                    auto_optimize.optimize()
+            except Exception:
+                pass
             if time.strftime("%M:%S") <= "00:30" and LAST.get("health") != time.strftime("%Y-%m-%d %H"):
                 LAST["health"] = time.strftime("%Y-%m-%d %H")
                 ops.health_check()

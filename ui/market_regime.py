@@ -21,12 +21,14 @@ from ui import quant_lab
 
 ADX_PERIOD = 14
 ATR_PERIOD = 14
-ATR_MULT = 1.5
+from ui import params as _params  # noqa: E402  — auto-optimization (son adım)
+
+ATR_MULT = _params.load()["atr_mult"]
 TREND_ADX = 25.0
 RANGE_PCT = 0.05       # son 7 günde %5 içinde -> yatay
 RANGE_DAYS = 7
 GRID_PARTS = 5
-GRID_STEP = 0.01       # %1
+GRID_STEP = _params.load()["grid_step_pct"] / 100  # optimizer tarafından güncellenir
 LOSS_STREAK_LIMIT = 3
 LOSS_COOLDOWN_SEC = 86400
 MTF_TF = "4h"
