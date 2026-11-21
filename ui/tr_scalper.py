@@ -182,6 +182,12 @@ def available_try() -> float:
 
 
 def buy(symbol: str, qty_override: float | None = None) -> dict[str, Any]:
+    # ADIM 1: 1-dk scalper kapatıldı. Doğrudan çağrı engellenir.
+    # Tek giriş yolu ui.daily_engine.buy() (günlük EMA50 pullback).
+    return {"ok": False, "reason": "1dk scalper KAPALI — ui.daily_engine kullanılmalı"}
+
+
+def _buy_legacy(symbol: str, qty_override: float | None = None) -> dict[str, Any]:
     px = price(symbol)
     if not px:
         return {"ok": False, "reason": "fiyat yok"}
@@ -265,8 +271,42 @@ def kill_switch() -> bool:
     if STOP_FILE.exists():
         return True
     st = _load()
-    return (float(st.get("realized_pnl", 0)) <= -MAX_LOSS_TRY or
-            len(st.get("history", [])) >= MAX_TRADES)
+    if (float(st.get("realized_pnl", 0)) <= -MAX_LOSS_TRY or
+            len(st.get("history", [])) >= MAX_TRADES):
+        return True
+    # ADIM 2 frenleri
+    try:
+        from ui import risk_brakes
+
+        risk_brakes.update_from_history(st.get("history", []))
+        daily, _ = risk_brakes.daily_loss_breached()
+        dd, _ = risk_brakes.drawdown_breached(available_try())
+        if daily or dd:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def brakes_block(symbol: str) -> str:
+    """Yeni giriş öncesi fren kontrolü. Sebep dönür, yoksa ''. """
+    try:
+        from ui import risk_brakes
+
+        st = _load()
+        risk_brakes.update_from_history(st.get("history", []))
+        daily, dmsg = risk_brakes.daily_loss_breached()
+        if daily:
+            return dmsg
+        dd, dmsg2 = risk_brakes.drawdown_breached(available_try())
+        if dd:
+            return dmsg2
+        crash, cmsg = risk_brakes.crash_detected(symbol)
+        if crash:
+            return cmsg
+    except Exception:
+        pass
+    return ""
 
 
 def tradeable_pairs() -> tuple[str, ...]:
@@ -383,6 +423,10 @@ def cycle() -> list[str]:
         logs.append(f"{sym}: {s.get('decision')} RSI={s.get('rsi', '—')}")
     if best:
         sym, s = best
+        brake = brakes_block(sym)
+        if brake:
+            logs.append(f"AL ENGELLENDİ — FREN: {brake}")
+            return logs
         res = buy(sym)
         logs.append(f"AL {sym} {'OK' if res.get('ok') else 'HATA'} rsi={s.get('rsi')} "
                     f"fiyat={s.get('price')} miktar={res.get('qty')}")

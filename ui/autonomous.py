@@ -130,7 +130,20 @@ def decide() -> dict[str, Any]:
     robust = int(research.get("robust_count", 0))
     verdict = research.get("verdict", "veri yok")
 
+    # ADIM 2 — frenler karar seviyesinde de bağlı.
     reasons: list[str] = []
+    try:
+        from ui import risk_brakes
+
+        risk_brakes.update_from_history(_load().get("history", []))
+        d, dmsg = risk_brakes.daily_loss_breached()
+        if d:
+            reasons.append(dmsg)
+        dd, ddmsg = risk_brakes.drawdown_breached(tr_scalper.available_try())
+        if dd:
+            reasons.append(ddmsg)
+    except Exception:
+        pass
     if not research.get("ok"):
         reasons.append("gerçek veri alınamadı")
     if robust <= 0:

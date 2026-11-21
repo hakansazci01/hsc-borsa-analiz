@@ -13,12 +13,15 @@ import os
 import time
 from pathlib import Path
 
-from ui import auth, tr_scalper
+from ui import auth, daily_engine, tr_scalper
 
 LOG = auth.USERS_DIR / "tr_scalper.log"
 RUN_FLAG = auth.USERS_DIR / "TR_SCALPER_RUN"
 LOCK = auth.USERS_DIR / "TR_SCALPER_LOCK"
-INTERVAL = 15
+INTERVAL = 900  # 15 dk — günlük EMA50 stratejisi için yeterli, API çağrısı az
+
+# 1-dk scalper KAPALI: tüm döngü günlük EMA50 motorunu çağırır.
+CYCLE = daily_engine.cycle
 
 
 def _pid_alive(pid: int) -> bool:
@@ -96,7 +99,7 @@ def run_forever() -> None:
                     RUN_FLAG.unlink(missing_ok=True)
                     _log("Durdurma sinyali alındı — güvenle çıkılıyor")
                     return
-                lines = tr_scalper.cycle()
+                lines = CYCLE()
                 for line in lines:
                     _log(line)
                 try:

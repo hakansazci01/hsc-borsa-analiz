@@ -190,6 +190,26 @@ def test_autonomous_selftest_logic() -> None:
     assert acc["n"] == 2 and acc["rate"] == 50.0
 
 
+def test_step1_daily_engine_and_brakes() -> None:
+    """ADIM 1+2: günlük motor aktif, 1dk scalper kapalı, frenler tanımlı."""
+    from ui import daily_engine, risk_brakes, tr_runner
+    from ui import tr_scalper as t
+
+    # 1dk scalper emri doğrudan reddediyor
+    assert t.buy("XRP_TRY").get("ok") is False
+    assert "KAPALI" in t.buy("XRP_TRY").get("reason", "")
+    # motor günlük engine'i kullanıyor
+    assert tr_runner.CYCLE is daily_engine.cycle
+    # fren limitleri
+    assert risk_brakes.DAILY_LOSS_PCT == 0.03
+    assert risk_brakes.MAX_DD_PCT == 0.10
+    assert risk_brakes.CRASH_PCT == 0.10
+    assert risk_brakes.CRASH_WINDOW_MIN == 5
+    # günlük strateji sabitleri
+    assert daily_engine.EXIT_BELOW_EMA == 0.97
+    assert daily_engine.MAX_HOLD_DAYS == 90
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

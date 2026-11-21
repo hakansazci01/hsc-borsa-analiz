@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from ui import autonomous, quant_lab, summary_report, tr_journal, tr_monitor, tr_scalper
+from ui import autonomous, quant_lab, risk_brakes, summary_report, tr_journal, tr_monitor, tr_scalper
 
 
 st.title("Canlı işlem akışı", icon=":material/stream:")
@@ -122,6 +122,26 @@ def _dashboard():
         if st.button("Raporu dosyaya yaz (GitHub için)", key="write_report"):
             path = summary_report.write()
             st.success(f"Yazıldı: `{path.relative_to(summary_report.ROOT)}`", icon=":material/check:")
+
+    # --- ADIM 2 FRENLERİ ---
+    st.divider()
+    st.subheader("Frenler — sermaye koruma (gerçek veri)", divider="gray")
+    br = risk_brakes.status()
+    f1, f2, f3, f4 = st.columns(4)
+    f1.metric("Günlük K/Z", f"{br['day_realized_pnl']:+.2f} ₺",
+              help=f"gün açılışı {br['day_open_balance']:.2f} ₺")
+    f2.metric("Günlük limit", f"%{br['daily_limit_pct']:.0f}",
+              delta="AŞILDI" if br["daily_breached"] else "SAĞLIKLI",
+              delta_color="inverse")
+    f3.metric("Kasa zirvesi", f"₺{br['peak_balance']:,.2f}")
+    f4.metric("Drawdown limiti", f"%{br['dd_limit_pct']:.0f}",
+              delta="AŞILDI" if br["dd_breached"] else "SAĞLIKLI",
+              delta_color="inverse")
+    st.caption(
+        f"Ani çöküş koruması: son 5 dakikada **%{br['crash_limit_pct']:.0f}** düşüşte yeni giriş engellenir. "
+        + ("⚠️ " + br["daily_msg"] if br["daily_msg"] else "")
+        + (" ⚠️ " + br["dd_msg"] if br["dd_msg"] else "")
+    )
 
     # --- TAM TETİKLEYİCİ: ne zaman alır / satar ---
     st.divider()
