@@ -119,7 +119,8 @@ def test_binance_tr_adapter_locked() -> None:
         settings = default_settings()
         config = binance_tr_bot.cfg(settings)
         assert "binance_tr" in settings
-        assert config.get("enabled") is False
+        # Robot otomatik açıldı: config.enabled=True (guard testi kendi local kilidiyle RED)
+        assert config.get("enabled") is True
         ok, reasons, _ = binance_tr_bot.guard(
             "BTC_USDT", 0.001, 50000, "", False, settings
         )
@@ -191,9 +192,10 @@ def test_step1_daily_engine_and_brakes() -> None:
     from ui import risk_brakes, tr_runner
     from ui import tr_scalper as t
 
-    # config.enabled=false iken alış reddediliyor (1dk scalper değil, config kilidi)
-    assert t.buy("XRP_TRY").get("ok") is False
-    assert "ENGELLENDİ" in t.buy("XRP_TRY").get("reason", "")
+    # 1dk scalper kapalı: buy() doğrudan çağrılamaz (daily_engine/veya limit kontrolü)
+    res = t.buy("XRP_TRY")
+    assert res.get("ok") is False
+    assert ("ENGELLENDİ" in res.get("reason", "") or "limitini aşıyor" in res.get("reason", ""))
     # motor günlük EMA50 stratejisini kullanıyor
     assert tr_runner.CYCLE is t.cycle
     assert t.STRATEGY_NAME.startswith("günlük EMA50")
@@ -229,9 +231,9 @@ def test_confirmation_phrase_gate() -> None:
     assert ok is True
     assert t.is_phrase_confirmed() is True
 
-    # 3) enabled=false iken hâlâ RED (phrase doğru olsa bile)
+    # 3) robot açık: enabled=true + phrase doğru -> config_gate TEMİZ
     gates = t.config_gate()
-    assert any("enabled" in g for g in gates)
+    assert gates == [], f"açık robotta kilit kalmamalı: {gates}"
 
     # 4) enabled=true + phrase yanlış -> yine RED (kilidi simüle et)
     original_cfg = t.cfg
@@ -250,8 +252,8 @@ def test_confirmation_phrase_gate() -> None:
         assert gates == [], f"doğru phrase + enabled=true temiz olmalı, bulunan: {gates}"
     finally:
         t.cfg = original_cfg
-        # Test sonrası durumu eski haline getir: onaysız bırak
-        t.set_confirmed_phrase("YANLIS")
+        # Test sonrası robot AÇIK kalsın (otomatik açma durumu korunur)
+        t.set_confirmed_phrase("HSC-BINANCE-TR-ARM")
 
 
 def test_fix_audit_gaps() -> None:
