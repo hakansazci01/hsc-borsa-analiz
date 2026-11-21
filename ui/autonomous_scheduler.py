@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import time
 from ui import autonomous_ops as ops
 
@@ -77,4 +78,6 @@ def run_forever(check_every: int = 30) -> None:
 
 
 if __name__ == "__main__":
-    run_forever()
+    # Sadece proje .venv python'u scheduler olabilir (çift rapor/çalışma riski).
+    if ".venv" in sys.executable.lower():
+        run_forever()

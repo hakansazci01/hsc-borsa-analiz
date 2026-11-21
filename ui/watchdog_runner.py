@@ -1,6 +1,7 @@
 """Watchdog sürecini kalıcı başlatır — MOTOR + SCHEDULER'ı gerçekten izler/başlatır."""
 
 import os
+import sys
 from pathlib import Path
 
 from ui.autonomous_ops import watchdog
@@ -25,6 +26,8 @@ def _claim() -> bool:
 
 
 if __name__ == "__main__":
-    if _claim():
+    # SADECE proje .venv python'u watchdog olabilir — global kopyalar kilitleri
+    # ezip çift süreç yaratıyordu; onlar hemen çıkar.
+    if ".venv" in sys.executable.lower() and _claim():
         watchdog(claim_fn=_claim)
 

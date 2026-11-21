@@ -10,6 +10,7 @@ Kalıcı Binance TR kâr odaklı çalışma döngüsü.
 from __future__ import annotations
 
 import os
+import sys
 import time
 from pathlib import Path
 
@@ -120,4 +121,6 @@ def run_forever() -> None:
 
 
 if __name__ == "__main__":
-    run_forever()
+    # Sadece proje .venv python'u motor olabilir (çift emir riski).
+    if ".venv" in sys.executable.lower():
+        run_forever()
