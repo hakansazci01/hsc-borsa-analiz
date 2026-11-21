@@ -178,27 +178,8 @@ def daily_summary() -> str:
 
 
 # --------------------------------------------------------- yedekleme
-def backup_files() -> list[str]:
-    BACKUPS.mkdir(parents=True, exist_ok=True)
-    stamp = time.strftime("%Y%m%d")
-    targets = [ROOT / "trades.csv", ROOT / "users" / "tr_daily_state.json", ROOT / "config.yaml"]
-    saved = []
-    for src in targets:
-        if src.exists():
-            dst = BACKUPS / f"{stamp}_{src.name}"
-            shutil.copy2(src, dst)
-            saved.append(dst.name)
-    # son 30 gün
-    cutoff = datetime.now() - timedelta(days=30)
-    for f in BACKUPS.glob("*_trades.csv"):
-        try:
-            d = datetime.strptime(f.name[:8], "%Y%m%d")
-            if d < cutoff:
-                f.unlink()
-        except Exception:
-            pass
-    _log(f"yedeklendi: {saved}")
-    return saved
+# Yedekleme TEK yerde: ui.disaster_recovery.backup()
+# (günlük 00:00 ve işlem sonrası aynı fonksiyonu çağırır)
 
 
 # --------------------------------------------------------- sağlık kontrolü

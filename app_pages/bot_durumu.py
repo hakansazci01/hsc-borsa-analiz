@@ -369,11 +369,11 @@ def _panel():
     from ui import order_guard
 
     og = order_guard.last()
+    has_order = bool(og.get("status"))  # boşsa gerçek emir yok
     o1, o2 = st.columns(2)
-    o1.metric("Son Emir Durumu", og.get("status", "—"))
-    o2.metric("Son Slippage", f"%{og.get('slippage_pct', 0):.2f}")
-    st.caption(f"Deneme: {og.get('attempt', '—')}/3 · "
-               f"beklenen {og.get('expected', '—')} · gerçek {og.get('actual', '—')} · "
+    o1.metric("Son Emir Durumu", og.get("status", "—") + (" (GERÇEK)" if has_order else " (YOK)"))
+    o2.metric("Son Slippage", f"%{og.get('slippage_pct', 0):.2f}" if has_order else "---")
+    st.caption("Gerçek emir gelene kadar slippage gösterilmez (test verisi kullanılmaz) · "
                f"maksimum kayma %{order_guard.MAX_SLIPPAGE*100:.0f}")
 
     # KISMİ KÂR ALIMI
@@ -411,10 +411,13 @@ def _panel():
 
     mb = monthly_backtest.last()
     b1, b2 = st.columns(2)
-    b1.metric("Son Backtest",
+    b1.metric("Son Backtest (slippage'siz)",
               f"{mb['at']} — Kar: {mb['net_pnl']:+.2f} TL, Kazanma: %{mb['win_rate']:.0f}, "
               f"Drawdown: %{mb['max_dd']:.0f}")
-    b2.metric("Sonraki Backtest", monthly_backtest.next_run())
+    b2.metric("Son Backtest (slippage'li)",
+              f"Kar: {mb.get('net_pnl_slip', 0):+.2f} TL")
+    st.caption(f"Slippage modeli: %{mb.get('slippage_pct', 0.5):.1f} dahil "
+               f"(alım üstten / satım alttan) · sonraki: {monthly_backtest.next_run()}")
     if mb["warn"]:
         st.warning("BACKTEST UYARISI — strateji gözden geçirilmeli.", icon=":material/warning:")
 
@@ -459,46 +462,34 @@ def _panel():
     fs = live_feed.status()
     bp = live_feed.book_pressure()
     w1, w2, w3 = st.columns(3)
-    w1.metric("Veri Kaynağı", fs["source"])
-    w2.metric("Order Book", f"Alış %{bp['buy']*100:.0f} / Satış %{bp['sell']*100:.0f}")
+    w1.metric("Veri Kaynağı", fs["source"] + (" (GERÇEK)" if fs["source"] == "WebSocket CANLI" else " (GERÇEK)"))
+    w2.metric("Order Book", (f"Alış %{bp['buy']*100:.0f} / Satış %{bp['sell']*100:.0f} (GERÇEK)"
+                              if bp["ok"] else "--- (veri yok)"))
     w3.metric("Son Fiyat Güncelleme",
-              f"{fs['price_age']} sn önce" if fs["price_age"] is not None else "—")
-    st.caption(f"WS bağlı: {'EVET ✅' if fs['connected'] else 'HAYIR'} · "
-               f"son fiyat {fs['price'] or '—'} · "
-               f"Satış baskısı > %{live_feed.PRESSURE_LIMIT*100:.0f} ise yeni alım yok")
+              f"{fs['price_age']} sn önce" if fs["price_age"] is not None else "---")
+    if fs["connected"] and fs["price_age"] is None:
+        st.warning("WS bağlı ama veri akmıyor — REST yedekte. "
+                   "Gerçek fiyat akışı gelene kadar WebSocket'ten işlem yapılmaz.",
+                   icon=":material/warning:")
+    elif not fs["connected"]:
+        st.caption("WS bağlı değil — REST yedek aktif (GERÇEK).")
 
     # 16-CHECK GATE — canlı veriyle senkron (eski kayıt kullanılmaz)
     st.divider()
     st.subheader("16-CHECK GATE — son emir kontrolleri", divider="gray")
     from ui import check_gate
 
-    gate = check_gate.last()
-    if gate:
-        # Aynı anlık veriyi kullan: en üstteki REJİM (reg) ile 8. kontrolü senkronize et
-        live_reg = reg["name"]
-        live_pairs = tr_scalper.tradeable_pairs()
-        live_symbol = "BTCUSDT"  # tek standart: hepsi USDT
-        fixed = []
-        for r in gate.get("results", []):
-            row = dict(r)
-            if row["no"] == 8:  # rejim AYI değil
-                row["ok"] = live_reg != "AYI"
-                row["note"] = f"rejim={live_reg}" + ("" if row["ok"] else " (AYI ise alınmaz)")
-            elif row["no"] == 14:  # sembol işlem görüyor — USDT standardı
-                row["ok"] = live_symbol in live_pairs
-                row["note"] = f"sembol {live_symbol} " + ("işlem görüyor" if row["ok"] else "listede yok")
-            fixed.append(row)
-        gpass = sum(1 for r in fixed if r["ok"])
-        gtotal = len(fixed)
-        ok_color = "#22c55e" if gpass == gtotal else "#ef4444"
-        summary = (f"{gpass}/{gtotal} GEÇTİ" if gpass == gtotal
-                   else f"{gpass}/{gtotal} GEÇTİ — "
-                        + "; ".join(f"{r['no']}. {r['check']}: {r['note']}"
-                                    for r in fixed if not r["ok"]))
+    # CANLI gate — kayıtlı/eski veri KULLANILMAZ
+    try:
+        gate_live = check_gate.run("BTCUSDT", price=tr_scalper.price("BTCUSDT"))
+        fixed = gate_live["results"]
+        gpass, gtotal = int(gate_live["passed"]), int(gate_live["total"])
+        summary = gate_live["summary"]
+        ok_color = "#22c55e" if gate_live["ok"] else "#ef4444"
         st.markdown(
             f'<div style="text-align:center;padding:8px 0 12px 0;">'
             f'<span style="font-size:22px;font-weight:800;color:{ok_color};letter-spacing:1px;">'
-            f'SON EMİR KONTROLLERİ: {summary}</span></div>',
+            f'SON EMİR KONTROLLERİ (GERÇEK — canlı): {summary}</span></div>',
             unsafe_allow_html=True,
         )
         st.progress(gpass / gtotal if gtotal else 0)
@@ -506,14 +497,15 @@ def _panel():
             pd.DataFrame([{
                 "#": r["no"], "Kontrol": r["check"],
                 "Sonuç": "✅" if r["ok"] else "❌", "Not": r["note"],
+                "Veri": "GERÇEK",
             } for r in fixed]),
             use_container_width=True, hide_index=True,
         )
-        st.caption(f"Sembol standardı: hepsi USDT · canlı rejim: **{live_reg}** "
-                   f"(en üstteki REJİM ile aynı veri) · kontrol sembolü: **{live_symbol}**")
-    else:
-        st.info("Henüz alım denemesi olmadı — gate çalıştığında 16 kontrol burada görünür.",
-                icon=":material/info:")
+        st.caption("Gate her sayfa yenilemesinde **canlı** çalışır — kayıtlı/eski veri kullanılmaz. "
+                   "Sembol standardı: hepsi USDT · en üstteki REJİM ile aynı anlık veri.")
+    except Exception as exc:
+        st.warning(f"Canlı gate çalıştırılamadı: {type(exc).__name__} — eski veri gösterilmez.",
+                   icon=":material/warning:")
     st.caption(
         f"Komisyon filtresi: beklenen kâr ≥ {tr_scalper.MIN_EXPECTED_RR:.0f}× komisyon "
         f"(oran %{tr_scalper.COMMISSION*100:.2f}) · "

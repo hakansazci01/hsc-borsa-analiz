@@ -40,6 +40,15 @@ def backup(reason: str = "işlem sonrası") -> dict[str, Any]:
    dst = BACKUPS / f"{stamp}_{src.name}"
    shutil.copy2(src, dst)
    saved.append(dst.name)
+ # son 30 günden eski yedekleri sil
+ from datetime import datetime, timedelta
+ cutoff = datetime.now() - timedelta(days=30)
+ for f in BACKUPS.glob("*_trades.csv"):
+  try:
+   if datetime.strptime(f.name[:8], "%Y%m%d") < cutoff:
+    f.unlink()
+  except Exception:
+   pass
  rec = {"at": time.strftime("%Y-%m-%d %H:%M:%S"), "reason": reason,
         "files": saved, "ok": bool(saved)}
  _save_recovery(rec)

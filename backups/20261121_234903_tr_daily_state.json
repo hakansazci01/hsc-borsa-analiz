@@ -1,8 +1,8 @@
 {
-  "vol_until": 1795248025.2353263,
-  "vol_at": "2026-11-21 10:00:25",
-  "vol_symbol": "XRP_TRY",
-  "vol_range_pct": 4.96,
+  "vol_until": 1795271809.5563834,
+  "vol_at": "2026-11-21 16:36:49",
+  "vol_symbol": "BTCUSDT",
+  "vol_range_pct": 3.3,
   "basket": {
     "selected": "BTCUSDT",
     "score": -22,
@@ -20,7 +20,7 @@
         "gate_pts": 0,
         "funding": null,
         "funding_skip": false,
-        "reason": "14/16 GEÇTİ — Başarısız: 8. rejim AYI değil: rejim=AYI (AYI ise alınmaz)"
+        "reason": "13/16 GEÇTİ — Başarısız: 2. confirmation phrase doğru: confirmation phrase doğrulanmadı"
       },
       {
         "symbol": "ETHUSDT",
@@ -35,7 +35,7 @@
         "gate_pts": 0,
         "funding": null,
         "funding_skip": false,
-        "reason": "14/16 GEÇTİ — Başarısız: 8. rejim AYI değil: rejim=AYI (AYI ise alınmaz)"
+        "reason": "13/16 GEÇTİ — Başarısız: 2. confirmation phrase doğru: confirmation phrase doğrulanmadı"
       },
       {
         "symbol": "XRPUSDT",
@@ -80,7 +80,7 @@
         "gate_pts": 0,
         "funding": null,
         "funding_skip": false,
-        "reason": "14/16 GEÇTİ — Başarısız: 8. rejim AYI değil: rejim=AYI (AYI ise alınmaz)"
+        "reason": "12/16 GEÇTİ — Başarısız: 1. enabled = true: enabled=false"
       },
       {
         "symbol": "LINKUSDT",

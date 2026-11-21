@@ -20,7 +20,7 @@
         "gate_pts": 0,
         "funding": null,
         "funding_skip": false,
-        "reason": "14/16 GEÇTİ — Başarısız: 8. rejim AYI değil: rejim=AYI (AYI ise alınmaz)"
+        "reason": "13/16 GEÇTİ — Başarısız: 2. confirmation phrase doğru: confirmation phrase doğrulanmadı"
       },
       {
         "symbol": "ETHUSDT",
@@ -35,7 +35,7 @@
         "gate_pts": 0,
         "funding": null,
         "funding_skip": false,
-        "reason": "14/16 GEÇTİ — Başarısız: 8. rejim AYI değil: rejim=AYI (AYI ise alınmaz)"
+        "reason": "13/16 GEÇTİ — Başarısız: 2. confirmation phrase doğru: confirmation phrase doğrulanmadı"
       },
       {
         "symbol": "XRPUSDT",
@@ -80,7 +80,7 @@
         "gate_pts": 0,
         "funding": null,
         "funding_skip": false,
-        "reason": "14/16 GEÇTİ — Başarısız: 8. rejim AYI değil: rejim=AYI (AYI ise alınmaz)"
+        "reason": "12/16 GEÇTİ — Başarısız: 1. enabled = true: enabled=false"
       },
       {
         "symbol": "LINKUSDT",

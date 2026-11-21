@@ -40,7 +40,9 @@ def run_forever(check_every: int = 30) -> None:
             except Exception:
                 pass
             if _due("backup", "00:00"):
-                ops.backup_files()
+                from ui import disaster_recovery
+
+                disaster_recovery.backup("günlük 00:00")
             if _due("strategy", "00:00@sun"):
                 ops.weekly_strategy_review()
             if _due("perf_export", "23:00@sun"):

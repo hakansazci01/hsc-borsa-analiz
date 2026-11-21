@@ -78,7 +78,13 @@ def signals(frame: pd.DataFrame, kind: str, p: tuple[Any, ...]):
     raise ValueError(kind)
 
 
-def backtest(frame: pd.DataFrame, kind: str, p: tuple[Any, ...], maxhold: int = 30) -> list[dict]:
+def backtest(frame: pd.DataFrame, kind: str, p: tuple[Any, ...],
+             maxhold: int = 30, slippage: float = 0.0) -> list[dict]:
+    """Backtest — slippage: alım fiyatın %üstünden, satım %altından.
+
+    Varsayılan slippage=0 → mevcut çağrılar (strateji) aynı sonucu verir.
+    Stratejiye dokunulmaz; sadece getiri hesabına kayma eklenir.
+    """
     ent, ex = signals(frame, kind, p)
     c = frame["Close"]
     out: list[dict] = []
@@ -87,11 +93,11 @@ def backtest(frame: pd.DataFrame, kind: str, p: tuple[Any, ...], maxhold: int = 
         if not ent.iloc[i]:
             i += 1
             continue
-        px = c.iloc[i]
+        px = c.iloc[i] * (1 + slippage)  # alış kayması
         exit_px = None
         for j in range(i + 1, min(i + maxhold + 1, len(c))):
             if ex.iloc[j] or j == i + maxhold:
-                exit_px = c.iloc[j]
+                exit_px = c.iloc[j] * (1 - slippage)  # satış kayması
                 break
         if exit_px is not None:
             out.append({"ret": (exit_px - px) / px - 2 * FEE, "i": i})

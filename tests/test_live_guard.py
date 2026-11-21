@@ -59,55 +59,16 @@ def test_keys_and_phrase_required() -> None:
         _clean()
 
 
-def test_binance_default_locked() -> None:
-    from ui import binance_bot
-    from ui.core import default_settings
+def test_unused_adapters_removed() -> None:
+    """Kullanılmayan global Binance / Gate.io adapter'ları kaldırıldı."""
+    import importlib.util
+    from pathlib import Path
 
-    _clean()
-    binance_bot.set_local_armed(False)
-    try:
-        settings = default_settings()
-        ok, reasons, config = binance_bot.guard(
-            "BTCUSDT", 0.001, 50000, "", False, settings
-        )
-        assert not ok and config.get("testnet") is True
-        assert any("Ortam kilidi" in r for r in reasons)
-        assert any("Onay ifadesi" in r for r in reasons)
-        assert any("Oturum onayı" in r for r in reasons)
-        with patch("ui.binance_bot._request") as send:
-            result = binance_bot.execute(
-                USER, "BTCUSDT", "buy", 0.001, 50000, settings=settings
-            )
-        assert not result.get("ok")
-        send.assert_not_called()
-    finally:
-        _clean()
-
-
-def test_gateio_adapter() -> None:
-    from ui import gateio_bot
-    from ui.core import default_settings
-
-    _clean()
-    gateio_bot.set_local_armed(False)
-    try:
-        settings = default_settings()
-        config = gateio_bot.cfg(settings)
-        assert config.get("testnet") is True
-        ok, reasons, _ = gateio_bot.guard(
-            "BTC_USDT", 0.001, 50000, "", False, settings
-        )
-        assert not ok and reasons
-        with patch("ui.gateio_bot._request") as send:
-            result = gateio_bot.execute(
-                USER, "BTC_USDT", "buy", 0.001, 50000, settings=settings
-            )
-        assert not result.get("ok")
-        send.assert_not_called()
-        signal = gateio_bot.quick_signal("BTC_USDT")
-        assert signal.get("decision") in ("AL", "SAT", "BEKLE")
-    finally:
-        _clean()
+    root = Path(__file__).resolve().parent.parent
+    assert not (root / "ui" / "binance_bot.py").exists()
+    assert not (root / "ui" / "gateio_bot.py").exists()
+    assert importlib.util.find_spec("ui.binance_bot") is None
+    assert importlib.util.find_spec("ui.gateio_bot") is None
 
 
 def test_binance_tr_adapter_locked() -> None:
@@ -192,7 +153,7 @@ def test_step1_daily_engine_and_brakes() -> None:
     from ui import risk_brakes, tr_runner
     from ui import tr_scalper as t
 
-    # 1dk scalper kapalı: buy() doğrudan çağrılamaz (daily_engine/veya limit kontrolü)
+    # 1dk scalper kapalı: buy() doğrudan çağrılamaz (limit kontrolü)
     res = t.buy("XRP_TRY")
     assert res.get("ok") is False
     assert ("ENGELLENDİ" in res.get("reason", "") or "limitini aşıyor" in res.get("reason", "")
@@ -362,12 +323,16 @@ def test_autonomous_ops() -> None:
     summary = ops.daily_summary()
     for key in ("GÜNLÜK ÖZET", "Bugün işlem", "Güncel kasa", "Bot:"):
         assert key in summary
-    # 5) yedekleme mevcut dosyaları kopyalar (state dosyası ilk alışa kadar yok)
-    saved = ops.backup_files()
-    assert any("config.yaml" in x for x in saved)
-    assert any("trades.csv" in x for x in saved)
-    for name in saved:
-        assert (ops.BACKUPS / name).exists()
+    # 5) yedekleme TEK fonksiyonda (disaster_recovery.backup)
+    from ui import disaster_recovery as dr
+
+    b = dr.backup("test")
+    assert b["ok"] and len(b["files"]) >= 2
+    assert any("config.yaml" in x for x in b["files"])
+    assert any("trades.csv" in x for x in b["files"])
+    for name in b["files"]:
+        assert (dr.BACKUPS / name).exists()
+    assert not hasattr(ops, "backup_files")  # eski ikinci fonksiyon yok
     assert (ops.BACKUPS / f"{time.strftime('%Y%m%d')}_config.yaml").exists()
     # 6) sağlık kontrolü
     h = ops.health_check()
@@ -1201,11 +1166,14 @@ def test_monthly_backtest() -> None:
     assert mb.WIN_WARN == 40.0
     assert mb.DD_WARN == 20.0
     assert mb.DAYS == 90
+    assert mb.SLIPPAGE == 0.005  # %0,5
 
     # 1) Backtest çalışır (gerçek veri)
     r = mb.run(days=90)
-    for key in ("at", "trades", "net_pnl", "win_rate", "max_dd", "warn", "msg"):
+    for key in ("at", "trades", "net_pnl", "net_pnl_slip", "slippage_pct",
+                "win_rate", "max_dd", "warn", "msg"):
         assert key in r
+    assert r["slippage_pct"] == 0.5
     assert 0 <= r["win_rate"] <= 100
     assert r["max_dd"] >= 0
 
@@ -1236,7 +1204,7 @@ def test_monthly_backtest() -> None:
 
     # 4) Panel ve sonraki tarih
     panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
-    assert "Son Backtest" in panel and "Sonraki Backtest" in panel
+    assert "Son Backtest (slippage'siz)" in panel and "Slippage modeli" in panel
     nxt = mb.next_run()
     assert "-01 00:00" in nxt
 
