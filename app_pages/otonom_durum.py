@@ -130,17 +130,19 @@ def _dashboard():
     f1, f2, f3, f4 = st.columns(4)
     f1.metric("Günlük K/Z", f"{br['day_realized_pnl']:+.2f} ₺",
               help=f"gün açılışı {br['day_open_balance']:.2f} ₺")
-    f2.metric("Günlük limit", f"%{br['daily_limit_pct']:.0f}",
+    f2.metric("Günlük limit", f"-{br['daily_limit_try']:.0f} ₺",
               delta="AŞILDI" if br["daily_breached"] else "SAĞLIKLI",
               delta_color="inverse")
-    f3.metric("Kasa zirvesi", f"₺{br['peak_balance']:,.2f}")
+    f3.metric("Başlangıç kasası", f"₺{br['start_balance']:,.2f}")
     f4.metric("Drawdown limiti", f"%{br['dd_limit_pct']:.0f}",
               delta="AŞILDI" if br["dd_breached"] else "SAĞLIKLI",
               delta_color="inverse")
     st.caption(
-        f"Ani çöküş koruması: son 5 dakikada **%{br['crash_limit_pct']:.0f}** düşüşte yeni giriş engellenir. "
-        + ("⚠️ " + br["daily_msg"] if br["daily_msg"] else "")
-        + (" ⚠️ " + br["dd_msg"] if br["dd_msg"] else "")
+        f"Ani çöküş: son 5 dk **%{br['crash_limit_pct']:.0f}** düşüş → "
+        f"**{br['crash_cooldown_min']} dk** alım yok"
+        + (f" · kalan {br['crash_remaining']//60} dk" if br["crash_remaining"] else "")
+        + (" · ⚠️ " + br["daily_msg"] if br["daily_msg"] else "")
+        + (" · ⚠️ " + br["dd_msg"] if br["dd_msg"] else "")
     )
 
     # --- TAM TETİKLEYİCİ: ne zaman alır / satar ---

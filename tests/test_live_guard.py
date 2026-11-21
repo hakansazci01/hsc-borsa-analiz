@@ -140,20 +140,16 @@ def test_binance_tr_adapter_locked() -> None:
 
 
 def test_tr_scalper_bounds() -> None:
-    """Mikro alsat motorunun saf fonksiyonlari ve risk sinirlari."""
+    """Günlük EMA50 motoru sabitleri ve gerçek kilitler."""
     from ui import tr_scalper as t
 
-    assert t.MAX_ORDER_TRY == 50.0
-    assert t.MAX_ORDER_GROW == 100.0
-    assert t.MAX_LOSS_TRY == 15.0
-    assert t.MAX_TRADES >= 50
-    assert t.MAX_HOLD_SEC == 900
-    assert t.TAKE_PROFIT > t.STOP_LOSS > 0
-    assert t._round_qty(0.2063, 0.1, 0.1) == 0.2
-    assert t._round_qty(0.05, 0.1, 0.1) == 0.1
-    assert t._round_qty(1.234, 0.0, 0.0) == 1.234
-    assert set(t.PAIRS).issubset({"XRP_TRY", "DOGE_TRY", "ADA_TRY",
-                                  "TRX_TRY", "LTC_TRY", "LINK_TRY", "FORM_TRY"})
+    assert t.STRATEGY_NAME.startswith("günlük EMA50")
+    assert t.EXIT_BELOW_EMA == 0.97
+    assert t.MAX_HOLD_DAYS == 90
+    assert t.COMMISSION == 0.001
+    assert "quant_lab.signals" in str(t.signal.__doc__ or "")
+    assert set(t.SYMBOLS).issubset({"BTCUSDT", "ETHUSDT", "XRPUSDT", "DOGEUSDT",
+                                     "ADAUSDT", "LINKUSDT", "BNBUSDT", "SOLUSDT"})
 
 
 def test_quant_lab_verdict_logic() -> None:
@@ -192,22 +188,25 @@ def test_autonomous_selftest_logic() -> None:
 
 def test_step1_daily_engine_and_brakes() -> None:
     """ADIM 1+2: günlük motor aktif, 1dk scalper kapalı, frenler tanımlı."""
-    from ui import daily_engine, risk_brakes, tr_runner
+    from ui import risk_brakes, tr_runner
     from ui import tr_scalper as t
 
-    # 1dk scalper emri doğrudan reddediyor
+    # config.enabled=false iken alış reddediliyor (1dk scalper değil, config kilidi)
     assert t.buy("XRP_TRY").get("ok") is False
-    assert "KAPALI" in t.buy("XRP_TRY").get("reason", "")
-    # motor günlük engine'i kullanıyor
-    assert tr_runner.CYCLE is daily_engine.cycle
+    assert "ENGELLENDİ" in t.buy("XRP_TRY").get("reason", "")
+    # motor günlük EMA50 stratejisini kullanıyor
+    assert tr_runner.CYCLE is t.cycle
+    assert t.STRATEGY_NAME.startswith("günlük EMA50")
     # fren limitleri
-    assert risk_brakes.DAILY_LOSS_PCT == 0.03
+    assert risk_brakes.DAILY_LOSS_TRY == 100.0
     assert risk_brakes.MAX_DD_PCT == 0.10
-    assert risk_brakes.CRASH_PCT == 0.10
+    assert risk_brakes.CRASH_PCT == 0.05
     assert risk_brakes.CRASH_WINDOW_MIN == 5
+    assert risk_brakes.CRASH_COOLDOWN_SEC == 1800
     # günlük strateji sabitleri
-    assert daily_engine.EXIT_BELOW_EMA == 0.97
-    assert daily_engine.MAX_HOLD_DAYS == 90
+    assert t.EXIT_BELOW_EMA == 0.97
+    assert t.MAX_HOLD_DAYS == 90
+    assert t.max_order_usdt() == 150.0  # config.yaml
 
 
 def test_readiness_checklist() -> None:

@@ -1,17 +1,14 @@
 """
-ADIM 2 — Frenler: günlük zarar limiti + kasa drawdown kilidi + ani çöküş koruması.
+GERÇEK PARA KORUMALARI — kullanıcı talimatıyla sabitlenen limitler.
 
-Hiçbir fren "tahmin" değildir; gerçek bakiye, gerçek işlem geçmişi ve gerçek
-fiyat değişimi üzerinden çalışır. Frenler YALNIZCA yeni girişi engeller veya
-mevcut pozisyonu kapatır; yanlış yönde emir üretmez.
+1) GÜNLÜK ZARAR: o gün gerçekleşen net K/Z <= -100 TL ise yeni işlem YOK,
+   ertesi güne kadar bekler (gün otomatik sıfırlanır).
+2) KASA DRAWDOWN: başlangıç kasasına göre %10 erime olursa botu TAMAMEN durdurur
+   ve STOP_FILE oluşturur.
+3) ANİ ÇÖKÜŞ: son 5 dakikada fiyat %5'ten fazla düşerse yeni alımı durdurur,
+   30 dakika bekletir (cooldown süresi kaydedilir).
 
-Kurallar:
-1) Günlük zarar: o gün gerçekleşen net K/Z <= -DAILY_LOSS_PCT * açılış bakiyesi
-   ise yeni giriş yok (ve açık pozisyon varsa kapatılır).
-2) Kasa drawdown: mevcut bakiye, kaydedilmiş zirve bakiyeden %MAX_DD_PCT düştüyse
-   yeni giriş yok.
-3) Ani çöküş: son 5 dakikada fiyat %CRASH_PCT düşüş yaptıysa (gerçek 1dk mumlar),
-   yeni giriş yok; açık pozisyon varsa stop'a çekilir.
+Sanal/paper/dry-run modu YOK. Tüm veri gerçek Binance TR API'sindendir.
 """
 
 from __future__ import annotations
@@ -25,10 +22,11 @@ from ui import auth, tr_scalper
 
 STATE = auth.USERS_DIR / "risk_brakes_state.json"
 
-DAILY_LOSS_PCT = 0.03     # günlük %3
-MAX_DD_PCT = 0.10         # kasa zirveden %10 düşüş
-CRASH_PCT = 0.10          # 5 dakikada %10
+DAILY_LOSS_TRY = 100.0       # günlük -100 TL
+MAX_DD_PCT = 0.10            # kasa %10 erime -> tam dur
+CRASH_PCT = 0.05             # 5 dakikada %5 düşüş
 CRASH_WINDOW_MIN = 5
+CRASH_COOLDOWN_SEC = 1800    # 30 dakika bekleme
 
 
 def _load() -> dict[str, Any]:
@@ -54,15 +52,9 @@ def reset_daily_if_needed(balance: float) -> dict[str, Any]:
         st["day"] = today()
         st["day_open_balance"] = balance
         st["day_started"] = time.strftime("%Y-%m-%d %H:%M:%S")
-        _save(st)
-    return st
-
-
-def sync_equity(balance: float) -> dict[str, Any]:
-    """Zirve bakiyeyi güncelle (sadece yukarı yönde)."""
-    st = reset_daily_if_needed(balance)
-    peak = float(st.get("peak_balance", 0) or 0)
-    if balance > peak:
+    if not st.get("start_balance"):
+        st["start_balance"] = balance
+    if balance > float(st.get("peak_balance", 0) or 0):
         st["peak_balance"] = balance
         st["peak_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
     _save(st)
@@ -70,8 +62,8 @@ def sync_equity(balance: float) -> dict[str, Any]:
 
 
 def update_from_history(history: list[dict[str, Any]]) -> dict[str, Any]:
-    """Günlük gerçekleşen K/Z'i işlem geçmişinden hesapla."""
-    st = reset_daily_if_needed(float(tr_scalper.available_try()))
+    bal = tr_scalper.available_try()
+    st = reset_daily_if_needed(bal)
     day = today()
     realized = sum(
         float(h.get("net_pnl", 0))
@@ -85,29 +77,31 @@ def update_from_history(history: list[dict[str, Any]]) -> dict[str, Any]:
 
 def daily_loss_breached() -> tuple[bool, str]:
     st = _load()
-    day_open = float(st.get("day_open_balance", 0) or 0)
     pnl = float(st.get("day_realized_pnl", 0) or 0)
-    if day_open <= 0:
-        return False, ""
-    limit = -day_open * DAILY_LOSS_PCT
-    if pnl <= limit:
-        return True, f"günlük zarar {pnl:+.2f} ₺ ≤ %{DAILY_LOSS_PCT*100:.0f} limit ({limit:.2f} ₺)"
+    if pnl <= -DAILY_LOSS_TRY:
+        return True, f"günlük zarar {pnl:+.2f} TL ≤ -{DAILY_LOSS_TRY:.0f} TL — yarına kadar bekle"
     return False, ""
 
 
 def drawdown_breached(balance: float) -> tuple[bool, str]:
-    st = sync_equity(balance)
-    peak = float(st.get("peak_balance", 0) or balance)
-    if peak <= 0:
+    st = reset_daily_if_needed(balance)
+    start = float(st.get("start_balance", 0) or 0)
+    if start <= 0:
         return False, ""
-    dd = (peak - balance) / peak
-    if dd >= MAX_DD_PCT:
-        return True, f"kasa drawdown %{dd*100:.1f} ≥ %{MAX_DD_PCT*100:.0f} (zirve {peak:.2f} ₺)"
+    loss_pct = (start - balance) / start
+    if loss_pct >= MAX_DD_PCT:
+        return True, (f"kasa drawdown %{loss_pct*100:.1f} ≥ %{MAX_DD_PCT*100:.0f} "
+                      f"(başlangıç {start:.2f} TL, şu an {balance:.2f} TL) — TAM DUR")
     return False, ""
 
 
 def crash_detected(symbol: str) -> tuple[bool, str]:
-    """Son 5 adet 1dk mumda %10'dan fazla düşüş var mı?"""
+    """Son 5 dk 1dk mumlarda %5+ düşüş -> 30 dk cooldown yazar."""
+    st = _load()
+    until = float(st.get("crash_until", 0) or 0)
+    if time.time() < until:
+        left = int(until - time.time())
+        return True, f"ani çöküş cooldown: {left//60} dk {left%60} sn kaldı"
     frame = tr_scalper.klines(symbol, "1m", CRASH_WINDOW_MIN + 2)
     if frame is None or len(frame) < 3:
         return False, ""
@@ -117,26 +111,35 @@ def crash_detected(symbol: str) -> tuple[bool, str]:
         return False, ""
     change = (last - first) / first
     if change <= -CRASH_PCT:
-        return True, f"{symbol} 5dk içinde %{change*100:.1f} düştü"
+        st["crash_until"] = time.time() + CRASH_COOLDOWN_SEC
+        st["crash_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        st["crash_symbol"] = symbol
+        st["crash_pct"] = round(change * 100, 2)
+        _save(st)
+        return True, (f"{symbol} son 5 dk %{change*100:.1f} düştü — "
+                      f"30 dk yeni alım yok")
     return False, ""
 
 
 def status() -> dict[str, Any]:
     bal = tr_scalper.available_try()
-    st = _load()
-    daily, daily_msg = daily_loss_breached()
-    dd, dd_msg = drawdown_breached(bal)
+    st = reset_daily_if_needed(bal)
+    daily, dmsg = daily_loss_breached()
+    dd, ddmsg = drawdown_breached(bal)
+    until = float(st.get("crash_until", 0) or 0)
     return {
         "balance": bal,
         "day": st.get("day", "—"),
         "day_open_balance": float(st.get("day_open_balance", 0) or 0),
         "day_realized_pnl": float(st.get("day_realized_pnl", 0) or 0),
+        "start_balance": float(st.get("start_balance", 0) or 0),
         "peak_balance": float(st.get("peak_balance", 0) or 0),
-        "daily_breached": daily,
-        "daily_msg": daily_msg,
-        "dd_breached": dd,
-        "dd_msg": dd_msg,
-        "daily_limit_pct": DAILY_LOSS_PCT * 100,
+        "daily_breached": daily, "daily_msg": dmsg,
+        "dd_breached": dd, "dd_msg": ddmsg,
+        "crash_until": until,
+        "crash_remaining": max(0, int(until - time.time())),
+        "daily_limit_try": DAILY_LOSS_TRY,
         "dd_limit_pct": MAX_DD_PCT * 100,
         "crash_limit_pct": CRASH_PCT * 100,
+        "crash_cooldown_min": CRASH_COOLDOWN_SEC // 60,
     }
