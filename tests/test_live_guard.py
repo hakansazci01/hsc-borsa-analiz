@@ -199,10 +199,10 @@ def test_step1_daily_engine_and_brakes() -> None:
     assert t.STRATEGY_NAME.startswith("günlük EMA50")
     # fren limitleri
     assert risk_brakes.DAILY_LOSS_TRY == 50.0
-    assert risk_brakes.BASE_CAPITAL_TRY == 500.0
+    assert risk_brakes.BASE_CAPITAL_TRY == 506.26  # gerçek API bakiyesi
     assert risk_brakes.MAX_DD_PCT == 0.10
-    # %10 drawdown = -50 TL (500 TL kasa)
-    assert risk_brakes.BASE_CAPITAL_TRY * risk_brakes.MAX_DD_PCT == 50.0
+    # %10 drawdown = -50.63 TL (506.26 TL kasa)
+    assert round(risk_brakes.BASE_CAPITAL_TRY * risk_brakes.MAX_DD_PCT, 2) == 50.63
     assert risk_brakes.CRASH_PCT == 0.05
     assert risk_brakes.CRASH_WINDOW_MIN == 5
     assert risk_brakes.CRASH_COOLDOWN_SEC == 1800
@@ -249,6 +249,44 @@ def test_confirmation_phrase_gate() -> None:
         t.cfg = original_cfg
         # Test sonrası durumu eski haline getir: onaysız bırak
         t.set_confirmed_phrase("YANLIS")
+
+
+def test_fix_audit_gaps() -> None:
+    """Denetim eksikleri: geçmiş birleşme, trades.csv, ölü kod, gerçek bakiye."""
+    import csv
+    import importlib.util
+    from pathlib import Path
+
+    from ui import tr_monitor
+
+    root = Path(__file__).resolve().parent.parent
+    # 1) geçmiş birleşti: eski FORM_TRY işlemi görünüyor
+    hist = tr_monitor.merged_history()
+    assert any(h.get("symbol") == "FORM_TRY" for h in hist)
+    assert any(abs(float(h.get("net_pnl", 0)) + 0.0694) < 0.0001 for h in hist)
+    s = tr_monitor.summary()
+    assert s["trades"] >= 1
+    assert abs(s["net_pnl"] + 0.0694) < 0.0001
+
+    # 2) trades.csv başlık + 1 satır
+    p = root / "trades.csv"
+    assert p.exists()
+    with p.open(encoding="utf-8-sig", newline="") as fh:
+        rows = list(csv.DictReader(fh))
+    assert rows and rows[0]["sembol"] == "FORM_TRY"
+    assert abs(float(rows[0]["net_kar_zarar"]) + 0.0694) < 0.0001
+    assert set(rows[0].keys()) == {"tarih", "sembol", "alış_fiyatı", "satış_fiyatı",
+                                    "adet", "komisyon", "net_kar_zarar",
+                                    "işlem_süresi", "strateji_adı"}
+
+    # 3) ölü kod silindi ve import edilemiyor
+    assert not (root / "ui" / "daily_engine.py").exists()
+    assert importlib.util.find_spec("ui.daily_engine") is None
+
+    # 4) gerçek bakiye referansı
+    from ui import risk_brakes
+
+    assert risk_brakes.BASE_CAPITAL_TRY == 506.26
 
 
 def test_readiness_checklist() -> None:

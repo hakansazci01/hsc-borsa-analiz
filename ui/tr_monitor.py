@@ -55,16 +55,44 @@ def _age(entry_ts: float | None) -> str:
     return f"{sec // 60:02d}:{sec % 60:02d}"
 
 
+def legacy_state() -> dict[str, Any]:
+    """Eski scalper state dosyası (silinmez — geçmiş burada)."""
+    path = auth.USERS_DIR / "tr_scalper_state.json"
+    try:
+        d = json.loads(path.read_text(encoding="utf-8"))
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+def merged_history() -> list[dict[str, Any]]:
+    """Yeni + eski state dosyalarındaki gerçek işlemleri birleştir (tekrar yok)."""
+    from ui import tr_scalper as t
+
+    rows = list(legacy_state().get("history", [])) + list(t._load().get("history", []))
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for h in rows:
+        key = f"{h.get('symbol')}|{h.get('exit_time')}|{h.get('entry')}"
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(h)
+    return out
+
+
 def live_metrics() -> dict[str, Any]:
     """Anlık pozisyon + gerçek piyasa verisinden tüm metrikler."""
     from ui import tr_scalper as t
 
     st = t._load()
     pos = st.get("position")
+    hist = merged_history()
     out: dict[str, Any] = {
-        "history": st.get("history", []),
-        "realized_pnl": float(st.get("realized_pnl", 0) or 0),
-        "fees_paid": float(st.get("fees_paid", 0) or 0),
+        "history": hist,
+        "realized_pnl": round(sum(float(h.get("net_pnl", h.get("pnl", 0))) for h in hist), 4),
+        "fees_paid": round(float(st.get("fees_paid", 0) or 0) +
+                           float(legacy_state().get("fees_paid", 0) or 0), 4),
         "position": None,
     }
     if not pos:
