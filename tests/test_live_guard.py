@@ -838,12 +838,16 @@ def test_check_gate() -> None:
     check_gate.t.set_confirmed_phrase("HSC-BINANCE-TR-ARM")  # sonraki testler için
 
 
-def test_websocket_and_order_book() -> None:
-    """WS bağlantı/kopma-yeniden bağlanma; satış baskısı >%70 alım engeli."""
+def test_websocket_and_order_book(tmp_path, monkeypatch) -> None:
+    """WS bağlantı/kopma-yeniden bağlanma; satış baskısı >%70 alım engeli.
+
+    Test state'i production users/live_feed_state.json'a YAZMAZ (tmp izolasyonu).
+    """
     from pathlib import Path
 
     from ui import live_feed
 
+    monkeypatch.setattr(live_feed, "STATE", tmp_path / "live_feed_state.json")
     assert live_feed.WS_BASE == "wss://stream-tr.2meta.app/ws"
     assert live_feed.RECONNECT_SEC == 5
     assert live_feed.PRESSURE_LIMIT == 0.70
@@ -1054,12 +1058,16 @@ def test_partial_profit() -> None:
     assert "Kısmî Satış" in panel and "Cebe Konan Kâr" in panel and "Kalan Pozisyon" in panel
 
 
-def test_slippage_and_fill() -> None:
-    """Slippage >%1 iptal; emir dolmazsa 3 deneme; dolum ve kayma kaydı."""
+def test_slippage_and_fill(tmp_path, monkeypatch) -> None:
+    """Slippage >%1 iptal; emir dolmazsa 3 deneme; dolum ve kayma kaydı.
+
+    Test dolum kaydı production users/order_guard_state.json'a YAZMAZ.
+    """
     from pathlib import Path
 
     from ui import order_guard as og
 
+    monkeypatch.setattr(og, "STATE", tmp_path / "order_guard_state.json")
     assert og.MAX_SLIPPAGE == 0.01
     assert og.MAX_RETRIES == 3
 
@@ -1392,13 +1400,17 @@ def test_performance_export() -> None:
     assert "HAFTALIK ÖZETİ GÖSTER" in panel and "Son dışa aktarma" in panel
 
 
-def test_manual_intervention_log() -> None:
-    """Elle işlem manual_log.csv'ye yazar, trades.csv'ye KARIŞMAZ."""
+def test_manual_intervention_log(tmp_path, monkeypatch) -> None:
+    """Elle işlem manual_log.csv'ye yazar, trades.csv'ye KARIŞMAZ.
+
+    Test kayıtları production manual_log.csv'ye YAZMAZ (tmp izolasyonu).
+    """
     import csv
     from pathlib import Path
 
     from ui import manual_log as ml
 
+    monkeypatch.setattr(ml, "CSV_FILE", tmp_path / "manual_log.csv")
     # 1) Elle alım kaydı
     trades_before = ml.t.TRADES_CSV.read_bytes() if ml.t.TRADES_CSV.exists() else b""
     row = ml.log("Elle Alım", "BTC_TRY", 0.01, "test müdahale")

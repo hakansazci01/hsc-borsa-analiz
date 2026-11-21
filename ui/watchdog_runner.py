@@ -26,5 +26,5 @@ def _claim() -> bool:
 
 if __name__ == "__main__":
     if _claim():
-        watchdog()
+        watchdog(claim_fn=_claim)
 

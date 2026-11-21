@@ -269,18 +269,16 @@ def process_state(pattern: str) -> tuple[bool, int | None, str]:
     import sys as _sys
 
     me = __import__("os").getpid()
-    exe = str(ROOT / ".venv" / "Scripts" / "python.exe").lower()
     for p in psutil.process_iter(["pid", "cmdline", "create_time", "exe"]):
         cmd = " ".join(p.info.get("cmdline") or [])
         pexe = (p.info.get("exe") or "").lower()
-        # SADECE .venv python'u ve tam '-m <module>' argümanı ile eşleş
-        if p.info["pid"] != me and pattern in cmd and "-m" in cmd:
+        # .venv YA DA global python — ikisini de gör (kaçan süreç kalmasın)
+        if p.info["pid"] != me and pattern in cmd and "-m" in cmd and "python" in pexe:
             args = p.info.get("cmdline") or []
-            if "-m" in args and args[args.index("-m") + 1] == pattern.split(".")[-1] or \
-               any(a.endswith(pattern) for a in args):
-                if exe in pexe or ".venv" in pexe:
-                    start = datetime.fromtimestamp(p.info["create_time"]).strftime("%H:%M:%S")
-                    return True, p.info["pid"], start
+            module = args[args.index("-m") + 1] if "-m" in args else ""
+            if module in (pattern, pattern.split(".")[-1]) or any(a.endswith(pattern) for a in args):
+                start = datetime.fromtimestamp(p.info["create_time"]).strftime("%H:%M:%S")
+                return True, p.info["pid"], start
     return False, None, "—"
 
 
@@ -331,10 +329,17 @@ def watchdog_once() -> dict[str, Any]:
     }
 
 
-def watchdog(interval: int = 60) -> None:
-    """60 saniyede bir motoru ve scheduler'ı gerçekten başlatır/izler."""
+def watchdog(interval: int = 60, claim_fn=None) -> None:
+    """60 saniyede bir motoru ve scheduler'ı gerçekten başlatır/izler.
+
+    claim_fn verilirse HER TURDA tek-instance kilidini doğrular; kilidi başkası
+    aldıysa bu örnek hemen çıkar (çift watchdog birbirini başlatmasın).
+    """
     _log(f"WATCHDOG BAŞLADI — {interval} sn ctrl, MOTOR + SCHEDULER")
     while True:
+        if claim_fn is not None and not claim_fn():
+            _log("BAŞKA WATCHDOG VAR — tek-instance kilidi bu örneği durdurdu")
+            return
         try:
             watchdog_once()
         except Exception as exc:

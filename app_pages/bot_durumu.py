@@ -465,12 +465,27 @@ def _panel():
 
     fs = live_feed.status()
     bp = live_feed.book_pressure()
-    w1, w2, w3 = st.columns(3)
-    w1.metric("Veri Kaynağı", fs["source"] + (" (GERÇEK)" if fs["source"] == "WebSocket CANLI" else " (GERÇEK)"))
+    w1, w2, w3, w4 = st.columns(4)
+    w1.metric("Veri Kaynağı", fs["source"] + (" (GERÇEK)" if fs["connected"] else " (GERÇEK — REST yedek)"))
     w2.metric("Order Book", (f"Alış %{bp['buy']*100:.0f} / Satış %{bp['sell']*100:.0f} (GERÇEK)"
                               if bp["ok"] else "--- (veri yok)"))
     w3.metric("Son Fiyat Güncelleme",
               f"{fs['price_age']} sn önce" if fs["price_age"] is not None else "---")
+    # HACİM ANALİZİ — sadece gösterge, stratejiye/sinyale dokunmaz
+    from ui import quant_lab
+    try:
+        _vf = quant_lab.fetch("BTCUSDT", "1h", 30)
+        if _vf is not None and len(_vf) >= 21:
+            _last_v = float(_vf["Volume"].iloc[-1])
+            _avg_v = float(_vf["Volume"].iloc[-21:-1].mean())
+            _ratio = _last_v / _avg_v if _avg_v else 0.0
+            _vol_txt = "ARTIŞ VAR ▲" if _ratio >= 1.5 else "ARTIŞ YOK"
+            _vol_help = f"son={_last_v:,.0f} · 20b ort={_avg_v:,.0f} · oran={_ratio:.2f}x"
+        else:
+            _vol_txt, _vol_help = "---", "hacim verisi yok"
+    except Exception:
+        _vol_txt, _vol_help = "---", "hacim alınamadı"
+    w4.metric("Hacim (20b)", _vol_txt, help=_vol_help)
     if fs["connected"] and fs["price_age"] is None:
         st.warning("WS bağlı ama veri akmıyor — REST yedekte. "
                    "Gerçek fiyat akışı gelene kadar WebSocket'ten işlem yapılmaz.",
