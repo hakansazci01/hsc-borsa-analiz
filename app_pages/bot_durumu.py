@@ -275,6 +275,19 @@ def _panel():
     st.caption(f"Kural: korelasyon > {correlation_guard.CORR_LIMIT} ise aynı anda alım yok · "
                f"son {correlation_guard.CORR_DAYS} günlük kapanış")
 
+    # SLIPPAGE + EMİR DOLUMU
+    st.divider()
+    st.subheader("Emir dolumu ve slippage", divider="gray")
+    from ui import order_guard
+
+    og = order_guard.last()
+    o1, o2 = st.columns(2)
+    o1.metric("Son Emir Durumu", og.get("status", "—"))
+    o2.metric("Son Slippage", f"%{og.get('slippage_pct', 0):.2f}")
+    st.caption(f"Deneme: {og.get('attempt', '—')}/3 · "
+               f"beklenen {og.get('expected', '—')} · gerçek {og.get('actual', '—')} · "
+               f"maksimum kayma %{order_guard.MAX_SLIPPAGE*100:.0f}")
+
     # KISMİ KÂR ALIMI
     st.divider()
     st.subheader("Kısmî kâr alımı", divider="gray")

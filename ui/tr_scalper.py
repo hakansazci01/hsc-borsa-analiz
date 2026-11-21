@@ -374,6 +374,19 @@ def buy(symbol: str, qty_override: float | None = None,
     comm_ok, comm_reason = commission_gate(symbol, TAKE_PROFIT_EXPECTED, qty, px)
     if not comm_ok:
         return {"ok": False, "reason": comm_reason}
+    # SLIPPAGE KONTROLÜ: emir öncesi güncel fiyatı tekrar oku, %1'den fazla kayma varsa iptal
+    try:
+        from ui import order_guard
+
+        now_px = price(symbol) or px
+        slip_ok, slip_msg = order_guard.check_slippage(px, now_px)
+        if not slip_ok:
+            from ui import autonomous_ops
+
+            autonomous_ops._log(slip_msg)
+            return {"ok": False, "reason": slip_msg}
+    except ImportError:
+        pass
     res = _order(symbol, 0, qty)
     if res.get("ok"):
         try:

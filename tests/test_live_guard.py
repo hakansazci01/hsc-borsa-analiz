@@ -1082,6 +1082,54 @@ def test_partial_profit() -> None:
     assert "Kısmî Satış" in panel and "Cebe Konan Kâr" in panel and "Kalan Pozisyon" in panel
 
 
+def test_slippage_and_fill() -> None:
+    """Slippage >%1 iptal; emir dolmazsa 3 deneme; dolum ve kayma kaydı."""
+    from pathlib import Path
+
+    from ui import order_guard as og
+
+    assert og.MAX_SLIPPAGE == 0.01
+    assert og.MAX_RETRIES == 3
+
+    # 1) Slippage %0.5 -> OK
+    ok, msg = og.check_slippage(100.0, 100.50)
+    assert ok is True and "%0.50" in msg
+
+    # 2) Slippage %2 -> İPTAL
+    ok, msg = og.check_slippage(100.0, 102.0)
+    assert ok is False and "SLIPPAGE YÜKSEK, EMİR İPTAL" in msg
+
+    # 3) Dolum tespiti
+    assert og.is_filled({"code": 0, "data": {"status": "FILLED", "filledQty": "0.5"}}) is True
+    assert og.is_filled({"code": 0, "data": {"status": "NEW", "filledQty": "0"}}) is False
+    assert og.is_filled({"code": 400, "data": {}}) is False
+
+    # 4) 3 deneme sonra iptal (dolmayan emir)
+    calls = []
+
+    def never_fill():
+        calls.append(1)
+        return {"code": 0, "data": {"status": "NEW", "filledQty": "0"}}
+
+    r = og.retry_order(never_fill, "BTCUSDT", "AL", 100.0)
+    assert len(calls) == 3
+    assert r["status"] == "İptal" and r["attempt"] == 3
+
+    # 5) İlk denemede dolum
+    def fill_first():
+        calls.append(1)
+        return {"code": 0, "data": {"status": "FILLED", "avgPrice": "100.20", "filledQty": "0.5"}}
+
+    before = len(calls)
+    r2 = og.retry_order(fill_first, "BTCUSDT", "AL", 100.0)
+    assert len(calls) == before + 1  # tek denemede doldu
+    assert r2["status"] == "Doldu" and abs(r2["slippage_pct"] - 0.20) < 0.01
+
+    # 6) Panel göstergeleri
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "Son Emir Durumu" in panel and "Son Slippage" in panel
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 
