@@ -122,7 +122,8 @@ def _panel():
     summary = tr_monitor.summary()
     hist = tr_monitor.merged_history()
     j, k, l = st.columns(3)
-    j.metric("BİNANCE TR BAKİYE (canlı)", f"₺{bal:,.2f}")
+    j.metric("BİNANCE TR BAKİYE (CANLI)", f"₺{bal:,.2f}",
+             help="Her panel yenilemesinde Binance TR API'den (imzalı /open/v1/account/spot) çekilir.")
     if pos:
         age = int(time.time() - float(pos.get("entry_ts", time.time())))
         k.metric("AÇIK POZİSYON", f"{pos['symbol']} · ₺{pos['cost']:.2f}",
@@ -133,12 +134,27 @@ def _panel():
              f"{len([x for x in hist if str(x.get('exit_time', '')).startswith(time.strftime('%Y-%m-%d'))])} / "
              f"{summary['net_pnl']:+.2f} ₺")
 
-    if hist:
-        last = hist[-1]
-        st.caption(
-            f"**Son işlem:** {last.get('exit_time', '—')} · {last.get('symbol', '—')} · "
-            f"net **{last.get('net_pnl', last.get('pnl', 0)):+.2f} ₺**"
+    # SON İŞLEM — trades.csv'den gerçek kayıt (sadece gösterge)
+    st.divider()
+    st.subheader("Son İşlem", divider="gray")
+    import csv as _csv
+    _tp = ROOT / "trades.csv"
+    _last_row = None
+    if _tp.exists():
+        try:
+            with _tp.open(encoding="utf-8-sig", newline="") as fh:
+                _rows = list(_csv.DictReader(fh))
+            _last_row = _rows[-1] if _rows else None
+        except Exception:
+            _last_row = None
+    if _last_row:
+        _net = float(_last_row.get("net_kar_zarar", 0) or 0)
+        st.markdown(
+            f"**Son İşlem:** {_last_row.get('tarih', '—')} - "
+            f"{_last_row.get('sembol', '—')} - Net: {_net:+.2f} TL"
         )
+    else:
+        st.info("Henüz işlem yok", icon=":material/info:")
 
     # --- FRENLER ---
     br = risk_brakes.status()
@@ -212,7 +228,7 @@ def _panel():
         cash_pct = 0 if _pos_now else 100
         st.error("**Strateji: Ayıda Nakitte Kalma Aktif** — alım yok, Grid yok, "
                  "short/futures/yok. Spot long-only.", icon=":material/warning:")
-        st.metric("Nakit Oranı", f"%{cash_pct}")
+        st.metric("Nakit Oranı", f"%{cash_pct}", help=f"Binance TR canlı bakiye: ₺{bal:,.2f}")
     else:
         st.success("BOĞA rejimi — Grid kapalı, normal EMA50 pullback modu.",
                    icon=":material/check:")
@@ -379,6 +395,30 @@ def _panel():
     o2.metric("Son Slippage", f"%{og.get('slippage_pct', 0):.2f}" if has_order else "---")
     st.caption("Gerçek emir gelene kadar slippage gösterilmez (test verisi kullanılmaz) · "
                f"maksimum kayma %{order_guard.MAX_SLIPPAGE*100:.0f}")
+
+    # AÇIK POZİSYON KÂR/ZARAR — sadece gösterge, alım/satım mantığına dokunmaz
+    st.divider()
+    st.subheader("Açık Pozisyon Kâr/Zarar", divider="gray")
+    _op = tr_scalper._load().get("position") or {}
+    if _op:
+        _sym = _op.get("symbol", "—")
+        _entry = float(_op.get("entry", 0) or 0)
+        _qty = float(_op.get("qty", 0) or 0)
+        _cur = tr_scalper.price(_sym) or _entry
+        _pnl = (_cur - _entry) * _qty
+        _pct = ((_cur - _entry) / _entry * 100) if _entry else 0.0
+        _sl = float(_op.get("atr_stop", 0) or 0)
+        _ttp = tr_scalper.trailing_tp(_op, _cur)
+        _target = float(_ttp.get("tp", 0) or 0) or _entry * (1 + tr_scalper.TAKE_PROFIT_EXPECTED)
+        st.markdown(
+            f"**Açık Pozisyon:** {_sym} - Giriş: {_entry:,.4f} - "
+            f"Şu Anki Fiyat: {_cur:,.4f} - Kar/Zarar: {_pnl:+,.2f} TL (%{_pct:+.2f}) - "
+            f"Stop: {_sl:,.4f} - Hedef: {_target:,.4f}"
+        )
+        st.caption("Stop = 1.5 × ATR(14) fiyatı · Hedef = trailing TP satış fiyatı. "
+                   "Bu bölüm salt okunur göstergedir.")
+    else:
+        st.info("Açık Pozisyon Yok", icon=":material/info:")
 
     # KISMİ KÂR ALIMI
     st.divider()
