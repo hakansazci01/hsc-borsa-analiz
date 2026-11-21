@@ -196,7 +196,7 @@ def test_step1_daily_engine_and_brakes() -> None:
     res = t.buy("XRP_TRY")
     assert res.get("ok") is False
     assert ("ENGELLENDİ" in res.get("reason", "") or "limitini aşıyor" in res.get("reason", "")
-            or "14-CHECK GATE" in res.get("reason", ""))
+            or "16-CHECK GATE" in res.get("reason", ""))
     # motor günlük EMA50 stratejisini kullanıyor
     assert tr_runner.CYCLE is t.cycle
     assert t.STRATEGY_NAME.startswith("günlük EMA50")
@@ -768,7 +768,7 @@ def test_correlation_protection() -> None:
 
 
 def test_check_gate() -> None:
-    """14-check gate: başarılı 14/14, başarısız senaryoda hangi kontrol engelledi."""
+    """16-check gate: başarılı 16/16, başarısız senaryoda hangi kontrol engelledi."""
     from pathlib import Path
 
     from ui import check_gate
@@ -869,7 +869,7 @@ def test_check_gate() -> None:
 
     # 4) Panel 14 kontrol listesini gösteriyor
     panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
-    assert "14-CHECK GATE" in panel and "SON EMİR KONTROLLERİ" in panel
+    assert "16-CHECK GATE" in panel and "SON EMİR KONTROLLERİ" in panel
     check_gate.t.set_confirmed_phrase("HSC-BINANCE-TR-ARM")  # sonraki testler için
 
 

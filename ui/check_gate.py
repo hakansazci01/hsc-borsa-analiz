@@ -1,5 +1,5 @@
 """
-14-CHECK GATE — her alım emrinden önce 14 kontrol, sırayla.
+16-CHECK GATE — her alım emrinden önce 16 kontrol, sırayla.
 
 Biri bile başarısız olursa emir ATILMAZ ve hangi kontrolün engellediği loglanır.
 Önceki 6 adımın (rejim, grid, ATR, ardışık zarar, MTF, korelasyon) tüm kontrolleri
@@ -35,7 +35,7 @@ CHECKS = [
 
 def run(symbol: str, price: float | None = None,
         expected_return: float | None = None) -> dict[str, Any]:
-    """14 kontrolü sırayla çalıştır. İlk başarısızlıkta durur."""
+    """16 kontrolü sırayla çalıştır. İlk başarısızlıkta durur."""
     px = price if price is not None else t.price(symbol)
     results: list[dict[str, Any]] = []
     failed_at: int | None = None

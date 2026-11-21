@@ -5,7 +5,7 @@ Skor (0-100):
   +40  rejim BOĞA (AYI = -40, YATAY = +10)
   +25  multi-timeframe onayı (günlük + 4s)
   +20  order book alış baskısı (buy * 20)
-  +15  14-check gate geçti
+  +15  16-check gate geçti
 
 Kurallar:
   - En yüksek skorlu coin'e alım; diğerlerine yapma.

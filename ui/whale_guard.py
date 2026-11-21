@@ -2,7 +2,7 @@
 BALİNA / HABER KORUMASI — son 5 dakikadaki %3+ hareket -> 30 dk alım yasağı.
 
 Hem %3+ düşüş hem %3+ yükseliş şüphelidir (haber/balina veya sahte pump).
-14-Check Gate'in 15. kontrolü olarak çalışır.
+16-Check Gate'in 15. kontrolü olarak çalışır.
 """
 
 from __future__ import annotations

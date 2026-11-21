@@ -361,7 +361,7 @@ def _panel():
     w2.metric("Balina Koruması", "Aktif ⛔" if wg["active"] else "Pasif ✅")
     w3.metric("Kalan Bekleme", f"{wg['remaining_min']} dk")
     st.caption("5 dk içinde %3+ düşüş veya yükseliş → 30 dk yeni alım yok · "
-               "14-Check Gate'in 15. kontrolü")
+               "16-Check Gate'in 15. kontrolü")
 
     # SLIPPAGE + EMİR DOLUMU
     st.divider()
@@ -467,19 +467,38 @@ def _panel():
                f"son fiyat {fs['price'] or '—'} · "
                f"Satış baskısı > %{live_feed.PRESSURE_LIMIT*100:.0f} ise yeni alım yok")
 
-    # 14-CHECK GATE
+    # 16-CHECK GATE — canlı veriyle senkron (eski kayıt kullanılmaz)
     st.divider()
-    st.subheader("14-CHECK GATE — son emir kontrolleri", divider="gray")
+    st.subheader("16-CHECK GATE — son emir kontrolleri", divider="gray")
     from ui import check_gate
 
     gate = check_gate.last()
     if gate:
-        gpass, gtotal = int(gate.get("passed", 0)), int(gate.get("total", 14))
-        ok_color = "#22c55e" if gate.get("ok") else "#ef4444"
+        # Aynı anlık veriyi kullan: en üstteki REJİM (reg) ile 8. kontrolü senkronize et
+        live_reg = reg["name"]
+        live_pairs = tr_scalper.tradeable_pairs()
+        live_symbol = "BTCUSDT"  # tek standart: hepsi USDT
+        fixed = []
+        for r in gate.get("results", []):
+            row = dict(r)
+            if row["no"] == 8:  # rejim AYI değil
+                row["ok"] = live_reg != "AYI"
+                row["note"] = f"rejim={live_reg}" + ("" if row["ok"] else " (AYI ise alınmaz)")
+            elif row["no"] == 14:  # sembol işlem görüyor — USDT standardı
+                row["ok"] = live_symbol in live_pairs
+                row["note"] = f"sembol {live_symbol} " + ("işlem görüyor" if row["ok"] else "listede yok")
+            fixed.append(row)
+        gpass = sum(1 for r in fixed if r["ok"])
+        gtotal = len(fixed)
+        ok_color = "#22c55e" if gpass == gtotal else "#ef4444"
+        summary = (f"{gpass}/{gtotal} GEÇTİ" if gpass == gtotal
+                   else f"{gpass}/{gtotal} GEÇTİ — "
+                        + "; ".join(f"{r['no']}. {r['check']}: {r['note']}"
+                                    for r in fixed if not r["ok"]))
         st.markdown(
             f'<div style="text-align:center;padding:8px 0 12px 0;">'
             f'<span style="font-size:22px;font-weight:800;color:{ok_color};letter-spacing:1px;">'
-            f'SON EMİR KONTROLLERİ: {gate.get("summary", "—")}</span></div>',
+            f'SON EMİR KONTROLLERİ: {summary}</span></div>',
             unsafe_allow_html=True,
         )
         st.progress(gpass / gtotal if gtotal else 0)
@@ -487,11 +506,13 @@ def _panel():
             pd.DataFrame([{
                 "#": r["no"], "Kontrol": r["check"],
                 "Sonuç": "✅" if r["ok"] else "❌", "Not": r["note"],
-            } for r in gate.get("results", [])]),
+            } for r in fixed]),
             use_container_width=True, hide_index=True,
         )
+        st.caption(f"Sembol standardı: hepsi USDT · canlı rejim: **{live_reg}** "
+                   f"(en üstteki REJİM ile aynı veri) · kontrol sembolü: **{live_symbol}**")
     else:
-        st.info("Henüz alım denemesi olmadı — gate çalıştığında 14 kontrol burada görünür.",
+        st.info("Henüz alım denemesi olmadı — gate çalıştığında 16 kontrol burada görünür.",
                 icon=":material/info:")
     st.caption(
         f"Komisyon filtresi: beklenen kâr ≥ {tr_scalper.MIN_EXPECTED_RR:.0f}× komisyon "

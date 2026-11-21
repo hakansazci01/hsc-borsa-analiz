@@ -302,7 +302,7 @@ def _log_gate(gate: dict[str, Any]) -> None:
     try:
         from ui import autonomous_ops as ops
 
-        ops._log("14-CHECK GATE: " + gate["summary"])
+        ops._log("16-CHECK GATE: " + gate["summary"])
         ops._send("HSC EMİR ENGELLENDİ", gate["summary"])
     except Exception:
         pass
@@ -334,7 +334,7 @@ def _order(symbol: str, side: int, qty: float) -> dict[str, Any]:
 
 def buy(symbol: str, qty_override: float | None = None,
         grid_part: float | None = None) -> dict[str, Any]:
-    """GERÇEK ALIŞ — 14-check gate + tüm kilitler."""
+    """GERÇEK ALIŞ — 16-check gate + tüm kilitler."""
     try:
         from ui import check_gate
 
@@ -342,7 +342,7 @@ def buy(symbol: str, qty_override: float | None = None,
         check_gate.save(gate)
         if not gate["ok"]:
             _log_gate(gate)
-            return {"ok": False, "reason": "14-CHECK GATE: " + gate["summary"]}
+            return {"ok": False, "reason": "16-CHECK GATE: " + gate["summary"]}
     except ImportError:
         pass
     gates = config_gate()
