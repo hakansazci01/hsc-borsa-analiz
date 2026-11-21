@@ -221,6 +221,9 @@ def run_once() -> dict[str, Any]:
             trade_notify.decision_alert(
                 d["decision"], d.get("reasons", []), d.get("robust", 0), accuracy(_load())
             )
+        from ui.summary_report import write as write_report
+
+        write_report()
     except Exception:
         pass
     return d

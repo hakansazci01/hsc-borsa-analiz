@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from ui import autonomous, quant_lab, tr_journal, tr_monitor, tr_scalper
+from ui import autonomous, quant_lab, summary_report, tr_journal, tr_monitor, tr_scalper
 
 
 st.title("Otonom durum", icon=":material/monitoring:")
@@ -82,6 +82,26 @@ def _dashboard():
               "para riske atılmaz.",
             icon=":material/info:",
         )
+
+    # --- ÖZET RAPOR ---
+    st.divider()
+    st.subheader("Başarı özeti — tek bakışta", divider="gray")
+    rep = summary_report.build()
+    q1, q2, q3, q4 = st.columns(4)
+    q1.metric("Toplam karar", rep["decisions"])
+    q2.metric("Öngörü testi", rep["prediction_tests"])
+    q3.metric("Doğru / Yanlış", f"{rep['prediction_correct']} / {rep['prediction_wrong']}")
+    q4.metric("İsabet", f"%{rep['accuracy']}" if rep["accuracy"] is not None else "—")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Emir kaydı", rep["orders"])
+    c2.metric("İşlem", rep["trades"])
+    c3.metric("Net K/Z", f"{rep['net_pnl']:+.2f} ₺")
+    c4.metric("Bakiye", f"₺{rep['balance']:,.0f}")
+    with st.expander("Tam özet raporunu oku", icon=":material/description:"):
+        st.markdown(summary_report.to_markdown(rep))
+        if st.button("Raporu dosyaya yaz (GitHub için)", key="write_report"):
+            path = summary_report.write()
+            st.success(f"Yazıldı: `{path.relative_to(summary_report.ROOT)}`", icon=":material/check:")
 
     # --- TAM TETİKLEYİCİ: ne zaman alır / satar ---
     st.divider()
