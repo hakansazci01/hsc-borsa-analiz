@@ -221,28 +221,67 @@ def weekly_strategy_review() -> dict[str, Any]:
 
 
 # --------------------------------------------------------- watchdog
-def watchdog(interval: int = 60) -> None:
-    """Motoru izler; çökerse 60 sn içinde yeniden başlatır."""
+def process_state(pattern: str) -> tuple[bool, int | None, str]:
+    """GERÇEK süreç listesinden (psutil) kontrol — dosya kilidine güvenmez."""
+    import psutil
+
+    me = __import__("os").getpid()
+    for p in psutil.process_iter(["pid", "cmdline", "create_time"]):
+        cmd = " ".join(p.info.get("cmdline") or [])
+        if pattern in cmd and p.info["pid"] != me:
+            start = datetime.fromtimestamp(p.info["create_time"]).strftime("%H:%M:%S")
+            return True, p.info["pid"], start
+    return False, None, "—"
+
+
+def _start_module(module: str) -> int | None:
+    """Bir modülü detached süreç olarak başlatır, PID döndürür."""
     import subprocess
     import sys
 
-    _log(f"WATCHDOG BAŞLADI — {interval} sn kontrol")
+    exe = str(ROOT / ".venv" / "Scripts" / "python.exe")
+    if not Path(exe).exists():
+        exe = sys.executable
+    proc = subprocess.Popen(
+        [exe, "-m", module], cwd=str(ROOT),
+        creationflags=0x00000008 | 0x00000200,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    return proc.pid
+
+
+def watchdog_once() -> dict[str, Any]:
+    """Tek tur: MOTOR + SCHEDULER'ı gerçek süreç listesinden kontrol et,
+    durmuş olanları 60 sn içinde yeniden başlat."""
+    motor = process_state("ui.tr_runner")
+    sched = process_state("ui.autonomous_scheduler")
+    actions: list[str] = []
+    if not motor[0]:
+        pid = _start_module("ui.tr_runner")
+        actions.append(f"MOTOR yeniden başlatıldı (PID {pid})")
+    if not sched[0]:
+        pid = _start_module("ui.autonomous_scheduler")
+        actions.append(f"SCHEDULER yeniden başlatıldı (PID {pid})")
+    if actions:
+        msg = "WATCHDOG AKSİYON: " + "; ".join(actions)
+        _log(msg)
+        _send("HSC WATCHDOG", msg)
+    else:
+        _log(f"watchdog OK — motor PID {motor[1]}, scheduler PID {sched[1]}")
+    return {
+        "motor_alive": motor[0], "motor_pid": motor[1], "motor_start": motor[2],
+        "sched_alive": sched[0], "sched_pid": sched[1], "sched_start": sched[2],
+        "actions": actions,
+        "at": time.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+
+def watchdog(interval: int = 60) -> None:
+    """60 saniyede bir motoru ve scheduler'ı gerçekten başlatır/izler."""
+    _log(f"WATCHDOG BAŞLADI — {interval} sn ctrl, MOTOR + SCHEDULER")
     while True:
         try:
-            from ui import tr_runner
-
-            alive = tr_runner.LOCK.exists() and tr_runner._pid_alive(
-                int(tr_runner.LOCK.read_text(encoding="utf-8").strip() or 0)
-            )
-            if not alive:
-                _log("motor ölü — yeniden başlatılıyor")
-                exe = str(ROOT / ".venv" / "Scripts" / "python.exe")
-                if not Path(exe).exists():
-                    exe = sys.executable
-                subprocess.Popen([exe, "-m", "ui.tr_runner"], cwd=str(ROOT),
-                                 creationflags=0x00000008 | 0x00000200,
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                _send("HSC WATCHDOG", "Motor çöktü, otomatik yeniden başlatıldı")
+            watchdog_once()
         except Exception as exc:
             _log(f"watchdog hata: {type(exc).__name__}: {str(exc)[:100]}")
         time.sleep(interval)

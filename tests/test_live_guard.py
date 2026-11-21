@@ -433,6 +433,32 @@ def test_status_panel_and_alive_signal() -> None:
     assert ops._send("HSC SATIM YAPILDI", "SATIM YAPILDI — BTC_TRY\nFiyat: 102 TL\nKar/Zarar: +1.00 TL\nYeni Bakiye: 501 TL")
 
 
+def test_watchdog_restarts_dead_processes() -> None:
+    """Watchdog gerçek süreçleri kontrol eder; duran MOTOR/SCHEDULER'ı başlatır."""
+    import time as _time
+    from pathlib import Path
+
+    from ui import autonomous_ops as ops
+
+    # process_state gerçek psutil kullanır
+    ok, pid, start = ops.process_state("ui.tr_runner")
+    assert isinstance(ok, bool)
+    # watchdog_once tek tur çalışır (durmuş süreçleri başlatır)
+    result = ops.watchdog_once()
+    for key in ("motor_alive", "sched_alive", "motor_pid", "sched_pid", "actions", "at"):
+        assert key in result
+    _time.sleep(3)
+    after = ops.watchdog_once()
+    # tur sonunda en az biri ayakta olmalı (watchdog başlattı)
+    assert after["motor_alive"] or after["sched_alive"]
+
+    # Panel ışığı: süreçler durmuşsa config temiz olsa bile AÇIK olmamalı
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "procs_ok" in panel
+    assert "w_alive and s_alive and r_alive" in panel
+    assert "MOTOR DURMUŞ" in panel
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

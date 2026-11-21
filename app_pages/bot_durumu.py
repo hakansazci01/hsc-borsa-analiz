@@ -41,7 +41,17 @@ def _panel():
     phrase = tr_scalper.is_phrase_confirmed()
     stop = tr_scalper.STOP_FILE.exists()
     gate = tr_scalper.config_gate()
-    bot_open = bool(enabled and phrase and not stop and not gate)
+
+    # GERÇEK süreç durumu (psutil) — dosya kilidine güvenmez
+    w_alive, w_pid, w_start = autonomous_ops.process_state("ui.autonomous_runner")
+    s_alive, s_pid, s_start = autonomous_ops.process_state("ui.autonomous_scheduler")
+    r_alive, r_pid, r_start = autonomous_ops.process_state("ui.tr_runner")
+
+    # IŞIK: config TEMİZ + 3 süreç AYAKTA olmalı; biri bile durmuşsa KIRMIZI
+    procs_ok = bool(w_alive and s_alive and r_alive)
+    bot_open = bool(enabled and phrase and not stop and not gate and procs_ok)
+    dead = [n for n, ok in (("WATCHDOG", w_alive), ("SCHEDULER", s_alive),
+                            ("MOTOR", r_alive)) if not ok]
 
     # --- BÜYÜK IŞIK ---
     color = "#22c55e" if bot_open else "#ef4444"
@@ -65,13 +75,15 @@ def _panel():
         """,
         unsafe_allow_html=True,
     )
-    st.caption(f"Kanıt: enabled={enabled} · phrase={phrase} · STOP_FILE={stop} · config_gate={gate}")
+    if dead:
+        st.error("**" + ", ".join(dead) + " DURMUŞ** — ışık kırmızı. "
+                 "Watchdog 60 sn içinde yeniden başlatmalı.", icon=":material/error:")
+    st.caption(
+        f"Kanıt: enabled={enabled} · phrase={phrase} · STOP_FILE={stop} · "
+        f"config_gate={gate} · WATCHDOG={w_alive} · SCHEDULER={s_alive} · MOTOR={r_alive}"
+    )
 
-    # --- SÜREÇLER / ZAMANLAMA ---
-    w_alive, w_pid, w_start = _proc_alive("ui.autonomous_runner")
-    s_alive, s_pid, s_start = _proc_alive("ui.autonomous_scheduler")
-    r_alive, r_pid, r_start = _proc_alive("ui.tr_runner")
-
+    # --- ZAMANLAMA ---
     health = autonomous.HEARTBEAT
     try:
         hb = json.loads(health.read_text(encoding="utf-8"))
@@ -98,8 +110,11 @@ def _panel():
 
     h, i = st.columns(2)
     h.metric("SON CYCLE", f"{last_cycle // 60} dk {last_cycle % 60} sn önce", help=cyc_at)
-    i.metric("SONRAKİ CYCLE", f"{next_in // 60} dk {next_in % 60} sn içinde",
-             help=f"aralık {interval} sn")
+    if not r_alive:
+        i.metric("SONRAKİ CYCLE", "MOTOR DURMUŞ — BELİRSİZ")
+    else:
+        i.metric("SONRAKİ CYCLE", f"{next_in // 60} dk {next_in % 60} sn içinde",
+                 help=f"aralık {interval} sn")
 
     # --- BAKİYE / POZİSYON / İŞLEM (canlı API + gerçek kayıt) ---
     bal = tr_scalper.available_try()
