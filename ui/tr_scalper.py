@@ -625,8 +625,25 @@ def commission_gate(symbol: str, expected_return_pct: float, qty: float, px: flo
     return True, ""
 
 
+MOTOR_HEARTBEAT = ROOT / "users" / "motor_heartbeat.json"
+
+
+def _beat(count: int = 1) -> None:
+    """Her cycle'da gerçek motor nabzı — panel BURADAN okur."""
+    try:
+        MOTOR_HEARTBEAT.parent.mkdir(parents=True, exist_ok=True)
+        MOTOR_HEARTBEAT.write_text(json.dumps({
+            "ts": time.time(), "at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "cycles": count, "pid": __import__("os").getpid(),
+        }, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+
 def cycle() -> list[str]:
     """Tek tur — AKILLI SEPET: 8 coin taranır, en yüksek skorluya alım (max 2 pozisyon)."""
+    _beat(int(_load().get("cycle_count", 0)) + 1)
+    _save({**_load(), "cycle_count": int(_load().get("cycle_count", 0)) + 1})
     logs: list[str] = []
     # MANUEL MÜDAHALE TESPİTİ: bot emri olmadan bakiye değiştiyse kaydet
     try:

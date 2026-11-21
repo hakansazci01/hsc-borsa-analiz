@@ -84,9 +84,9 @@ def _panel():
     )
 
     # --- ZAMANLAMA ---
-    health = autonomous.HEARTBEAT
+    # SON CYCLE — motorun KENDİ nabzından (otonom nabız değil)
     try:
-        hb = json.loads(health.read_text(encoding="utf-8"))
+        hb = json.loads(tr_scalper.MOTOR_HEARTBEAT.read_text(encoding="utf-8"))
         last_cycle = int(time.time() - float(hb.get("ts", 0)))
         cyc_at = hb.get("at", "—")
     except Exception:
