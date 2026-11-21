@@ -32,6 +32,13 @@ def run_forever(check_every: int = 30) -> None:
                 ops.alive_signal()
             if _due("summary", "23:00"):
                 ops.daily_summary()
+            try:
+                from ui import health_report
+
+                if _due("health_report", "23:00"):
+                    health_report.send()
+            except Exception:
+                pass
             if _due("backup", "00:00"):
                 ops.backup_files()
             if _due("strategy", "00:00@sun"):

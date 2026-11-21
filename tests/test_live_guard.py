@@ -1359,6 +1359,36 @@ def test_disaster_recovery() -> None:
     assert "Son Yedek" in panel and "Yedek Durumu" in panel and "Kurtarma Testi" in panel
 
 
+def test_health_report() -> None:
+    """Günlük sağlık raporu: 7 madde, dosya ve ntfy, panel."""
+    from pathlib import Path
+
+    from ui import health_report as hr
+
+    r = hr.build()
+    for key in ("at", "trades", "pnl", "position", "backups", "backup_ok",
+                "restarts", "regime", "plan"):
+        assert key in r
+
+    text = hr.format_report(r)
+    for i in range(1, 8):
+        assert f"{i})" in text
+    for word in ("Bugün işlem", "Bugün K/Z", "Açık pozisyon", "Bugün yedek",
+                 "Yeniden başlatma", "Rejim", "Yarın planı"):
+        assert word in text
+
+    # Gönder + dosyaya yaz
+    result = hr.send()
+    assert "text" in result and "sent" in result
+    assert hr.REPORT_FILE.exists()
+    assert "GÜNLÜK SAĞLIK RAPORU" in hr.REPORT_FILE.read_text(encoding="utf-8")
+
+    # Panel
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "Son Rapor" in panel and "Sonraki Rapor" in panel
+    assert "23:00" in hr.next_run()
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

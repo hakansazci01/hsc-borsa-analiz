@@ -275,6 +275,20 @@ def _panel():
     st.caption(f"Kural: korelasyon > {correlation_guard.CORR_LIMIT} ise aynı anda alım yok · "
                f"son {correlation_guard.CORR_DAYS} günlük kapanış")
 
+    # GÜNLÜK SAĞLIK RAPORU
+    st.divider()
+    st.subheader("Günlük sağlık raporu", divider="gray")
+    from ui import health_report
+
+    hr = health_report.last()
+    r1, r2 = st.columns(2)
+    r1.metric("Son Rapor", f"{hr['at']} — {'Gönderildi ✅' if hr['sent'] else 'Bekliyor'}")
+    r2.metric("Sonraki Rapor", health_report.next_run())
+    rp = t.ROOT / "daily_report.txt"
+    if rp.exists():
+        with st.expander("Son raporu oku", icon=":material/description:"):
+            st.text(rp.read_text(encoding="utf-8"))
+
     # YEDEK + FELAKET KURTARMA
     st.divider()
     st.subheader("Yedek + Felaket Kurtarma", divider="gray")
