@@ -175,14 +175,22 @@ def _panel():
     from ui import market_regime
 
     reg = market_regime.regime("BTCUSDT")
-    grid = market_regime.grid_plan(tr_scalper.available_try())
-    r1, r2 = st.columns(2)
-    r1.metric("REJİM", reg["name"],
-              help=reg["reason"] + f" · ADX {reg.get('adx', '—')}")
-    r2.metric("MOD", "GRID 🔲" if reg["range"] else "EMA50 📈",
-              help=grid["reason"] if reg["range"] else "trend rejimi — EMA50 sinyali")
-    if reg["bear"]:
+    _rc = {"BOĞA": "#22c55e", "AYI": "#ef4444", "YATAY": "#eab308"}.get(reg["name"], "#94a3b8")
+    st.markdown(
+        f'<div style="text-align:center;padding:8px 0 12px 0;">'
+        f'<span style="font-size:26px;font-weight:800;color:{_rc};letter-spacing:3px;">'
+        f'REJİM: {reg["name"]}</span></div>',
+        unsafe_allow_html=True,
+    )
+    st.caption(f"ADX {reg['adx']:.1f} · fiyat {reg['price']:.2f} / EMA50 {reg['ema50']:.2f} — "
+               f"{reg['reason']}")
+    if reg["range"]:
+        st.info("YATAY rejim — yeni alım yok, Grid modu için bekleniyor (sonraki adım).",
+                icon=":material/info:")
+    elif reg["bear"]:
         st.warning("AYI rejimi — yeni alım yok, para güvende.", icon=":material/warning:")
+    else:
+        st.success("BOĞA rejimi — EMA50 pullback sinyali bekleniyor.", icon=":material/check:")
     st.caption(
         f"Komisyon filtresi: beklenen kâr ≥ {tr_scalper.MIN_EXPECTED_RR:.0f}× komisyon "
         f"(oran %{tr_scalper.COMMISSION*100:.2f}) · "

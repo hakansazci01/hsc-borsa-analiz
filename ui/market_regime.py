@@ -63,7 +63,7 @@ def daily_data(symbol: str) -> Any:
 
 
 def regime(symbol: str) -> dict[str, Any]:
-    """ADX + EMA50 + 7 gün aralığı ile AYI / BOĞA / YATAY."""
+    """ADX + EMA50 ile REJİM: ADX<25 -> YATAY; üst/alt + ADX>25 -> BOĞA/AYI."""
     f = daily_data(symbol)
     if f is None or len(f) < 60:
         return {"name": "YATAY", "bull": False, "bear": False, "range": True,
@@ -72,20 +72,17 @@ def regime(symbol: str) -> dict[str, Any]:
     ma = quant_lab.ema(c, 50)
     px, ema = float(c.iloc[-1]), float(ma.iloc[-1])
     adx = _adx(f)
-    last7 = c.tail(RANGE_DAYS)
-    spread = (float(last7.max()) - float(last7.min())) / float(last7.min()) if float(last7.min()) > 0 else 0
-    if adx < TREND_ADX and spread <= RANGE_PCT:
+    if adx < TREND_ADX:
         name, bull, bear, rng = "YATAY", False, False, True
-        reason = f"ADX {adx:.1f}<{TREND_ADX:.0f} ve 7g aralık %{spread*100:.1f}≤%{RANGE_PCT*100:.0f}"
+        reason = f"ADX {adx:.1f} < {TREND_ADX:.0f} — yatay, Grid için bekle"
     elif px > ema:
         name, bull, bear, rng = "BOĞA", True, False, False
-        reason = f"fiyat {px:.4f} > EMA50 {ema:.4f}, ADX {adx:.1f}"
+        reason = f"fiyat {px:.4f} > EMA50 {ema:.4f} ve ADX {adx:.1f} > {TREND_ADX:.0f}"
     else:
         name, bull, bear, rng = "AYI", False, True, False
-        reason = f"fiyat {px:.4f} < EMA50 {ema:.4f}, ADX {adx:.1f}"
+        reason = f"fiyat {px:.4f} < EMA50 {ema:.4f} ve ADX {adx:.1f} > {TREND_ADX:.0f}"
     return {"name": name, "bull": bull, "bear": bear, "range": rng,
-            "adx": round(adx, 2), "spread_pct": round(spread * 100, 2),
-            "price": px, "ema50": ema, "reason": reason}
+            "adx": round(adx, 2), "price": px, "ema50": ema, "reason": reason}
 
 
 def atr_stop(price: float, symbol: str) -> dict[str, Any]:

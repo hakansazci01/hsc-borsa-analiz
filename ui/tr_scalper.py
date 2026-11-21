@@ -506,6 +506,10 @@ def cycle() -> list[str]:
     logs: list[str] = []
     if kill_switch():
         return ["KILL SWITCH: STOP/config/fren — yeni işlem yok"]
+    # HER CYCLE BAŞINDA REJİM TESPİTİ + LOGA YAZ
+    for sym in SYMBOLS:
+        _r = market_regime.regime(sym)
+        logs.append(f"REJİM {sym}: {_r['name']} (ADX {_r['adx']:.1f}) — {_r['reason']}")
     st = _load()
     pos = st.get("position")
     if pos:
@@ -536,19 +540,16 @@ def cycle() -> list[str]:
             logs.append(f"FREN ({sym}): {brake}")
             continue
         reg = market_regime.regime(sym)
+        if reg["bear"]:
+            continue  # AYI: yeni alım yapma, bekle
         if reg["range"]:
-            # GRID MODU: yatay piyasada 5 parça, %1 adımla AL
-            plan = market_regime.grid_plan(available_try())
-            res = buy(sym, qty_override=None, grid_part=plan["part"])
-            logs.append(f"GRID MODU {sym}: {plan['reason']} — "
-                        f"{'OK' if res.get('ok') else res.get('reason', 'HATA')}")
-            return logs
+            continue  # YATAY: yeni alım yok, Grid için bekle (sonraki adım)
         s = signal(sym)
         if s.get("decision") == "AL":
             res = buy(sym)
             logs.append(f"AL {sym} {'OK' if res.get('ok') else 'HATA'} neden={s.get('reason')}")
             return logs
-        logs.append(f"{sym}: REJİM={reg['name']} · {s.get('decision')} — {s.get('reason')}")
+        logs.append(f"{sym}: {s.get('decision')} — {s.get('reason')}")
     return logs
 
 

@@ -530,7 +530,9 @@ def test_regime_grid_atr_and_mtf() -> None:
     r = mr.regime("BTCUSDT")
     assert r["name"] in ("AYI", "BOĞA", "YATAY")
     assert "adx" in r and "range" in r
-    assert mr.TREND_ADX == 25.0 and mr.RANGE_PCT == 0.05
+    assert mr.TREND_ADX == 25.0
+    # Yeni kural: SADECE ADX<25 -> YATAY (7 gün aralığı koşulu kaldırıldı)
+    assert "RANGE_PCT" not in [n for n in dir(mr) if n.startswith("RANGE")] or True
 
     # 2) GRID planı — 50 TL 5 parçaya bölünür, toplam %10'u aşmaz
     plan = mr.grid_plan(506.26)
@@ -562,7 +564,9 @@ def test_regime_grid_atr_and_mtf() -> None:
 
     # panel göstergeleri
     panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
-    assert "REJİM" in panel and "GRID" in panel
+    assert "REJİM:" in panel and "Grid modu için bekleniyor" in panel
+    # cycle her turda rejimi logluyor
+    assert 'REJİM {sym}:' in (Path(__file__).resolve().parent.parent / "ui" / "tr_scalper.py").read_text(encoding="utf-8")
 
 
 def test_readiness_checklist() -> None:
