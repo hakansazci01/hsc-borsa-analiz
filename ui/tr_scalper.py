@@ -36,7 +36,8 @@ SYMBOLS = ("BTCUSDT", "ETHUSDT", "XRPUSDT", "DOGEUSDT",
            "ADAUSDT", "LINKUSDT", "BNBUSDT", "SOLUSDT")
 MAX_HOLD_DAYS = 90
 EXIT_BELOW_EMA = 0.97   # STOP-LOSS: günlük kapanış EMA50 * 0.97 altına düşerse sat
-COMMISSION = 0.001      # Binance TR spot VIP0, her yön
+COMMISSION = 0.001            # Binance TR spot VIP0, her yön
+TAKE_PROFIT_EXPECTED = 0.008  # beklenen işlem getirisi (%0,8) — komisyon filtresi için
 
 
 # ------------------------------------------------------------------- config
@@ -283,6 +284,10 @@ def buy(symbol: str) -> dict[str, Any]:
     qty = max(qty, flt["min_qty"])
     if qty * px > cap + 0.01:  # yuvarlama payı
         return {"ok": False, "reason": f"tutar dinamik %10 limitini aşıyor (>{cap:.2f} TL)"}
+    # KOMİSYON FİLTRESİ: beklenen kâr (hedef %0,8) komisyonun 3 katı olmalı
+    comm_ok, comm_reason = commission_gate(symbol, TAKE_PROFIT_EXPECTED, qty, px)
+    if not comm_ok:
+        return {"ok": False, "reason": comm_reason}
     res = _order(symbol, 0, qty)
     if res.get("ok"):
         try:
@@ -351,6 +356,7 @@ def sell(symbol: str, qty: float, reason: str) -> dict[str, Any]:
             "tarih": time.strftime("%Y-%m-%d %H:%M:%S"), "sembol": symbol,
             "alış_fiyatı": round(entry, 6), "satış_fiyatı": round(px, 6),
             "adet": qty, "komisyon": round(fee, 4),
+            "komisyon_oranı": COMMISSION,
             "net_kar_zarar": round(net, 4), "işlem_süresi": f"{duration_sec:.0f} sn",
             "strateji_adı": STRATEGY_NAME,
         })
@@ -359,7 +365,8 @@ def sell(symbol: str, qty: float, reason: str) -> dict[str, Any]:
 
 def _write_trade_csv(row: dict[str, Any]) -> None:
     cols = ["tarih", "sembol", "alış_fiyatı", "satış_fiyatı", "adet",
-            "komisyon", "net_kar_zarar", "işlem_süresi", "strateji_adı"]
+            "komisyon", "komisyon_oranı", "net_kar_zarar",
+            "işlem_süresi", "strateji_adı"]
     exists = TRADES_CSV.exists()
     with TRADES_CSV.open("a", encoding="utf-8-sig", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=cols)
@@ -407,7 +414,58 @@ def brakes_block(symbol: str) -> str:
             return msg3
     except Exception:
         pass
+    # YÜKSEK VOLATİLİTE KORUMASI: son 1 saatte %3+ dalgalanma -> 1 saat bekle
+    vol, vol_msg = volatility_block(symbol)
+    if vol:
+        return vol_msg
     return ""
+
+
+VOLATILITY_PCT = 0.03       # 1 saatte %3'ten fazla dalgalanma -> dur
+VOLATILITY_COOLDOWN = 3600  # 1 saat bekleme
+MIN_EXPECTED_RR = 3.0       # beklenen kar >= komisyon * 3
+
+
+def volatility_state(symbol: str) -> dict[str, Any]:
+    """Son 1 saatin gerçek 1dk mumlarından volatilite ölç."""
+    frame = klines(symbol, "1m", 60)
+    if frame is None or len(frame) < 10:
+        return {"high": False, "range_pct": 0.0, "reason": "veri yok"}
+    hi, lo = float(frame["High"].max()), float(frame["Low"].min())
+    rng = (hi - lo) / lo if lo > 0 else 0.0
+    return {
+        "high": rng >= VOLATILITY_PCT,
+        "range_pct": round(rng * 100, 2),
+        "reason": f"son 1s %{rng*100:.2f} dalgalanma",
+    }
+
+
+def volatility_block(symbol: str) -> tuple[bool, str]:
+    """Yüksek volatilite varsa 1 saat cooldown yazar."""
+    st = _load()
+    until = float(st.get("vol_until", 0) or 0)
+    if time.time() < until:
+        left = int(until - time.time())
+        return True, f"yüksek volatilite: {left//60} dk daha bekleniyor"
+    v = volatility_state(symbol)
+    if v["high"]:
+        st["vol_until"] = time.time() + VOLATILITY_COOLDOWN
+        st["vol_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        st["vol_symbol"] = symbol
+        st["vol_range_pct"] = v["range_pct"]
+        _save(st)
+        return True, f"YÜKSEK VOLATİLİTE ({v['reason']}) — 1 saat yeni alım yok"
+    return False, ""
+
+
+def commission_gate(symbol: str, expected_return_pct: float, qty: float, px: float) -> tuple[bool, str]:
+    """Beklenen kâr, komisyonun en az 3 katı olmalı."""
+    fee = (px * qty) * COMMISSION * 2  # alış + satış
+    expected = (px * qty) * expected_return_pct
+    if expected < fee * MIN_EXPECTED_RR:
+        return False, (f"komisyon filtresi: beklenen kâr {expected:.2f} TL < "
+                       f"{MIN_EXPECTED_RR:.0f}x komisyon ({fee*MIN_EXPECTED_RR:.2f} TL)")
+    return True, ""
 
 
 def cycle() -> list[str]:

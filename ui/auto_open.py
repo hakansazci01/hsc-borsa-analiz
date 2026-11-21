@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -108,6 +109,54 @@ def open_robot() -> dict[str, Any]:
         msg = f"ROBOT AÇILAMADI — kilitler: {gates}"
         ops._log(msg)
         ops._send("HSC OTOMATIK AÇMA", msg)
+    return state
+
+
+def emergency_stop() -> dict[str, Any]:
+    """ACİL DURDURMA: STOP_FILE yazar + enabled=false. Açık pozisyona dokunmaz."""
+    _set_enabled(False)
+    t.STOP_FILE.parent.mkdir(parents=True, exist_ok=True)
+    t.STOP_FILE.write_text("ACİL DURDURMA — kullanıcı talebi", encoding="utf-8")
+    state = {
+        "stopped": True,
+        "enabled": t.cfg().get("enabled"),
+        "stop_file": t.STOP_FILE.exists(),
+        "at": time.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    try:
+        from ui import autonomous_ops as ops
+
+        ops._send("HSC ACİL DURDURMA",
+                  f"BOT ACİL DURDURULDU\nZaman: {state['at']}\n"
+                  f"enabled=false · STOP_FILE yazıldı\n"
+                  f"Açık pozisyon korunuyor, yeni alım yok")
+        ops._log("ACİL DURDURMA: enabled=false, STOP_FILE yazıldı")
+    except Exception:
+        pass
+    return state
+
+
+def emergency_start() -> dict[str, Any]:
+    """TEKRAR BAŞLAT: STOP_FILE sil + enabled=true + phrase doğrula."""
+    t.STOP_FILE.unlink(missing_ok=True)
+    _set_enabled(True)
+    t.auto_confirm_phrase()
+    state = {
+        "started": True,
+        "enabled": t.cfg().get("enabled"),
+        "stop_file": t.STOP_FILE.exists(),
+        "gate": t.config_gate(),
+        "at": time.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    try:
+        from ui import autonomous_ops as ops
+
+        ops._send("HSC TEKRAR BAŞLAT",
+                  f"BOT TEKRAR BAŞLATILDI\nZaman: {state['at']}\n"
+                  f"enabled=true · STOP_FILE silindi · config_gate={state['gate']}")
+        ops._log("TEKRAR BAŞLAT: enabled=true, STOP_FILE silindi")
+    except Exception:
+        pass
     return state
 
 

@@ -11,7 +11,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from ui import (autonomous, autonomous_ops, risk_brakes, tr_journal,
+from ui import (auto_open, autonomous, autonomous_ops, risk_brakes, tr_journal,
                 tr_monitor, tr_runner, tr_scalper)
 
 
@@ -158,6 +158,27 @@ def _panel():
         f"{br.get('crash_remaining', 0) // 60} dk bekleme kaldı"
     )
 
+    # KOMİSYON + VOLATİLİTE
+    import csv as _csv
+
+    comm_total = 0.0
+    tpath = ROOT / "trades.csv"
+    if tpath.exists():
+        with tpath.open(encoding="utf-8-sig", newline="") as fh:
+            comm_total = sum(float(r.get("komisyon", 0) or 0)
+                             for r in list(_csv.DictReader(fh))[-10:])
+    vstate = tr_scalper.volatility_state("BTCUSDT")
+    v1, v2 = st.columns(2)
+    v1.metric("KOMİSYON (son 10 işlem)", f"₺{comm_total:.4f}")
+    v2.metric("VOLATİLİTE", "YÜKSEK ⚠️" if vstate["high"] else "Normal ✅",
+              help=vstate["reason"])
+    st.caption(
+        f"Komisyon filtresi: beklenen kâr ≥ {tr_scalper.MIN_EXPECTED_RR:.0f}× komisyon "
+        f"(oran %{tr_scalper.COMMISSION*100:.2f}) · "
+        f"Yüksek volatilite: 1 saatte %{tr_scalper.VOLATILITY_PCT*100:.0f} üzeri → "
+        f"{tr_scalper.VOLATILITY_COOLDOWN//60} dk bekleme"
+    )
+
     # --- SON KAYITLAR ---
     rows = tr_journal.recent(5)
     if rows:
@@ -166,6 +187,26 @@ def _panel():
             "Zaman": r.get("at"), "Tür": r.get("kind"),
             "Kayıt": " | ".join(r.get("events", [])[:2])[:180],
         } for r in reversed(rows)]), use_container_width=True, hide_index=True)
+    # --- ACİL DURDURMA / TEKRAR BAŞLATMA ---
+    st.divider()
+    st.subheader("Acil kontrol", divider="gray")
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("🛑 BOTU ACİL DURDUR", key="emergency_stop_btn",
+                     type="primary", use_container_width=True):
+            res = auto_open.emergency_stop()
+            st.error(f"**BOT DURDURULDU** — enabled={res['enabled']}, STOP_FILE={res['stop_file']}. "
+                     "Açık pozisyon korunuyor, yeni alım yok.", icon=":material/stop:")
+            st.rerun()
+    with c2:
+        if st.button("▶ BOTU TEKRAR BAŞLAT", key="emergency_start_btn",
+                     use_container_width=True):
+            res = auto_open.emergency_start()
+            st.success(f"**BOT BAŞLATILDI** — enabled={res['enabled']}, "
+                       f"STOP_FILE={res['stop_file']}, gate={res['gate']}",
+                       icon=":material/play_arrow:")
+            st.rerun()
+
     st.caption(f"Şu an: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} · her saniye yenilenir")
 
 

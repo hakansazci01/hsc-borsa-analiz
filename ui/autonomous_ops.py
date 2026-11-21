@@ -91,6 +91,66 @@ def alive_signal() -> str:
     return msg
 
 
+def weekly_report() -> dict[str, Any]:
+    """Pazartesi 09:00 — haftalık işlem raporu (ntfy)."""
+    import csv
+    from datetime import timedelta
+
+    p = ROOT / "trades.csv"
+    rows: list[dict[str, Any]] = []
+    if p.exists():
+        with p.open(encoding="utf-8-sig", newline="") as fh:
+            for r in csv.DictReader(fh):
+                try:
+                    d = datetime.strptime(str(r.get("tarih", ""))[:10], "%Y-%m-%d")
+                except Exception:
+                    continue
+                if d >= datetime.now() - timedelta(days=7):
+                    rows.append(r)
+    pnls = [float(r.get("net_kar_zarar", 0) or 0) for r in rows]
+    wins = sum(1 for x in pnls if x > 0)
+    win_rate = round(wins / len(pnls) * 100, 1) if pnls else 0.0
+    total = round(sum(pnls), 2)
+    fees = round(sum(float(r.get("komisyon", 0) or 0) for r in rows), 4)
+    best = round(max(pnls), 2) if pnls else 0.0
+    worst = round(min(pnls), 2) if pnls else 0.0
+    report = {"trades": len(rows), "win_rate": win_rate, "net_pnl": total,
+              "best": best, "worst": worst, "fees": fees}
+    msg = (
+        f"HAFTALIK RAPOR\n"
+        f"Bu hafta işlem: {len(rows)}\n"
+        f"Win rate: %{win_rate}\n"
+        f"Toplam K/Z: {total:+.2f} TL\n"
+        f"En iyi işlem: {best:+.2f} TL\n"
+        f"En kötü işlem: {worst:+.2f} TL\n"
+        f"Toplam komisyon: {fees:.4f} TL"
+    )
+    _send("HSC HAFTALIK RAPOR", msg)
+    _log("haftalık rapor gönderildi")
+    return report
+
+
+def api_resilience() -> dict[str, Any]:
+    """Binance TR API bakım koruması: 5 dk arayla 3 deneme, sonra bildir."""
+    bal = None
+    failures = 0
+    for attempt in range(3):
+        try:
+            bal = tr_scalper.available_try()
+            if bal and bal > 0:
+                return {"ok": True, "attempts": attempt + 1, "balance": bal}
+            raise ValueError("bakiye okunamadı")
+        except Exception as exc:
+            failures += 1
+            _log(f"API deneme {attempt+1}/3 başarısız: {type(exc).__name__}")
+            if failures < 3:
+                time.sleep(300)  # 5 dakika bekle
+    _send("HSC BİNANCE TR BAKIMDA",
+          "BINANCE TR API 3 denemede cevap vermedi — bot bekliyor, "
+          "yeni alım yok. Lütfen kontrol et.")
+    return {"ok": False, "attempts": 3, "balance": None}
+
+
 def brake_notification(reason: str) -> bool:
     return _send("HSC FREN DEVREYE GİRDİ", "FREN DEVREYE GİRDİ\nSebep: " + reason)
 

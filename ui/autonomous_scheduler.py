@@ -13,7 +13,9 @@ def _due(key: str, when: str) -> bool:
     now = time.strftime("%Y-%m-%d %H:%M")
     parts = when.split("@")
     target_hm = parts[0]
-    if parts[-1] == "sun" and time.strftime("%A").lower() != "sunday":
+    day_map = {"sun": "sunday", "mon": "monday"}
+    tag = parts[-1]
+    if tag in day_map and time.strftime("%A").lower() != day_map[tag]:
         return False
     if now.endswith(target_hm) and LAST.get(key) != now:
         LAST[key] = now
@@ -34,6 +36,8 @@ def run_forever(check_every: int = 30) -> None:
                 ops.backup_files()
             if _due("strategy", "00:00@sun"):
                 ops.weekly_strategy_review()
+            if _due("weekly_report", "09:00@mon"):
+                ops.weekly_report()
             if time.strftime("%M:%S") <= "00:30" and LAST.get("health") != time.strftime("%Y-%m-%d %H"):
                 LAST["health"] = time.strftime("%Y-%m-%d %H")
                 ops.health_check()

@@ -281,8 +281,8 @@ def test_fix_audit_gaps() -> None:
     assert rows and rows[0]["sembol"] == "FORM_TRY"
     assert abs(float(rows[0]["net_kar_zarar"]) + 0.0694) < 0.0001
     assert set(rows[0].keys()) == {"tarih", "sembol", "alış_fiyatı", "satış_fiyatı",
-                                    "adet", "komisyon", "net_kar_zarar",
-                                    "işlem_süresi", "strateji_adı"}
+                                    "adet", "komisyon", "komisyon_oranı",
+                                    "net_kar_zarar", "işlem_süresi", "strateji_adı"}
 
     # 3) ölü kod silindi ve import edilemiyor
     assert not (root / "ui" / "daily_engine.py").exists()
@@ -458,6 +458,64 @@ def test_watchdog_restarts_dead_processes() -> None:
     assert "procs_ok" in panel
     assert "w_alive and s_alive and r_alive" in panel
     assert "MOTOR DURMUŞ" in panel
+
+
+def test_professional_features() -> None:
+    """Acil durdurma, komisyon/volatilite filtresi, haftalık rapor, API direnci."""
+    import csv
+    import time as _time
+    from pathlib import Path
+
+    from ui import auto_open, autonomous_ops as ops, tr_scalper as t
+
+    root = Path(__file__).resolve().parent.parent
+    cfg_path = root / "config.yaml"
+    original = cfg_path.read_text(encoding="utf-8")
+
+    try:
+        # 1) ACİL DURDURMA: enabled=false + STOP_FILE, pozisyona dokunmaz
+        r = auto_open.emergency_stop()
+        assert r["stopped"] is True and r["enabled"] is False and r["stop_file"] is True
+        assert t.config_gate()  # kilitli
+
+        # 2) TEKRAR BAŞLAT: STOP sil + enabled=true
+        s = auto_open.emergency_start()
+        assert s["started"] is True and s["enabled"] is True and s["stop_file"] is False
+        assert t.config_gate() == []
+    finally:
+        cfg_path.write_text(original, encoding="utf-8")
+        t.set_confirmed_phrase("HSC-BINANCE-TR-ARM")
+        if t.STOP_FILE.exists():
+            t.STOP_FILE.unlink()
+
+    # 3) KOMİSYON FİLTRESİ: beklenen kâr 3x komisyondan azsa RED
+    px, qty = 100.0, 0.5  # 50 TL işlem
+    ok, reason = t.commission_gate("BTC_TRY", 0.001, qty, px)
+    assert ok is False and "komisyon filtresi" in reason
+    ok, reason = t.commission_gate("BTC_TRY", t.TAKE_PROFIT_EXPECTED, qty, px)
+    assert ok is True
+    assert t.MIN_EXPECTED_RR == 3.0
+
+    # 4) VOLATİLİTE FİLTRESİ
+    assert t.VOLATILITY_PCT == 0.03
+    assert t.VOLATILITY_COOLDOWN == 3600
+    v = t.volatility_state("BTCUSDT")
+    assert "high" in v and "range_pct" in v
+
+    # 5) trades.csv komisyon oranı sütunu
+    with (root / "trades.csv").open(encoding="utf-8-sig", newline="") as fh:
+        rows = list(csv.DictReader(fh))
+    assert rows and "komisyon_oranı" in rows[0]
+
+    # 6) haftalık rapor + API direnci fonksiyonları
+    wr = ops.weekly_report()
+    for key in ("trades", "win_rate", "net_pnl", "best", "worst", "fees"):
+        assert key in wr
+    assert callable(ops.api_resilience)
+
+    # 7) panel butonları
+    panel = (root / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "BOTU ACİL DURDUR" in panel and "BOTU TEKRAR BAŞLAT" in panel
 
 
 def test_readiness_checklist() -> None:
