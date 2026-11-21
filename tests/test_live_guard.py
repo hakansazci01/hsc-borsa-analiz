@@ -1389,6 +1389,41 @@ def test_health_report() -> None:
     assert "23:00" in hr.next_run()
 
 
+def test_performance_export() -> None:
+    """Haftalık performans CSV: 10 sütun, eski haftalar silinmez, panel butonu."""
+    import csv
+    from pathlib import Path
+
+    from ui import performance_export as pe
+
+    # Kullanıcı "10 sütun" demiş ama 11 alan listelemiş — hepsi mevcut
+    assert len(pe.COLUMNS) == 11
+    for col in ("Hafta", "Toplam İşlem", "Kazanma Oranı %",
+                "Toplam Kar/Zarar TL", "Maksimum Drawdown"):
+        assert col in pe.COLUMNS
+
+    r = pe.export()
+    assert pe.CSV_FILE.exists()
+    for col in pe.COLUMNS:
+        assert col in r
+
+    with pe.CSV_FILE.open(encoding="utf-8-sig") as fh:
+        reader = csv.DictReader(fh)
+        assert reader.fieldnames == pe.COLUMNS
+        all_rows = list(reader)
+    assert len(all_rows) >= 1
+
+    # Aynı hafta tekrar export edilse satır çoğalmaz
+    before = len(all_rows)
+    pe.export()
+    with pe.CSV_FILE.open(encoding="utf-8-sig") as fh:
+        assert len(list(csv.DictReader(fh))) == before
+
+    # Panel butonu
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "HAFTALIK ÖZETİ GÖSTER" in panel and "Son dışa aktarma" in panel
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

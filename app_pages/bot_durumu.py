@@ -275,6 +275,23 @@ def _panel():
     st.caption(f"Kural: korelasyon > {correlation_guard.CORR_LIMIT} ise aynı anda alım yok · "
                f"son {correlation_guard.CORR_DAYS} günlük kapanış")
 
+    # PERFORMANS PANOSU DIŞA AKTARMA
+    st.divider()
+    st.subheader("Performans panosu — haftalık özet", divider="gray")
+    from ui import performance_export
+
+    pe = performance_export.last()
+    st.caption(f"Son dışa aktarma: **{pe['week']}** · {pe['at']} · "
+               f"her Pazar 23:00 · eski haftalar korunur")
+    if st.button("HAFTALIK ÖZETİ GÖSTER", icon=":material/table:", key="weekly_summary_btn"):
+        st.session_state["show_weekly_summary"] = not st.session_state.get("show_weekly_summary", False)
+    if st.session_state.get("show_weekly_summary"):
+        prs = performance_export.rows()
+        if prs:
+            st.dataframe(pd.DataFrame(prs), use_container_width=True, hide_index=True)
+        else:
+            st.info("Henüz haftalık özet yok — ilk Pazar 23:00'te oluşacak.", icon=":material/info:")
+
     # GÜNLÜK SAĞLIK RAPORU
     st.divider()
     st.subheader("Günlük sağlık raporu", divider="gray")

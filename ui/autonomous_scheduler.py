@@ -43,6 +43,13 @@ def run_forever(check_every: int = 30) -> None:
                 ops.backup_files()
             if _due("strategy", "00:00@sun"):
                 ops.weekly_strategy_review()
+            if _due("perf_export", "23:00@sun"):
+                try:
+                    from ui import performance_export
+
+                    performance_export.export()
+                except Exception:
+                    pass
             if _due("weekly_report", "09:00@mon"):
                 ops.weekly_report()
             try:
