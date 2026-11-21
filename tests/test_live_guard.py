@@ -198,15 +198,18 @@ def test_step1_daily_engine_and_brakes() -> None:
     assert tr_runner.CYCLE is t.cycle
     assert t.STRATEGY_NAME.startswith("günlük EMA50")
     # fren limitleri
-    assert risk_brakes.DAILY_LOSS_TRY == 100.0
+    assert risk_brakes.DAILY_LOSS_TRY == 50.0
+    assert risk_brakes.BASE_CAPITAL_TRY == 500.0
     assert risk_brakes.MAX_DD_PCT == 0.10
+    # %10 drawdown = -50 TL (500 TL kasa)
+    assert risk_brakes.BASE_CAPITAL_TRY * risk_brakes.MAX_DD_PCT == 50.0
     assert risk_brakes.CRASH_PCT == 0.05
     assert risk_brakes.CRASH_WINDOW_MIN == 5
     assert risk_brakes.CRASH_COOLDOWN_SEC == 1800
     # günlük strateji sabitleri
     assert t.EXIT_BELOW_EMA == 0.97
     assert t.MAX_HOLD_DAYS == 90
-    assert t.max_order_usdt() == 150.0  # config.yaml
+    assert t.max_order_usdt() == 50.0  # config.yaml:115
 
 
 def test_confirmation_phrase_gate() -> None:

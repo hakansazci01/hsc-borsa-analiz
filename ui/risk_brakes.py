@@ -22,7 +22,8 @@ from ui import auth, tr_scalper
 
 STATE = auth.USERS_DIR / "risk_brakes_state.json"
 
-DAILY_LOSS_TRY = 100.0       # günlük -100 TL
+DAILY_LOSS_TRY = 50.0        # günlük -50 TL (kasa 500 TL)
+BASE_CAPITAL_TRY = 500.0     # drawdown referans kasasi (500 TL -> %10 = -50 TL)
 MAX_DD_PCT = 0.10            # kasa %10 erime -> tam dur
 CRASH_PCT = 0.05             # 5 dakikada %5 düşüş
 CRASH_WINDOW_MIN = 5
@@ -84,14 +85,14 @@ def daily_loss_breached() -> tuple[bool, str]:
 
 
 def drawdown_breached(balance: float) -> tuple[bool, str]:
-    st = reset_daily_if_needed(balance)
-    start = float(st.get("start_balance", 0) or 0)
-    if start <= 0:
-        return False, ""
-    loss_pct = (start - balance) / start
-    if loss_pct >= MAX_DD_PCT:
-        return True, (f"kasa drawdown %{loss_pct*100:.1f} ≥ %{MAX_DD_PCT*100:.0f} "
-                      f"(başlangıç {start:.2f} TL, şu an {balance:.2f} TL) — TAM DUR")
+    """%10 drawdown = 500 TL'lik kasada -50 TL. Referans BASE_CAPITAL_TRY."""
+    reset_daily_if_needed(balance)
+    start = BASE_CAPITAL_TRY
+    loss_try = start - balance
+    stop_at = start * MAX_DD_PCT          # 500 * 0.10 = 50 TL
+    if loss_try >= stop_at:
+        return True, (f"kasa drawdown {loss_try:+.2f} TL ≥ -{stop_at:.0f} TL "
+                      f"(referans {start:.0f} TL, şu an {balance:.2f} TL) — TAM DUR")
     return False, ""
 
 

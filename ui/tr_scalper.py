@@ -88,9 +88,11 @@ def config_gate() -> list[str]:
 
 
 def max_order_usdt() -> float:
-    """config.yaml max_order_usdt — doğrudan uygulanır (sadece STOP'a güvenilmez)."""
+    """config.yaml max_order_try / max_order_usdt — tek işlem üst sınırı."""
+    c = cfg()
+    raw = c.get("max_order_try", c.get("max_order_usdt", 50))
     try:
-        return float(cfg().get("max_order_usdt", 50) or 50)
+        return float(raw or 50)
     except (TypeError, ValueError):
         return 50.0
 
