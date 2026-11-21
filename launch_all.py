@@ -20,9 +20,9 @@ def main() -> None:
     from ui import disaster_recovery
 
     disaster_recovery.recover()
-    states = ops.watchdog_once()  # motor + scheduler'ı gerekiyorsa başlatır
-    if not states.get("watch_alive") or not ops.process_state("ui.watchdog_runner")[0]:
-        ops._start_module("ui.watchdog_runner")
+    # watchdog_once() motor + scheduler + watchdog'u zaten kontrol edip başlatır.
+    # Burada ayrıca watchdog başlatmak çift watchdog (ve çift motor) yaratıyordu.
+    states = ops.watchdog_once()
     # Streamlit uygulaması da ayakta kalsın
     from launch_app import main as launch_app_main
 
