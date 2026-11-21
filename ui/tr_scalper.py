@@ -531,10 +531,29 @@ def commission_gate(symbol: str, expected_return_pct: float, qty: float, px: flo
 
 
 def cycle() -> list[str]:
-    """Tek tur — GERÇEK emir, günlük EMA50 stratejisi, tüm frenler aktif."""
+    """Tek tur — AKILLI SEPET: 8 coin taranır, en yüksek skorluya alım (max 2 pozisyon)."""
     logs: list[str] = []
     if kill_switch():
         return ["KILL SWITCH: STOP/config/fren — yeni işlem yok"]
+    # AKILLI SEPET: 8 coin skor tablosu
+    try:
+        from ui import smart_basket
+
+        open_n = len(_load().get("positions", [])) + (1 if _load().get("position") else 0)
+        pick = smart_basket.select()
+        st = _load()
+        st["basket"] = pick
+        _save(st)
+        logs.append("SEPET SIRALAMASI: " + " | ".join(
+            f"{i+1}. {r['symbol']} Skor {r['score']}" for i, r in enumerate(pick["ranking"][:8])))
+        logs.append(f"SEÇİLEN: {pick['selected']} (Skor {pick['score']}) · "
+                    f"Funding: {pick['funding'] if pick['funding'] is not None else 'N/A (spot)'}")
+        ok_open, why_open = smart_basket.can_open(available_try(), open_n)
+        if not ok_open:
+            logs.append(f"SEPET ENGELLENDİ: {why_open}")
+            # mevcut pozisyonların yönetimine devam et (aşağı)
+    except Exception as exc:
+        logs.append(f"sepet hatası: {type(exc).__name__}")
     # HER CYCLE BAŞINDA REJİM TESPİTİ + LOGA YAZ
     for sym in SYMBOLS:
         _r = market_regime.regime(sym)
@@ -563,7 +582,21 @@ def cycle() -> list[str]:
         else:
             logs.append(f"Pozisyon {sym}: fiyat {px:.4f} / EMA50 {ma:.4f} — bekleniyor")
         return logs
-    for sym in SYMBOLS:
+    # Sepet seçimi varsa SADECE seçilen coin'e alım yapılır
+    try:
+        from ui import smart_basket
+
+        _pick = smart_basket.select()
+        _open_n = len(st.get("positions", [])) + (1 if st.get("position") else 0)
+        _ok, _why = smart_basket.can_open(available_try(), _open_n)
+        if not _ok:
+            logs.append(f"3. POZİSYON ENGELLENDİ: {_why}")
+            return logs
+        _syms = (_pick["selected"],)
+    except Exception:
+        _syms = SYMBOLS
+
+    for sym in _syms:
         brake = brakes_block(sym)
         if brake:
             logs.append(f"FREN ({sym}): {brake}")

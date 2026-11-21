@@ -915,6 +915,51 @@ def test_websocket_and_order_book() -> None:
     assert "Veri Kaynağı" in panel and "Order Book" in panel and "Son Fiyat Güncelleme" in panel
 
 
+def test_smart_basket() -> None:
+    """8 coin skor tablosu, en yüksek seçim, max 2 pozisyon, funding N/A (spot)."""
+    from pathlib import Path
+
+    from ui import smart_basket as sb
+
+    assert sb.MAX_POSITIONS == 2
+    assert sb.FUNDING_LIMIT == 0.01
+
+    # 1) Funding: spot'ta veri yok -> N/A, uydurulmaz
+    fr = sb.funding_rate("BTCUSDT")
+    assert fr["available"] is False and fr["rate"] is None
+
+    # 2) 8 coin skor tablosu
+    rows = sb.rank()
+    assert len(rows) == 8
+    for r in rows:
+        assert "symbol" in r and "score" in r and "regime" in r
+        assert -100 <= r["score"] <= 100
+    # sıralama azalan
+    assert [r["score"] for r in rows] == sorted([r["score"] for r in rows], reverse=True)
+
+    # 3) En yüksek skorlu coin seçiliyor
+    best = rows[0]
+    assert best["score"] == max(r["score"] for r in rows)
+
+    # 4) Max 2 poziyon: 3. deneme engelli
+    ok2, msg2 = sb.can_open(506.26, 2)
+    assert ok2 is False and "3. coin" in msg2
+    ok0, _ = sb.can_open(506.26, 0)
+    assert ok0 is True
+    ok1, _ = sb.can_open(506.26, 1)
+    assert ok1 is True
+
+    # 5) Her pozisyon %10, toplam %20
+    per = 506.26 * 0.10
+    assert abs(per * 2 - 506.26 * 0.20) < 0.01
+
+    # 6) Kod ve panel
+    src = (Path(__file__).resolve().parent.parent / "ui" / "tr_scalper.py").read_text(encoding="utf-8")
+    assert "smart_basket.select()" in src and "3. POZİSYON ENGELLENDİ" in src
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "Sepet Sıralaması" in panel and "Seçilen Coin" in panel and "Funding Rate" in panel
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

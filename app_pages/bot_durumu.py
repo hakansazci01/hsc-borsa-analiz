@@ -275,6 +275,26 @@ def _panel():
     st.caption(f"Kural: korelasyon > {correlation_guard.CORR_LIMIT} ise aynı anda alım yok · "
                f"son {correlation_guard.CORR_DAYS} günlük kapanış")
 
+    # AKILLI SEPET + FUNDING
+    st.divider()
+    st.subheader("Akıllı Sepet — 8 coin taranıyor", divider="gray")
+    from ui import smart_basket
+
+    pick = smart_basket.select()
+    st.markdown("**Sepet Sıralaması:** " + " · ".join(
+        f"{i+1}. {r['symbol']} — Skor {r['score']}" for i, r in enumerate(pick["ranking"][:8])))
+    s1, s2 = st.columns(2)
+    s1.metric("Seçilen Coin", pick["selected"])
+    s2.metric("Funding Rate", f"%{pick['funding']:.4f}" if pick["funding"] is not None else "N/A (spot)")
+    st.dataframe(
+        pd.DataFrame([{
+            "Coin": r["symbol"], "Skor": r["score"], "Rejim": r["regime"],
+            "MTF": "✅" if r["mtf_ok"] else "❌", "Alış Baskısı": f"%{r['book_buy']:.0f}",
+            "Gate": "✅" if r["gate_ok"] else "❌", "Funding": f"%{r['funding']}" if r["funding"] is not None else "N/A",
+        } for r in pick["ranking"]]), use_container_width=True, hide_index=True,
+    )
+    st.caption("En yüksek skorlu coin'e alım · aynı anda max 2 pozisyon (her biri %10, toplam %20)")
+
     # WEBSOCKET + ORDER BOOK
     st.divider()
     st.subheader("Canlı veri akışı — WebSocket + Order Book", divider="gray")
