@@ -194,6 +194,12 @@ with st.sidebar:
 page = st.navigation(
     [
         st.Page(
+            "app_pages/bot_durumu.py",
+                title="BOT DURUMU",
+                icon=":material/traffic:",
+                help="Canlı durum: büyük AÇIK/KAPALI ışığı, kilitler, watchdog, bakiye, frenler — her saniye.",
+            ),
+        st.Page(
             "app_pages/otonom_durum.py",
                 title="CANLI İŞLEM AKIŞI",
                 icon=":material/stream:",

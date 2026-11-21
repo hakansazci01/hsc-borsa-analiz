@@ -25,6 +25,9 @@ def run_forever(check_every: int = 30) -> None:
     ops._log("ZAMANLAYICI BAŞLADI — 23:00 özet, 00:00 yedek, saatlik sağlık, Pazar 00:00 strateji")
     while True:
         try:
+            if time.strftime("%M:%S") <= "00:30" and LAST.get("alive") != time.strftime("%Y-%m-%d %H"):
+                LAST["alive"] = time.strftime("%Y-%m-%d %H")
+                ops.alive_signal()
             if _due("summary", "23:00"):
                 ops.daily_summary()
             if _due("backup", "00:00"):

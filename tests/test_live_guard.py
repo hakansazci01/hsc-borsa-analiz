@@ -405,6 +405,34 @@ def test_auto_open_guard() -> None:
         auto_open.t.set_confirmed_phrase("YANLIS")
 
 
+def test_status_panel_and_alive_signal() -> None:
+    """BOT DURUMU paneli + saatlik yaşam sinyali + alım/satım bildirim metinleri."""
+    from pathlib import Path
+
+    from ui import autonomous_ops as ops
+    from ui import tr_scalper as t
+
+    root = Path(__file__).resolve().parent.parent
+    # panel dosyası ve nav
+    assert (root / "app_pages" / "bot_durumu.py").exists()
+    app = (root / "streamlit_app.py").read_text(encoding="utf-8")
+    assert "bot_durumu.py" in app and "BOT DURUMU" in app
+    panel = (root / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    for key in ("botpulse", "AÇIK", "KAPALI", "WATCHDOG", "SCHEDULER",
+                "SON CYCLE", "SONRAKİ CYCLE", "FRENLER"):
+        assert key in panel
+
+    # yaşam sinyali
+    msg = ops.alive_signal()
+    for key in ("BOT YAŞIYOR", "Saat:", "Bot:", "Bakiye:", "Son cycle:", "Açık pozisyon:"):
+        assert key in msg
+    assert callable(ops.alive_signal)
+
+    # alım/satım bildirimi
+    assert ops._send("HSC ALIM YAPILDI", "ALIM YAPILDI — BTC_TRY\nFiyat: 100 TL\nAdet: 0.5\nBakiye: 500 TL")
+    assert ops._send("HSC SATIM YAPILDI", "SATIM YAPILDI — BTC_TRY\nFiyat: 102 TL\nKar/Zarar: +1.00 TL\nYeni Bakiye: 501 TL")
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

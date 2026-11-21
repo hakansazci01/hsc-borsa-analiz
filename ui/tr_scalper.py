@@ -285,6 +285,14 @@ def buy(symbol: str) -> dict[str, Any]:
         return {"ok": False, "reason": f"tutar dinamik %10 limitini aşıyor (>{cap:.2f} TL)"}
     res = _order(symbol, 0, qty)
     if res.get("ok"):
+        try:
+            from ui.autonomous_ops import _send
+
+            _send("HSC ALIM YAPILDI",
+                  f"ALIM YAPILDI — {symbol}\nFiyat: {px:,.4f} TL\nAdet: {qty}\n"
+                  f"Bakiye: {available_try():,.2f} TL")
+        except Exception:
+            pass
         body = (res.get("data") or {}).get("data") or {}
         st = _load()
         st["position"] = {
@@ -328,6 +336,14 @@ def sell(symbol: str, qty: float, reason: str) -> dict[str, Any]:
         try:
             from ui.autonomous_ops import trade_notification
 
+            try:
+                from ui.autonomous_ops import _send
+
+                _send("HSC SATIM YAPILDI",
+                      f"SATIM YAPILDI — {symbol}\nFiyat: {px:,.4f} TL\n"
+                      f"Kar/Zarar: {net:+.2f} TL\nYeni Bakiye: {available_try():,.2f} TL")
+            except Exception:
+                pass
             trade_notification(symbol, "SAT", qty, entry, px, net, available_try())
         except Exception:
             pass

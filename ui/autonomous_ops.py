@@ -63,6 +63,34 @@ def trade_notification(symbol: str, side: str, qty: float, buy_px: float,
     return _send("HSC GERÇEK İŞLEM", msg)
 
 
+def alive_signal() -> str:
+    """Saatlik 'BOT YAŞIYOR' sinyali — 2 saat gelmezse bot durdu anlaşılır."""
+    from ui import tr_monitor
+
+    bal = tr_scalper.available_try()
+    pos = tr_monitor.live_metrics()["position"]
+    gate = tr_scalper.config_gate()
+    try:
+        hb = json.loads(autonomous.HEARTBEAT.read_text(encoding="utf-8"))
+        age = int(time.time() - float(hb.get("ts", 0)))
+    except Exception:
+        age = 999999
+    open_txt = "AÇIK" if not gate and not tr_scalper.STOP_FILE.exists() else "KAPALI"
+    pos_txt = (f"{pos['symbol']} · ₺{pos['cost']:.2f} · {age//60} dk"
+               if pos else "yok")
+    msg = (
+        f"BOT YAŞIYOR\n"
+        f"Saat: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"Bot: {open_txt}\n"
+        f"Bakiye: {bal:,.2f} TL\n"
+        f"Son cycle: {age//60} dk {age%60} sn önce\n"
+        f"Açık pozisyon: {pos_txt}"
+    )
+    _send("HSC BOT YAŞIYOR", msg)
+    _log("yaşam sinyali gönderildi")
+    return msg
+
+
 def brake_notification(reason: str) -> bool:
     return _send("HSC FREN DEVREYE GİRDİ", "FREN DEVREYE GİRDİ\nSebep: " + reason)
 
