@@ -117,6 +117,12 @@ def emergency_stop() -> dict[str, Any]:
     _set_enabled(False)
     t.STOP_FILE.parent.mkdir(parents=True, exist_ok=True)
     t.STOP_FILE.write_text("ACİL DURDURMA — kullanıcı talebi", encoding="utf-8")
+    try:
+        from ui import manual_log
+
+        manual_log.log("Bot Durduruldu", note="kullanıcı acil durdurma")
+    except Exception:
+        pass
     state = {
         "stopped": True,
         "enabled": t.cfg().get("enabled"),
@@ -141,6 +147,12 @@ def emergency_start() -> dict[str, Any]:
     t.STOP_FILE.unlink(missing_ok=True)
     _set_enabled(True)
     t.auto_confirm_phrase()
+    try:
+        from ui import manual_log
+
+        manual_log.log("Bot Başlatıldı", note="kullanıcı tekrar başlatma")
+    except Exception:
+        pass
     state = {
         "started": True,
         "enabled": t.cfg().get("enabled"),

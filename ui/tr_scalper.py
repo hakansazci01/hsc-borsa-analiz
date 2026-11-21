@@ -627,6 +627,13 @@ def commission_gate(symbol: str, expected_return_pct: float, qty: float, px: flo
 def cycle() -> list[str]:
     """Tek tur — AKILLI SEPET: 8 coin taranır, en yüksek skorluya alım (max 2 pozisyon)."""
     logs: list[str] = []
+    # MANUEL MÜDAHALE TESPİTİ: bot emri olmadan bakiye değiştiyse kaydet
+    try:
+        from ui import manual_log
+
+        manual_log.detect_changes()
+    except Exception:
+        pass
     if kill_switch():
         return ["KILL SWITCH: STOP/config/fren — yeni işlem yok"]
     # AKILLI SEPET: 8 coin skor tablosu

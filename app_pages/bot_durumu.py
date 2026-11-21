@@ -275,6 +275,20 @@ def _panel():
     st.caption(f"Kural: korelasyon > {correlation_guard.CORR_LIMIT} ise aynı anda alım yok · "
                f"son {correlation_guard.CORR_DAYS} günlük kapanış")
 
+    # MANUEL MÜDAHALE KAYDI
+    st.divider()
+    st.subheader("Manuel Müdahaleler", divider="gray")
+    from ui import manual_log
+
+    mrows = manual_log.recent(5)
+    if mrows:
+        st.dataframe(pd.DataFrame(mrows), use_container_width=True, hide_index=True)
+    else:
+        st.info("Henüz manuel müdahale yok — botun kendi işlemleri trades.csv'de ayrı tutulur.",
+                icon=":material/info:")
+    st.caption("Elle alım/satım (bakiye değişimi ile tespit) ve bot durdur/başlat "
+               "manual_log.csv'ye yazılır · trades.csv SADECE bot işlemleri")
+
     # PERFORMANS PANOSU DIŞA AKTARMA
     st.divider()
     st.subheader("Performans panosu — haftalık özet", divider="gray")

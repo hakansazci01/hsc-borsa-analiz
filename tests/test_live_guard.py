@@ -1424,6 +1424,40 @@ def test_performance_export() -> None:
     assert "HAFTALIK ÖZETİ GÖSTER" in panel and "Son dışa aktarma" in panel
 
 
+def test_manual_intervention_log() -> None:
+    """Elle işlem manual_log.csv'ye yazar, trades.csv'ye KARIŞMAZ."""
+    import csv
+    from pathlib import Path
+
+    from ui import manual_log as ml
+
+    # 1) Elle alım kaydı
+    trades_before = ml.t.TRADES_CSV.read_bytes() if ml.t.TRADES_CSV.exists() else b""
+    row = ml.log("Elle Alım", "BTC_TRY", 0.01, "test müdahale")
+    assert row["Müdahale Türü"] == "Elle Alım"
+    assert ml.CSV_FILE.exists()
+
+    with ml.CSV_FILE.open(encoding="utf-8-sig") as fh:
+        rows = list(csv.DictReader(fh))
+    assert rows[-1]["Coin"] == "BTC_TRY"
+    assert rows[-1]["Müdahale Türü"] == "Elle Alım"
+    assert all(c in rows[-1] for c in ml.COLUMNS)
+
+    # 2) trades.csv DEĞİŞMEDİ (karışmadı)
+    trades_after = ml.t.TRADES_CSV.read_bytes() if ml.t.TRADES_CSV.exists() else b""
+    assert trades_after == trades_before
+
+    # 3) Bot durdur/başlat kayıtları
+    ml.log("Bot Durduruldu", note="test")
+    ml.log("Bot Başlatıldı", note="test")
+    assert len(ml.recent(5)) >= 3
+
+    # 4) Panel bölümü
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "Manuel Müdahaleler" in panel and "manual_log.csv" in panel
+    assert "trades.csv SADECE bot işlemleri" in panel
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 
