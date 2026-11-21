@@ -315,7 +315,7 @@ def _panel():
     r1, r2 = st.columns(2)
     r1.metric("Son Rapor", f"{hr['at']} — {'Gönderildi ✅' if hr['sent'] else 'Bekliyor'}")
     r2.metric("Sonraki Rapor", health_report.next_run())
-    rp = t.ROOT / "daily_report.txt"
+    rp = ROOT / "daily_report.txt"
     if rp.exists():
         with st.expander("Son raporu oku", icon=":material/description:"):
             st.text(rp.read_text(encoding="utf-8"))
