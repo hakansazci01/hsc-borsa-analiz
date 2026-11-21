@@ -209,6 +209,45 @@ def test_step1_daily_engine_and_brakes() -> None:
     assert t.max_order_usdt() == 150.0  # config.yaml
 
 
+def test_confirmation_phrase_gate() -> None:
+    """enabled=true olsa bile phrase doğrulanmadan config_gate RED döner."""
+    from ui import tr_scalper as t
+
+    # 1) Yanlış ifade reddedilir
+    ok, msg = t.set_confirmed_phrase("YANLIS-IFADE")
+    assert ok is False and "yanlış" in msg.lower()
+    assert t.is_phrase_confirmed() is False
+
+    # 2) Doğru ifade kabul edilir (config.yaml:116 -> HSC-BINANCE-TR-ARM)
+    ok, msg = t.set_confirmed_phrase("HSC-BINANCE-TR-ARM")
+    assert ok is True
+    assert t.is_phrase_confirmed() is True
+
+    # 3) enabled=false iken hâlâ RED (phrase doğru olsa bile)
+    gates = t.config_gate()
+    assert any("enabled" in g for g in gates)
+
+    # 4) enabled=true + phrase yanlış -> yine RED (kilidi simüle et)
+    original_cfg = t.cfg
+    t.cfg = lambda: {"enabled": True, "confirmation_phrase": "HSC-BINANCE-TR-ARM",
+                     "max_order_usdt": 50}
+    try:
+        t.set_confirmed_phrase("YANLIS")
+        gates = t.config_gate()
+        assert any("Onay ifadesi" in g for g in gates), "phrase yanlışken RED bekleniyor"
+        assert t.buy("BTCUSDT").get("ok") is False
+        assert "Onay ifadesi" in t.buy("BTCUSDT").get("reason", "")
+
+        # 5) enabled=true + phrase doğru -> config_gate temiz (STOP/file ayrı)
+        t.set_confirmed_phrase("HSC-BINANCE-TR-ARM")
+        gates = t.config_gate()
+        assert gates == [], f"doğru phrase + enabled=true temiz olmalı, bulunan: {gates}"
+    finally:
+        t.cfg = original_cfg
+        # Test sonrası durumu eski haline getir: onaysız bırak
+        t.set_confirmed_phrase("YANLIS")
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

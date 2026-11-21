@@ -671,6 +671,19 @@ with st.expander("CANLI ANALİZ — anlık alım/satım, kâr, süre, zarar", ic
 
     _live_panel()
 
+    st.markdown("##### Gerçek para onayı")
+    st.caption(
+        "config.yaml `binance_tr.enabled: true` olsa bile **onay ifadesi doğrulanmadan emir yok.** "
+        "Aşağıya `HSC-BINANCE-TR-ARM` yazıp doğrulayın."
+    )
+    _phrase = st.text_input("Onay ifadesi", type="password", key="scalper_phrase_input",
+                            placeholder="HSC-BINANCE-TR-ARM")
+    if st.button("ONAYI DOĞRULA", key="scalper_verify_phrase", icon=":material/verified:"):
+        _ok, _msg = tr_scalper.set_confirmed_phrase(_phrase)
+        (st.success if _ok else st.error)(_msg)
+        st.rerun()
+    st.caption("Durum: " + ("✅ Onaylandı" if tr_scalper.is_phrase_confirmed() else "❌ Onay bekleniyor"))
+
     ctrl1, ctrl2 = st.columns(2)
     if ctrl1.button("MOTORU BAŞLAT (kalıcı)", icon=":material/play_arrow:", key="scalper_start",
                     disabled=tr_scalper.STOP_FILE.exists() is False and

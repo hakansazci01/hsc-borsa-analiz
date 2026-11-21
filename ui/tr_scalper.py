@@ -50,12 +50,40 @@ def cfg() -> dict[str, Any]:
         return {}
 
 
+PHRASE_FILE = ROOT / "users" / "tr_phrase_armed.json"
+
+
+def set_confirmed_phrase(phrase: str) -> tuple[bool, str]:
+    """Kullanıcının yazdığı onay ifadesini config ile doğrulayıp yerel dosyaya kaydet."""
+    expected = str(cfg().get("confirmation_phrase", "HSC-BINANCE-TR-ARM"))
+    if str(phrase).strip() != expected:
+        PHRASE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        PHRASE_FILE.write_text(json.dumps({"confirmed": False, "at": time.strftime("%Y-%m-%d %H:%M:%S")}),
+                               encoding="utf-8")
+        return False, "Onay ifadesi yanlış"
+    PHRASE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    PHRASE_FILE.write_text(json.dumps({"confirmed": True, "at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                                       "phrase": expected}), encoding="utf-8")
+    return True, "Onay ifadesi doğrulandı"
+
+
+def is_phrase_confirmed() -> bool:
+    try:
+        d = json.loads(PHRASE_FILE.read_text(encoding="utf-8"))
+        expected = str(cfg().get("confirmation_phrase", "HSC-BINANCE-TR-ARM"))
+        return bool(d.get("confirmed")) and str(d.get("phrase", "")) == expected
+    except Exception:
+        return False
+
+
 def config_gate() -> list[str]:
-    """config.yaml kilitleri. BOŞ dönerse geçerli."""
+    """config.yaml kilitleri + onay ifadesi. BOŞ dönerse geçerli."""
     reasons: list[str] = []
     c = cfg()
     if not bool(c.get("enabled", False)):
         reasons.append("config.yaml: binance_tr.enabled = false")
+    if not is_phrase_confirmed():
+        reasons.append("Onay ifadesi doğrulanmadı (HSC-BINANCE-TR-ARM)")
     return reasons
 
 
