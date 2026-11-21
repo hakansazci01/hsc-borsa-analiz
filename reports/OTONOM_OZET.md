@@ -64,7 +64,7 @@ Sistem yalnızca **doğrulanmış edge + yukarı rejim** birlikte olduğunda iş
 | Kasa drawdown kilidi | **YOK** ⚠️ | Kodda `drawdown` kontrolü emir yolunda yok |
 | Ani çöküş koruması (5dk %10) | **YOK** ⚠️ | `ui/tr_scalper.py:322-375` tur başına fiyat kontrolü var ama %10 eşik yok |
 | Martingale | **YOK** | `ui/tr_scalper.py:195` sabit bütçe; `qty*2` yok |
-| Backtest (1 yıl) | **VAR ~1,4 yıl / 1000 günlük mum** | `ui/quant_lab.py:23`, `research/research_daily.py` |
+| Backtest | **VAR 1000 günlük mum (≈2,7 yıl)** | `ui/quant_lab.py:23`, `research/research_daily.py` |
 | Max drawdown sonucu | **%16–62** (strateji) | `docs/STRATEJI_ARASTIRMA_SONUCU.md:87` |
 | Paper/Testnet | **YOK ⚠️ (Binance TR)** | `config.yaml:110-118` `binance_tr` testnet alanı YOK; `binance_bot.py:59` sadece global Binance testnet |
 | İşlem logu | **VAR JSONL** | `ui/tr_journal.py:21-29`, `ui/tr_scalper.py:249-255` |
@@ -73,7 +73,28 @@ Sistem yalnızca **doğrulanmış edge + yukarı rejim** birlikte olduğunda iş
 | Bağlantı hatası | **YOK ediliyor, devam** | `ui/binance_tr_bot.py:96-101`, `ui/tr_runner.py:112-114` |
 | RSI/MACD/Bollinger/Grid | **RSI var, diğerleri YOK** | `ui/tr_scalper.py:119-143` (RSI7 + EMA9/20 + hacim) |
 
-## 7. Ne zaman işlem yapılacak?
+## 6b. KRİTİK TUTARSIZLIKLAR (gerçek para öncesi mutlaka düzelt)
+
+1. **Doğrulanan strateji ile çalışan strateji aynı değil!** Backtest'te kârlı çıkan
+   `günlük EMA50 pullback` (`ui/quant_lab.py:127-130`), ama canlı emir motoru **1 dakikalık**
+   RSI7+EMA9/20 sinyali kullanıyor (`ui/tr_scalper.py:59,119-143`). 1dk ailesinin komisyon
+   sonrası zararlı olduğu 311 kombinasyonla kanıtlanmıştı. Yani **motor, doğrulanmamış
+   stratejiyle emir atacak şekilde kurulu.** EN KRİTİK EKSİK BU.
+2. **`config.yaml` kilitleri motor tarafından okunmuyor.** `config.yaml:110-118` içindeki
+   `enabled: false`, `confirmation_phrase`, `max_order_usdt` alanlarını `ui/tr_scalper.py`
+   **hiç okumuyor**; tek kilit `STOP_FILE` (`ui/tr_scalper.py:265`). Yani config'de "kapalı"
+   görünse bile STOP kalktığında emir gider.
+
+## 7. Gerçek para öncesi eklenmesi GEREKEN 5 kritik şey
+
+1. Canlı motoru doğrulanmış günlük EMA50 stratejisine bağla (`tr_scalper.signal` ↔ `quant_lab`).
+2. Günlük zarar limiti + kasa drawdown kilidi ekle (`tr_scalper.py:264-269` sadece toplam PnL kullanıyor).
+3. Ani çöküş koruması (5 dk %10 düşüş → yeni girişi durdur) — kodda YOK.
+4. Binance TR için dry-run/testnet modu — `config.yaml:110-118` testnet alanı YOK.
+5. Gerçek `trades.csv`: order_id, sembol, alış/satış fiyatı, komisyon, net K/Z, süre
+   (şu an `tr_journal.py:23-29` sadece event/position/pnl tutuyor).
+
+## 8. Ne zaman işlem yapılacak?
 
 - BTC günlük kapanışı EMA50'nin üstüne geçmeli
 - Hedef coin günlük EMA50 üzerinde pullback yapmalı
