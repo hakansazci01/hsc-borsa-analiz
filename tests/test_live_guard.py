@@ -726,6 +726,46 @@ def test_step5_mtf_confirmation() -> None:
     assert "Günlük" in panel and "4 Saatlik" in panel and "Son Karar" in panel
 
 
+def test_correlation_protection() -> None:
+    """BTC açıkken ETH engelli (yüksek korr), XRP izinli (düşük korr)."""
+    from pathlib import Path
+
+    from ui import correlation_guard as cg
+
+    assert cg.CORR_LIMIT == 0.85
+    assert cg.CORR_DAYS == 30
+
+    # Gerçek veriden korelasyonlar
+    btc_eth = cg.correlation("BTCUSDT", "ETHUSDT")
+    btc_xrp = cg.correlation("BTCUSDT", "XRPUSDT")
+    assert btc_eth is not None and btc_xrp is not None
+
+    # BTC açıkken ETH: yüksek korelasyon -> ENGELLİ
+    g1 = cg.guard_entry("BTCUSDT", "ETHUSDT")
+    assert btc_eth > 0.85
+    assert g1["allowed"] is False
+    assert "KORELASYON YÜKSEK, ALIM ENGELLENDİ" in g1["reason"]
+
+    # BTC açıkken XRP: düşük korelasyon -> İZİN
+    g2 = cg.guard_entry("BTCUSDT", "XRPUSDT")
+    assert btc_xrp <= 0.85
+    assert g2["allowed"] is True
+
+    # Pozisyon yoksa izin
+    g3 = cg.guard_entry(None, "ETHUSDT")
+    assert g3["allowed"] is True
+
+    # Aynı coin ise izin
+    g4 = cg.guard_entry("BTCUSDT", "BTCUSDT")
+    assert g4["allowed"] is True
+
+    # Kod ve panel
+    src = (Path(__file__).resolve().parent.parent / "ui" / "tr_scalper.py").read_text(encoding="utf-8")
+    assert "correlation_guard.guard_entry" in src
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "ENGELLENDİ" in panel and "Korelasyon koruması" in panel
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

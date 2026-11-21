@@ -252,6 +252,28 @@ def _panel():
     if mode == "GRID":
         st.caption("GRID modunda bu onay aranmaz — Grid kendi kuralıyla çalışır.")
     st.caption(f"Kural: günlük EMA50 sinyali + 4s EMA50 üstü = AL; 4s altı = BEKLE. · {mtf.get('reason', '')}")
+
+    # CORRELATION PROTECTION
+    st.divider()
+    st.subheader("Korelasyon koruması", divider="gray")
+    from ui import correlation_guard
+
+    open_pos = tr_scalper._load().get("position") or {}
+    new_sig = "ETHUSDT" if open_pos.get("symbol") == "BTCUSDT" else "BTCUSDT"
+    cg = correlation_guard.guard_entry(open_pos.get("symbol"), new_sig)
+    c1, c2 = st.columns(2)
+    c1.metric("Açık Pozisyon", open_pos.get("symbol", "Yok"))
+    c2.metric("Yeni Sinyal", f"{new_sig} — Korelasyon: {cg['corr'] if cg['corr'] is not None else '—'}"
+              + (" — ENGELLENDİ" if not cg["allowed"] else " — İZİN"))
+    st.caption(cg["reason"])
+    corr_pairs = ("BTCUSDT", "ETHUSDT", "XRPUSDT", "DOGEUSDT")
+    st.dataframe(
+        pd.DataFrame(correlation_guard.matrix(corr_pairs),
+                     columns=["Coin", "BTC", "ETH", "XRP", "DOGE"]),
+        use_container_width=True, hide_index=True,
+    )
+    st.caption(f"Kural: korelasyon > {correlation_guard.CORR_LIMIT} ise aynı anda alım yok · "
+               f"son {correlation_guard.CORR_DAYS} günlük kapanış")
     st.caption(
         f"Komisyon filtresi: beklenen kâr ≥ {tr_scalper.MIN_EXPECTED_RR:.0f}× komisyon "
         f"(oran %{tr_scalper.COMMISSION*100:.2f}) · "

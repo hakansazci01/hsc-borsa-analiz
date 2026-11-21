@@ -274,6 +274,16 @@ def buy(symbol: str, qty_override: float | None = None,
         except Exception:
             pass
         return {"ok": False, "reason": "ALIŞ ENGELLENDİ (fren): " + brake}
+    # CORRELATION PROTECTION: açık pozisyonla yüksek korelasyonlu coin'e girme
+    try:
+        from ui import correlation_guard
+
+        open_pos = _load().get("position") or {}
+        cg = correlation_guard.guard_entry(open_pos.get("symbol"), symbol)
+        if not cg["allowed"]:
+            return {"ok": False, "reason": cg["reason"]}
+    except Exception:
+        pass
     px = price(symbol)
     if not px:
         return {"ok": False, "reason": "fiyat alınamadı"}
