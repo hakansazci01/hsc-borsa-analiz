@@ -1238,6 +1238,55 @@ def test_monthly_backtest() -> None:
     assert "-01 00:00" in nxt
 
 
+def test_volatility_position_size() -> None:
+    """ATR 30g ortalamasına göre %10/%7/%5; günlük limit değişmez."""
+    import pandas as pd
+
+    from ui import vol_position as vp
+
+    assert vp.PCT_NORMAL == 0.10
+    assert vp.PCT_HIGH == 0.07
+    assert vp.PCT_EXTREME == 0.05
+    assert vp.HIGH_MULT == 1.20 and vp.EXTREME_MULT == 1.50
+
+    def make_frame(ratio: float) -> pd.DataFrame:
+        # 60 mum: son 15'i ratio kadar geniş -> son ATR belirgin yükselir
+        rows = []
+        for i in range(60):
+            vol = 10.0 if i < 45 else 10.0 * ratio
+            rows.append({"Open": 100.0, "High": 100.0 + vol,
+                         "Low": 100.0 - vol, "Close": 100.0, "Volume": 1.0})
+        return pd.DataFrame(rows)
+
+    # 1) Normal volatilite -> %10
+    n = vp.atr_state("TEST", frame=make_frame(1.0))
+    assert n["state"] == "Normal" and n["pct"] == 0.10
+
+    # 2) Yüksek volatilite -> %7
+    h = vp.atr_state("TEST", frame=make_frame(1.4))
+    assert h["state"] == "Yüksek" and h["pct"] == 0.07
+
+    # 3) Çok yüksek volatilite -> %5
+    e = vp.atr_state("TEST", frame=make_frame(2.5))
+    assert e["state"] == "Çok Yüksek" and e["pct"] == 0.05
+
+    # 4) Tutar Hesabı
+    assert vp.sized_pct("TEST", 506.26, frame=make_frame(1.0))["amount"] == 50.626
+    assert vp.sized_pct("TEST", 506.26, frame=make_frame(1.4))["amount"] == 35.4382
+    assert vp.sized_pct("TEST", 506.26, frame=make_frame(2.5))["amount"] == 25.313
+
+    # 5) Günlük limit ve DD değişmez
+    from ui import risk_brakes as rb
+
+    assert rb.DAILY_LOSS_PCT == 0.10 and rb.TRAILING_DD_PCT == 0.15
+
+    # 6) Panel
+    from pathlib import Path
+
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "ATR Durumu" in panel and "Pozisyon Boyutu" in panel
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

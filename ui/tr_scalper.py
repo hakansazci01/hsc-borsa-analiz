@@ -100,10 +100,24 @@ POSITION_PCT = 0.10       # tek işlem = güncel bakiyenin %10'u (bileşik büy�
 PROFIT_LOCK_TRY = 50.0    # toplam kâr +50 TL'yi geçince stop giriş üstüne çekilir
 
 
-def position_size_try(balance: float | None = None) -> float:
-    """DİNAMİK işlem boyutu: API bakiyesi * 0.10. Sabit limit yok."""
+def position_size_try(balance: float | None = None, symbol: str | None = None) -> float:
+    """DİNAMİK işlem boyutu: bakiye * volatiliteye göre %10/%7/%5."""
     bal = available_try() if balance is None else float(balance)
+    if symbol:
+        try:
+            from ui import vol_position
+
+            return vol_position.sized_pct(symbol, bal)["amount"]
+        except Exception:
+            pass
     return round(bal * POSITION_PCT, 4)
+
+
+def position_pct(symbol: str) -> dict[str, Any]:
+    """Panel için volatiliteye göre pozisyon yüzdesi."""
+    from ui import vol_position
+
+    return vol_position.atr_state(symbol)
 
 
 def max_order_usdt() -> float:
@@ -362,7 +376,7 @@ def buy(symbol: str, qty_override: float | None = None,
     step = flt["step"] or 0.00000001
     # Her alışta güncel bakiyeyi API'den çek -> %10 (bileşik büyüme).
     current_balance = available_try()
-    cap = position_size_try(current_balance)   # örn 506 TL -> 50.6 TL
+    cap = position_size_try(current_balance, symbol)  # volatiliteye göre %10/%7/%5
     # Grid modunda sadece 1 parça (10 TL), toplam limit yine %10
     budget = grid_part if grid_part and grid_part <= cap else cap
     need = max(budget, flt["min_notional"] + 0.5) / px

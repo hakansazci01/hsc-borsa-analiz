@@ -275,6 +275,21 @@ def _panel():
     st.caption(f"Kural: korelasyon > {correlation_guard.CORR_LIMIT} ise aynı anda alım yok · "
                f"son {correlation_guard.CORR_DAYS} günlük kapanış")
 
+    # VOLATİLİTEYE GÖRE POZİSYON BOYUTU
+    st.divider()
+    st.subheader("Volatiliteye göre pozisyon boyutu", divider="gray")
+    from ui import vol_position
+
+    vs = vol_position.atr_state("BTCUSDT")
+    vcolor = {"Normal": "#22c55e", "Yüksek": "#eab308", "Çok Yüksek": "#ef4444"}.get(vs["state"], "#94a3b8")
+    st.markdown(
+        f'<div style="text-align:center;padding:6px 0 10px 0;">'
+        f'<span style="font-size:18px;font-weight:800;color:{vcolor};">'
+        f'ATR Durumu: {vs["state"]} · Pozisyon Boyutu: %{vs["pct"]*100:.0f}</span></div>',
+        unsafe_allow_html=True,
+    )
+    st.caption(f"Gerekçe: {vs['reason']} · ATR {vs['atr']} / 30g ort. {vs['avg']} (oran {vs['ratio']})")
+
     # BALİNA / HABER KORUMASI
     st.divider()
     st.subheader("Balina / Haber koruması", divider="gray")
