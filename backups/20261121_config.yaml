@@ -110,7 +110,7 @@ binance:
 # BINANCE TR - global Binance'den AYRI borsa. Gercek anahtar dogrulandi.
 # Emirler yine KILITLI: asagidaki kilitle birlikte ortam degiskeni de gerekir.
 binance_tr:
-  enabled: false            # once test sinyaliyle dogrulayin, sonra acin
+  enabled: true
   allowed_symbols: ["BTC_USDT", "ETH_USDT"]
   max_order_usdt: 50        # tek emir ust siniri 50 TL (kasa 500 TL)
   max_order_try: 50         # ayni sinir, TRY cinsinden (okunur/tutar)

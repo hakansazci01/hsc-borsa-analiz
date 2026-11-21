@@ -375,6 +375,34 @@ def test_autonomous_ops() -> None:
     assert callable(ops.watchdog)
 
 
+def test_auto_open_guard() -> None:
+    """Otomatik açma: test guard + 3 kilit + doğrulama."""
+    from pathlib import Path
+
+    from ui import auto_open
+
+    root = Path(__file__).resolve().parent.parent
+    assert auto_open.MIN_TESTS == 28
+    # test guard eşiği ve parser varlığı (iç içe test çalıştırmak recursion yapar)
+    assert auto_open.MIN_TESTS == 28
+    assert callable(auto_open.run_tests)
+    # auto-confirm fonksiyonu doğru ifadeyi yazar
+    assert auto_open.t.auto_confirm_phrase() is True
+    assert auto_open.t.is_phrase_confirmed() is True
+    # _set_enabled sadece binance_tr satırını değiştirir (gateio/live_trading bozulmaz)
+    p = root / "config.yaml"
+    original = p.read_text(encoding="utf-8")
+    try:
+        auto_open._set_enabled(True)
+        s = p.read_text(encoding="utf-8")
+        assert "  enabled: true" in s.split("binance_tr:")[1].split("gateio:")[0]
+        # diğer bölümler değişmedi
+        assert "  enabled: false                 # asla varsayilan acik birakma" in s
+    finally:
+        p.write_text(original, encoding="utf-8")
+        auto_open.t.set_confirmed_phrase("YANLIS")
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

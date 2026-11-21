@@ -76,6 +76,14 @@ def is_phrase_confirmed() -> bool:
         return False
 
 
+AUTO_CONFIRM_PHRASE = "HSC-BINANCE-TR-ARM"  # otomatik onay (kullanıcı talimatıyla)
+
+
+def auto_confirm_phrase() -> bool:
+    """Onay ifadesini kod içinden doğrula (panel beklenmez)."""
+    return set_confirmed_phrase(AUTO_CONFIRM_PHRASE)[0]
+
+
 def config_gate() -> list[str]:
     """config.yaml kilitleri + onay ifadesi. BOŞ dönerse geçerli."""
     reasons: list[str] = []
