@@ -332,6 +332,49 @@ def test_dynamic_position_and_limits() -> None:
     assert "kâr kilidi" in reason
 
 
+def test_autonomous_ops() -> None:
+    """Otonom operasyon: watchdog, bildirim, yedekleme, sağlık, strateji raporu."""
+    import time
+
+    from ui import autonomous_ops as ops
+    from ui.core import default_settings
+
+    # 1) log boyut limiti 10 MB
+    assert ops.MAX_LOG_BYTES == 10 * 1024 * 1024
+    # 2) ntfy konusu ve etkin
+    alerts = default_settings().get("alerts", {})
+    assert alerts.get("ntfy_enabled") is True
+    assert alerts.get("ntfy_topic")
+    # 3) trade bildirim metni tüm alanları içerir
+    import io
+
+    from contextlib import redirect_stdout
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        ok = ops.trade_notification("BTC_TRY", "SAT", 0.5, 100.0, 102.0, 1.0, 507.26)
+    assert ok is True  # notify.py Unicode-safe, test ortamında 200
+    # 4) günlük özet metni
+    summary = ops.daily_summary()
+    for key in ("GÜNLÜK ÖZET", "Bugün işlem", "Güncel kasa", "Bot:"):
+        assert key in summary
+    # 5) yedekleme mevcut dosyaları kopyalar (state dosyası ilk alışa kadar yok)
+    saved = ops.backup_files()
+    assert any("config.yaml" in x for x in saved)
+    assert any("trades.csv" in x for x in saved)
+    for name in saved:
+        assert (ops.BACKUPS / name).exists()
+    assert (ops.BACKUPS / f"{time.strftime('%Y%m%d')}_config.yaml").exists()
+    # 6) sağlık kontrolü
+    h = ops.health_check()
+    assert "api_ok" in h and "balance" in h and "failures" in h
+    # 7) haftalık strateji raporu
+    r = ops.weekly_strategy_review()
+    assert "win_rate" in r and "trades" in r and "degraded" in r
+    # 8) watchdog fonksiyonu var
+    assert callable(ops.watchdog)
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

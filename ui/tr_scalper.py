@@ -255,6 +255,12 @@ def buy(symbol: str) -> dict[str, Any]:
         return {"ok": False, "reason": "ALIŞ ENGELLENDİ: " + "; ".join(gates)}
     brake = brakes_block(symbol)
     if brake:
+        try:
+            from ui.autonomous_ops import brake_notification
+
+            brake_notification(brake)
+        except Exception:
+            pass
         return {"ok": False, "reason": "ALIŞ ENGELLENDİ (fren): " + brake}
     px = price(symbol)
     if not px:
@@ -311,6 +317,12 @@ def sell(symbol: str, qty: float, reason: str) -> dict[str, Any]:
         st["realized_pnl"] = round(sum(float(h.get("net_pnl", 0)) for h in st["history"]), 4)
         st.pop("position", None)
         _save(st)
+        try:
+            from ui.autonomous_ops import trade_notification
+
+            trade_notification(symbol, "SAT", qty, entry, px, net, available_try())
+        except Exception:
+            pass
         _write_trade_csv({
             "tarih": time.strftime("%Y-%m-%d %H:%M:%S"), "sembol": symbol,
             "alış_fiyatı": round(entry, 6), "satış_fiyatı": round(px, 6),
