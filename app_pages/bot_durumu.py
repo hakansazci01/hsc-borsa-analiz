@@ -329,6 +329,20 @@ def _panel():
     else:
         st.info("Açık pozisyon yok — trailing TP pasif.", icon=":material/info:")
 
+    # AYLIK BACKTEST
+    st.divider()
+    st.subheader("Aylık backtest (son 90 gün)", divider="gray")
+    from ui import monthly_backtest
+
+    mb = monthly_backtest.last()
+    b1, b2 = st.columns(2)
+    b1.metric("Son Backtest",
+              f"{mb['at']} — Kar: {mb['net_pnl']:+.2f} TL, Kazanma: %{mb['win_rate']:.0f}, "
+              f"Drawdown: %{mb['max_dd']:.0f}")
+    b2.metric("Sonraki Backtest", monthly_backtest.next_run())
+    if mb["warn"]:
+        st.warning("BACKTEST UYARISI — strateji gözden geçirilmeli.", icon=":material/warning:")
+
     # AUTO-OPTİMİZASYON
     st.divider()
     st.subheader("Otomatik optimizasyon", divider="gray")

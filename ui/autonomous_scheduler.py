@@ -45,6 +45,13 @@ def run_forever(check_every: int = 30) -> None:
                     auto_optimize.optimize()
             except Exception:
                 pass
+            try:
+                from ui import monthly_backtest
+
+                if monthly_backtest.due():
+                    monthly_backtest.run()
+            except Exception:
+                pass
             if time.strftime("%M:%S") <= "00:30" and LAST.get("health") != time.strftime("%Y-%m-%d %H"):
                 LAST["health"] = time.strftime("%Y-%m-%d %H")
                 ops.health_check()
