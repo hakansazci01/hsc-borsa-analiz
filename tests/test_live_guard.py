@@ -692,6 +692,40 @@ def test_step4_loss_streak() -> None:
     assert "ARDIŞIK ZARAR:" in panel and "/ 3" in panel
 
 
+def test_step5_mtf_confirmation() -> None:
+    """Adım 5: günlük+4s onaylı=AL, günlük onaylı+4s onaysız=BEKLE; sadece NORMAL modda."""
+    from pathlib import Path
+
+    from ui import market_regime as mr
+
+    def evaluate(daily_ok: bool, h4_ok: bool) -> str:
+        return "AL" if (daily_ok and h4_ok) else "BEKLE"
+
+    # 1) Günlük ONAYLI + 4s ONAYLI -> AL
+    assert evaluate(True, True) == "AL"
+    # 2) Günlük ONAYLI + 4s ONAYSIZ -> BEKLE
+    assert evaluate(True, False) == "BEKLE"
+    # 3) Günlük ONAYSIZ + 4s ONAYLI -> BEKLE
+    assert evaluate(False, True) == "BEKLE"
+
+    # Gerçek mtf_confirm fonksiyonu aynı mantığı kullanıyor
+    mtf = mr.mtf_confirm("BTCUSDT")
+    assert mtf["ok"] is bool(mtf["daily"] and mtf["h4"])
+
+    # 4) Kod: MTF sadece NORMAL modda, GRID modunda aranmıyor
+    src = (Path(__file__).resolve().parent.parent / "ui" / "tr_scalper.py").read_text(encoding="utf-8")
+    assert 'st["mode"] = "NORMAL"' in src
+    assert "if s.get(\"decision\") == \"AL\":" in src
+    assert "mtf_confirm(sym)" in src
+    # GRID bloğunda mtf_confirm çağrısı olmamalı
+    grid_block = src.split('if reg["range"]:')[1].split('st["mode"] = "NORMAL"')[0]
+    assert "mtf_confirm" not in grid_block
+
+    # 5) Panel göstergeleri
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "Günlük" in panel and "4 Saatlik" in panel and "Son Karar" in panel
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

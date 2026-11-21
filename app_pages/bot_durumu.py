@@ -237,6 +237,21 @@ def _panel():
     if _until > time.time():
         st.error(f"24 saatlik fren aktif — kalan {int((_until-time.time())//3600)} sa "
                  f"{int((_until-time.time())%3600//60)} dk", icon=":material/block:")
+
+    # MULTI-TIMEFRAME ONAY (sadece NORMAL modda)
+    st.divider()
+    st.subheader("Zaman dilimi onayı (NORMAL mod)", divider="gray")
+    mtf = market_regime.mtf_confirm("BTCUSDT")
+    daily_txt = "ONAYLI ✅" if mtf.get("daily") else "ONAYSIZ ❌"
+    h4_txt = "ONAYLI ✅" if mtf.get("h4") else "ONAYSIZ ❌"
+    decision = "AL" if mtf.get("ok") else "BEKLE"
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Günlük", daily_txt)
+    m2.metric("4 Saatlik", h4_txt)
+    m3.metric("Son Karar", decision)
+    if mode == "GRID":
+        st.caption("GRID modunda bu onay aranmaz — Grid kendi kuralıyla çalışır.")
+    st.caption(f"Kural: günlük EMA50 sinyali + 4s EMA50 üstü = AL; 4s altı = BEKLE. · {mtf.get('reason', '')}")
     st.caption(
         f"Komisyon filtresi: beklenen kâr ≥ {tr_scalper.MIN_EXPECTED_RR:.0f}× komisyon "
         f"(oran %{tr_scalper.COMMISSION*100:.2f}) · "

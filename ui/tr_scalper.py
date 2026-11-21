@@ -448,10 +448,7 @@ def brakes_block(symbol: str) -> str:
     reg = market_regime.regime(symbol)
     if reg["bear"]:
         return f"rejim AYI — alım yok ({reg['reason']})"
-    # MULTI-TIMEFRAME: günlük + 4s EMA50 ikisi de üstünde olmalı
-    mtf = market_regime.mtf_confirm(symbol)
-    if not mtf["ok"]:
-        return f"multi-timeframe onayı yok — {mtf['reason']}"
+    # NOT: MULTI-TIMEFRAME onayı GRID modunda aranmaz — cycle() içinde sadece NORMAL modda uygulanır.
     return ""
 
 
@@ -588,6 +585,15 @@ def cycle() -> list[str]:
         st["mode"] = "NORMAL"  # BOĞA: Grid kapat, EMA50 moduna dön
         _save(st)
         s = signal(sym)
+        # MULTI-TIMEFRAME ONAYI — SADECE NORMAL modda (GRID modunda aranmaz)
+        if s.get("decision") == "AL":
+            mtf = market_regime.mtf_confirm(sym)
+            st["mtf"] = mtf
+            _save(st)
+            if not mtf["ok"]:
+                logs.append(f"AL BEKLEME (MTF): günlük={'ONAYLI' if mtf['daily'] else 'ONAYSIZ'} · "
+                            f"4s={'ONAYLI' if mtf['h4'] else 'ONAYSIZ'} — işlem YOK")
+                continue
         if s.get("decision") == "AL":
             res = buy(sym)
             logs.append(f"AL {sym} {'OK' if res.get('ok') else 'HATA'} neden={s.get('reason')}")
