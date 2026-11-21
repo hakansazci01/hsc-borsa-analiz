@@ -104,10 +104,12 @@ def send_ntfy(text: str, topic: str, title: str = "HSC Borsa Analiz") -> tuple[b
     if not topic:
         return False, "ntfy konusu tanımlı değil."
     try:
+        safe_title = "".join(c if ord(c) < 128 else " " for c in title)
         resp = requests.post(
             f"https://ntfy.sh/{topic}",
             data=text.encode("utf-8"),
-            headers={"Title": title, "Priority": "high", "Tag": "chart_with_upwards_trend"},
+            headers={"Title": safe_title, "Priority": "high",
+                     "Tag": "chart_with_upwards_trend"},
             timeout=10,
         )
         if resp.status_code == 200:

@@ -1,15 +1,15 @@
 # Otonom Sistem — Gerçek Durum Özeti
 
-**Son güncelleme:** 2026-11-21 03:47:29  
+**Son güncelleme:** 2026-11-21 04:00:37  
 **Kaynak:** Yerel karar kayıtları, gerçek Binance TR API ve işlem defteri. Tahmin/simülasyon değildir.
 
 ## 1. Sistem sağlığı
 
 | Ölçü | Değer |
 |---|---|
-| Toplam otonom karar | 36 |
+| Toplam otonom karar | 37 |
 | OPEN kararı | 0 |
-| CLOSED kararı | 36 |
+| CLOSED kararı | 37 |
 | Son karar | **CLOSED** |
 | Piyasa rejimi | ASAGI (bear) |
 | Doğrulanmış kârlı edge | 49 |
@@ -35,11 +35,11 @@
 | Toplam komisyon | 0.0057 ₺ |
 | Kullanılabilir bakiye | **506.26 ₺** |
 | Açık pozisyon | Yok |
-| İşlem defteri kaydı | 15 |
+| İşlem defteri kaydı | 18 |
 
 ## 4. Neden işlem yok?
 
-Son kararın gerekçesi: ayı rejimi (-20.05%)
+Son kararın gerekçesi: ayı rejimi (-20.08%)
 
 Sistem yalnızca **doğrulanmış edge + yukarı rejim** birlikte olduğunda işlem açar. Bu koşul sağlanmadığı için para riske atılmaz; bu bir arıza değil, kasıtlı korumadır.
 
