@@ -275,6 +275,20 @@ def _panel():
     st.caption(f"Kural: korelasyon > {correlation_guard.CORR_LIMIT} ise aynı anda alım yok · "
                f"son {correlation_guard.CORR_DAYS} günlük kapanış")
 
+    # TRAILING TAKE-PROFIT
+    st.divider()
+    st.subheader("Trailing Take-Profit", divider="gray")
+    _pos = tr_scalper._load().get("position") or {}
+    if _pos:
+        _ttp = tr_scalper.trailing_tp(_pos, _pos.get("entry", 0))
+        t1, t2, t3 = st.columns(3)
+        t1.metric("Trailing TP", "Aktif ✅" if _ttp["active"] else "Pasif")
+        t2.metric("Zirve Fiyat", f"{_ttp['peak']:,.4f} ₺")
+        t3.metric("Trailing Satış Fiyatı", f"{_ttp['tp']:,.4f} ₺" if _ttp["tp"] else "—")
+        st.caption("%5 karda aktif · zirveden %2 düşüşte sat · sadece NORMAL mod")
+    else:
+        st.info("Açık pozisyon yok — trailing TP pasif.", icon=":material/info:")
+
     # AUTO-OPTİMİZASYON
     st.divider()
     st.subheader("Otomatik optimizasyon", divider="gray")

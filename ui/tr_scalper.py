@@ -218,12 +218,40 @@ def signal(symbol: str) -> dict[str, Any]:
             "reason": f"fiyat {px:.4f} / EMA50 {ma:.4f} — giriş koşulu yok"}
 
 
+TRAIL_TP_ACTIVATE = 0.05   # %5 karda trailing TP devreye girer
+TRAIL_TP_DROP = 0.02       # zirveden %2 geri çekilince sat
+
+
+def trailing_tp(pos: dict[str, Any], current_px: float) -> dict[str, Any]:
+    """Trailing take-profit: %5 karda aktif, fiyatla birlikte yükselir.
+
+    Örnek: giriş 100, fiyat 105 -> TP = 105*0.98 = 102.90
+           fiyat 110 -> TP = 110*0.98 = 107.80; 107.80'e düşerse SAT.
+    """
+    entry = float(pos.get("entry", 0) or 0)
+    peak = max(float(pos.get("peak_tp", entry) or 0), current_px)
+    gain = (current_px - entry) / entry if entry > 0 else 0.0
+    active = gain >= TRAIL_TP_ACTIVATE
+    tp = round(peak * (1 - TRAIL_TP_DROP), 6) if active else 0.0
+    triggered = bool(active and tp > 0 and current_px <= tp)
+    return {
+        "active": active, "peak": round(peak, 6), "tp": tp,
+        "gain_pct": round(gain * 100, 2), "triggered": triggered,
+    }
+
+
 def position_exit(pos: dict[str, Any], px: float, ma: float,
                   effective_sl: float | None = None) -> str:
     """Açık pozisyon çıkışı: SADECE ATR stop + kâr kilidi + 90 gün. Sabit %3 KALDIRILDI."""
     held_days = (time.time() - float(pos.get("entry_ts", time.time()))) / 86400
     if effective_sl and px <= effective_sl:
         return f"kâr kilidi: fiyat {px:.4f} ≤ kilitli stop {effective_sl:.4f}"
+    # TRAILING TAKE-PROFIT — SADECE NORMAL modda (Grid pozisyonu 'grid' bayrağı taşır)
+    if not pos.get("grid"):
+        ttp = trailing_tp(pos, px)
+        if ttp["triggered"]:
+            return (f"trailing TP: fiyat {px:.4f} ≤ zirve {ttp['peak']:.4f} - %2 "
+                    f"= {ttp['tp']:.4f}")
     # ATR BAZLI STOP: 1.5 * ATR(14) — NORMAL ve GRID modlarında GEÇERLİ
     atr_sl = float(pos.get("atr_stop", 0) or 0)
     if atr_sl and px <= atr_sl:
@@ -567,6 +595,15 @@ def cycle() -> list[str]:
             return ["günlük veri yok — pozisyon korunuyor"]
         px = float(vals["Close"].iloc[-1])
         ma = float(quant_lab.ema(vals["Close"], 50).iloc[-1])
+        # TRAILING TP: zirve fiyatını güncelle (NORMAL mod)
+        if not pos.get("grid"):
+            ttp = trailing_tp(pos, px)
+            pos["peak_tp"] = ttp["peak"]
+            if ttp["active"]:
+                logs.append(f"TRAILING TP AKTİF: zirve {ttp['peak']:.4f} · "
+                            f"satış eşiği {ttp['tp']:.4f} · kâr %{ttp['gain_pct']:.1f}")
+            st["position"] = pos
+            _save(st)
         # KÂR KORUMA: toplam gerçekleşen kâr +50 TL'yi geçtiyse stop'u giriş üstüne çek.
         realized = float(st.get("realized_pnl", 0) or 0)
         if realized >= PROFIT_LOCK_TRY:

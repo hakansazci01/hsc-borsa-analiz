@@ -997,6 +997,54 @@ def test_auto_optimization() -> None:
     assert "Son Optimizasyon" in panel and "Sonraki Optimizasyon" in panel
 
 
+def test_trailing_take_profit() -> None:
+    """%5 karda aktif, TP fiyatla yükselir, zirveden %2 düşüşte sat, GRID'de yok."""
+    from pathlib import Path
+
+    from ui import tr_scalper as t
+
+    assert t.TRAIL_TP_ACTIVATE == 0.05
+    assert t.TRAIL_TP_DROP == 0.02
+
+    pos = {"entry": 100.0, "entry_ts": 0}
+
+    # 1) %5 kara ULAŞMADAN trailing çalışmaz
+    r1 = t.trailing_tp(pos, 104.0)
+    assert r1["active"] is False and r1["tp"] == 0.0 and r1["triggered"] is False
+
+    # 2) %5 karda aktif, TP = 105 * 0.98 = 102.90
+    r2 = t.trailing_tp(pos, 105.0)
+    assert r2["active"] is True
+    assert abs(r2["tp"] - 102.90) < 0.01
+    assert r2["triggered"] is False
+
+    # 3) Fiyat 110'a çıkınca TP DE yükselir = 110 * 0.98 = 107.80
+    pos2 = {"entry": 100.0, "entry_ts": 0, "peak_tp": 105.0}
+    r3 = t.trailing_tp(pos2, 110.0)
+    assert r3["peak"] == 110.0
+    assert abs(r3["tp"] - 107.80) < 0.01
+    assert r3["tp"] > r2["tp"]  # TP yükseldi ✅
+
+    # 4) Zirveden %2 geri çekilince SAT tetiklenir
+    pos3 = {"entry": 100.0, "entry_ts": 0, "peak_tp": 110.0}
+    r4 = t.trailing_tp(pos3, 107.80)
+    assert r4["triggered"] is True
+
+    # 5) position_exit trailing nedeniyle satar
+    reason = t.position_exit(pos3, 107.80, ma=200.0)
+    assert "trailing TP" in reason
+
+    # 6) GRID pozisyonunda trailing TP uygulanmaz
+    pos_grid = dict(pos3)
+    pos_grid["grid"] = True
+    reason_grid = t.position_exit(pos_grid, 107.80, ma=200.0)
+    assert "trailing TP" not in reason_grid
+
+    # 7) Panel göstergeleri
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "Trailing TP" in panel and "Zirve Fiyat" in panel and "Trailing Satış Fiyatı" in panel
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 
