@@ -1474,6 +1474,27 @@ def test_bear_cash_strategy() -> None:
     assert "NAKİTTE BEKLEME" in panel
 
 
+def test_crypto_walk_forward() -> None:
+    """Mevcut kripto stratejisiyle walk-forward: 90 gün, 30 gün fold, 2 pencere."""
+    from ui import quant_lab
+    from ui.validation import crypto_walk_forward
+
+    df = quant_lab.fetch("BTCUSDT", "1d", 90)
+    assert df is not None and len(df) == 90
+
+    wf = crypto_walk_forward(df, windows=4)
+    assert len(wf) == 2  # 90//5=30 fold → 2 pencere
+    for r in wf:
+        for key in ("Pencere", "Test aralığı", "Eğitim işlem", "Eğitim getiri %",
+                    "Test işlem", "Test getiri %", "16-CHECK GATE", "Slippage %", "Neden"):
+            assert key in r
+        assert r["Slippage %"] == 0.5
+        assert r["Neden"]  # 0 işlemse nedeni açıkça yazılır
+    # Kural aynı: 90 gün → fold 30
+    assert wf[0]["Eğitim sonu"] == str(df.index[29])[:10]
+    assert wf[1]["Test aralığı"].endswith(str(df.index[89])[:10])
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

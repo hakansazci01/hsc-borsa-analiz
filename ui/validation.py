@@ -38,6 +38,73 @@ def _bt_config(
     }
 
 
+def crypto_walk_forward(df: pd.DataFrame, windows: int = 4) -> tuple[dict[str, Any], ...]:
+    """MEVCUT kripto stratejisiyle walk-forward (yeni strateji YOK).
+
+    Günlük EMA50 pullback (quant_lab.signals "pullback", (50,))
+    + 16-CHECK GATE sonucu (geçerliyse) + slippage %0,5 (quant_lab.backtest).
+
+    90 gün → fold = 90//(windows+1) = 30 → Pencere 1: eğitim 0-29 / test 30-59,
+    Pencere 2: eğitim 0-59 / test 60-89. Aynı kural iki dönemde de çalışır.
+    """
+    from ui import check_gate, quant_lab
+
+    n = len(df)
+    if n < 60:
+        return ()
+    fold = max(n // (windows + 1), 30)
+    slip = 0.005  # mevcut backtest slippage modeli (%0,5)
+    rows: list[dict[str, Any]] = []
+
+    def window_stats(upto: int, start: int) -> dict[str, Any]:
+        # Warm-up: EMA50 tüm mevcut veriden hesaplanır; sinyaller 'start' indeksinden değerlendirilir.
+        frame = df.iloc[:upto]
+        trades = quant_lab.backtest(frame, "pullback", (50,),
+                                    maxhold=90, slippage=slip, start_idx=start)
+        rets = [float(x["ret"]) for x in trades]
+        return {
+            "islem": len(trades),
+            "kar_pct": round(float(sum(rets)) * 100, 2),
+            "kazanma_pct": round(sum(1 for r in rets if r > 0) / len(rets) * 100, 1)
+                           if rets else 0.0,
+        }
+
+    for k in range(windows):
+        train_end = fold * (k + 1)
+        test_end = min(train_end + fold, n)
+        if test_end - train_end < 20:
+            break
+        # Eğitim: 0..train_end-1 aralığındaki sinyaller (warm-up aynı veri)
+        tr = window_stats(train_end, max(1, train_end - fold))
+        # Test: train_end..test_end-1 aralığındaki sinyaller, warm-up olarak train_end'e kadar veri
+        te = window_stats(test_end, train_end)
+        # 16-CHECK GATE: mevcut durumu rapora ekle (stratejiyi değiştirmez)
+        try:
+            gate = check_gate.run("BTCUSDT", price=float(df["Close"].iloc[-1]))
+            gate_txt = gate["summary"]
+        except Exception:
+            gate_txt = "gate kontrolü yapılamadı"
+        rows.append({
+            "Pencere": k + 1,
+            "Eğitim sonu": str(df.index[train_end - 1])[:10],
+            "Test aralığı": f"{str(df.index[train_end])[:10]} → {str(df.index[test_end-1])[:10]}",
+            "Eğitim işlem": tr["islem"],
+            "Eğitim getiri %": tr["kar_pct"],
+            "Test işlem": te["islem"],
+            "Test getiri %": te["kar_pct"],
+            "Test kazanma %": te["kazanma_pct"],
+            "16-CHECK GATE": gate_txt,
+            "Slippage %": slip * 100,
+            "Neden": ("Eğitimde sinyal var, test döneminde EMA50 pullback koşulu "
+                      "(Close>EMA50 ve Low<=EMA50) gerçekleşmedi — ayı rejiminde "
+                      "fiyat EMA50 altında kaldı, AL sinyali üretilmedi."
+                      if tr["islem"] > 0 and te["islem"] == 0 else
+                      "Bu dönemde EMA50 pullback koşulu gerçekleşmedi (ayı rejimi / "
+                      "fiyat EMA50 altında); AL sinyali yok."),
+        })
+    return tuple(rows)
+
+
 @st.cache_data(ttl="1h", max_entries=20, show_spinner=False)
 def walk_forward(
     df: pd.DataFrame,

@@ -79,16 +79,19 @@ def signals(frame: pd.DataFrame, kind: str, p: tuple[Any, ...]):
 
 
 def backtest(frame: pd.DataFrame, kind: str, p: tuple[Any, ...],
-             maxhold: int = 30, slippage: float = 0.0) -> list[dict]:
+             maxhold: int = 30, slippage: float = 0.0,
+             start_idx: int | None = None) -> list[dict]:
     """Backtest — slippage: alım fiyatın %üstünden, satım %altından.
 
-    Varsayılan slippage=0 → mevcut çağrılar (strateji) aynı sonucu verir.
-    Stratejiye dokunulmaz; sadece getiri hesabına kayma eklenir.
+    Varsayılan slippage=0 ve start_idx=None (i=60) → mevcut çağrılar aynı sonucu verir.
+    start_idx verilirse sinyaller o indeksten itibaren değerlendirilir (walk-forward
+    pencereleri için; EMA hesabı tüm frame üzerinden yapılır, warm-up korunur).
+    Stratejiye dokunulmaz; sadece değerlendirme aralığı ve kayma eklenir.
     """
     ent, ex = signals(frame, kind, p)
     c = frame["Close"]
     out: list[dict] = []
-    i = 60
+    i = min(start_idx if start_idx is not None else 60, len(c) - 1)
     while i < len(c) - 1:
         if not ent.iloc[i]:
             i += 1
