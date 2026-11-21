@@ -82,9 +82,17 @@ def run(symbol: str, price: float | None = None,
     open_sym = st.get("position", {}).get("symbol") if st.get("position") else None
     cg = correlation_guard.guard_entry(open_sym, symbol)
     add(cg["allowed"], cg["reason"])
-    # 11) volatilite
+    # 11) volatilite + order book satış baskısı (aynı kontrol)
     vol, volmsg = t.volatility_block(symbol)
-    add(not vol, volmsg or "volatilite normal")
+    bmsg = ""
+    try:
+        from ui import live_feed
+
+        bmsg = live_feed.book_block()
+    except Exception:
+        pass
+    add(not vol and not bmsg, bmsg or volmsg or "volatilite normal",
+        "volatilite normal, order book OK ✅")
     # 12) komisyon filtresi
     qty_guess = (t.position_size_try() / px) if px and px > 0 else 0
     comm_ok, comm_msg = t.commission_gate(

@@ -866,6 +866,55 @@ def test_check_gate() -> None:
     check_gate.t.set_confirmed_phrase("HSC-BINANCE-TR-ARM")  # sonraki testler için
 
 
+def test_websocket_and_order_book() -> None:
+    """WS bağlantı/kopma-yeniden bağlanma; satış baskısı >%70 alım engeli."""
+    from pathlib import Path
+
+    from ui import live_feed
+
+    assert live_feed.WS_BASE == "wss://stream-tr.2meta.app/ws"
+    assert live_feed.RECONNECT_SEC == 5
+    assert live_feed.PRESSURE_LIMIT == 0.70
+
+    # 1) WS bağlantısı (gerçek Binance TR)
+    feed = live_feed.Feed("BTCUSDT")
+    connected = feed.connect(max_attempts=1)
+    assert connected is True
+    assert live_feed.status()["connected"] is True
+
+    # 2) Kopma + yeniden bağlanma testi
+    live_feed.update(connected=False)
+    reconnected = feed.reconnect_test()
+    assert reconnected is True
+
+    # 3) Order Book baskısı — alış baskısı güçlü
+    buy_book = {"bids": [["100", "100"]], "asks": [["101", "10"]]}
+    p1 = live_feed.book_pressure(buy_book)
+    assert p1["ok"] and p1["buy"] > 0.70
+    assert live_feed.book_block() == ""  # alım serbest
+
+    # 4) Satış baskısı %70 üstü -> engel
+    sell_book = {"bids": [["100", "10"]], "asks": [["101", "100"]]}
+    p2 = live_feed.book_pressure(sell_book)
+    assert p2["ok"] and p2["sell"] > 0.70
+    # doğrudan kaydet ve kontrol et
+    live_feed.update(book=sell_book)
+    blocked = live_feed.book_block()
+    assert "SATIŞ BASKISI GÜÇLÜ" in blocked
+    # temizle
+    live_feed.update(book=buy_book)
+
+    # 5) Gate 11. kontrolde book engeli
+    from ui import check_gate
+
+    r = check_gate.run("BTCUSDT", price=58000.0)
+    assert r["total"] == 14
+
+    # 6) Panel göstergeleri
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "Veri Kaynağı" in panel and "Order Book" in panel and "Son Fiyat Güncelleme" in panel
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 

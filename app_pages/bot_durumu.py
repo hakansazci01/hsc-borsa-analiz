@@ -275,6 +275,22 @@ def _panel():
     st.caption(f"Kural: korelasyon > {correlation_guard.CORR_LIMIT} ise aynı anda alım yok · "
                f"son {correlation_guard.CORR_DAYS} günlük kapanış")
 
+    # WEBSOCKET + ORDER BOOK
+    st.divider()
+    st.subheader("Canlı veri akışı — WebSocket + Order Book", divider="gray")
+    from ui import live_feed
+
+    fs = live_feed.status()
+    bp = live_feed.book_pressure()
+    w1, w2, w3 = st.columns(3)
+    w1.metric("Veri Kaynağı", fs["source"])
+    w2.metric("Order Book", f"Alış %{bp['buy']*100:.0f} / Satış %{bp['sell']*100:.0f}")
+    w3.metric("Son Fiyat Güncelleme",
+              f"{fs['price_age']} sn önce" if fs["price_age"] is not None else "—")
+    st.caption(f"WS bağlı: {'EVET ✅' if fs['connected'] else 'HAYIR'} · "
+               f"son fiyat {fs['price'] or '—'} · "
+               f"Satış baskısı > %{live_feed.PRESSURE_LIMIT*100:.0f} ise yeni alım yok")
+
     # 14-CHECK GATE
     st.divider()
     st.subheader("14-CHECK GATE — son emir kontrolleri", divider="gray")
