@@ -275,6 +275,19 @@ def _panel():
     st.caption(f"Kural: korelasyon > {correlation_guard.CORR_LIMIT} ise aynı anda alım yok · "
                f"son {correlation_guard.CORR_DAYS} günlük kapanış")
 
+    # BALİNA / HABER KORUMASI
+    st.divider()
+    st.subheader("Balina / Haber koruması", divider="gray")
+    from ui import whale_guard
+
+    wg = whale_guard.status()
+    w1, w2, w3 = st.columns(3)
+    w1.metric("Son 5 Dk Hareket", f"%{wg['move_pct']:+.2f}")
+    w2.metric("Balina Koruması", "Aktif ⛔" if wg["active"] else "Pasif ✅")
+    w3.metric("Kalan Bekleme", f"{wg['remaining_min']} dk")
+    st.caption("5 dk içinde %3+ düşüş veya yükseliş → 30 dk yeni alım yok · "
+               "14-Check Gate'in 15. kontrolü")
+
     # SLIPPAGE + EMİR DOLUMU
     st.divider()
     st.subheader("Emir dolumu ve slippage", divider="gray")

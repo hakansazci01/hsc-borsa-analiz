@@ -777,7 +777,7 @@ def test_check_gate() -> None:
     # Test izolasyonu: phrase durumunu doğru ayarla
     check_gate.t.set_confirmed_phrase("HSC-BINANCE-TR-ARM")
 
-    assert len(check_gate.CHECKS) == 14
+    assert len(check_gate.CHECKS) == 15
     assert check_gate.CHECKS[0] == "enabled = true"
     assert check_gate.CHECKS[7] == "rejim AYI değil"
     assert check_gate.CHECKS[13] == "sembol işlem görüyor"
@@ -806,13 +806,16 @@ def test_check_gate() -> None:
         import ui.risk_brakes as rb
         import ui.market_regime as mr
         import ui.correlation_guard as cg
+        import ui.whale_guard as wg
 
         other = {
             "rb_hist": rb.update_from_history, "rb_daily": rb.daily_loss_breached,
             "rb_dd": rb.drawdown_breached, "rb_crash": rb.crash_detected,
             "mr_loss": mr.loss_streak_block, "mr_regime": mr.regime,
             "mr_mtf": mr.mtf_confirm, "cg": cg.guard_entry,
+            "wg": wg.check,
         }
+        wg.check = lambda s: {"blocked": False, "move_pct": 0.5, "reason": ""}
         rb.update_from_history = lambda h: {}
         rb.daily_loss_breached = lambda: (False, "")
         rb.drawdown_breached = lambda b: (False, "")
@@ -824,8 +827,8 @@ def test_check_gate() -> None:
 
         r = check_gate.run("BTCUSDT", price=58000.0)
         assert r["ok"] is True
-        assert r["passed"] == 14 and r["total"] == 14
-        assert "14/14 GEÇTİ" in r["summary"]
+        assert r["passed"] == 15 and r["total"] == 15
+        assert "15/15 GEÇTİ" in r["summary"]
 
         # geri yükle
         rb.update_from_history = other["rb_hist"]
@@ -836,6 +839,7 @@ def test_check_gate() -> None:
         mr.regime = other["mr_regime"]
         mr.mtf_confirm = other["mr_mtf"]
         cg.guard_entry = other["cg"]
+        wg.check = other["wg"]
     finally:
         t.cfg = orig["cfg"]
         t.is_phrase_confirmed = orig["phrase"]
@@ -908,7 +912,7 @@ def test_websocket_and_order_book() -> None:
     from ui import check_gate
 
     r = check_gate.run("BTCUSDT", price=58000.0)
-    assert r["total"] == 14
+    assert r["total"] == 15
 
     # 6) Panel göstergeleri
     panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
@@ -1128,6 +1132,61 @@ def test_slippage_and_fill() -> None:
     # 6) Panel göstergeleri
     panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
     assert "Son Emir Durumu" in panel and "Son Slippage" in panel
+
+
+def test_whale_guard() -> None:
+    """%3+ 5dk hareket -> 30 dk bekleme; %1 hareket -> normal. Gate 15 kontrol."""
+    from pathlib import Path
+
+    from ui import check_gate, whale_guard as wg
+
+    assert wg.MOVE_LIMIT == 0.03
+    assert wg.COOLDOWN_SEC == 1800
+
+    # 1) %4 düşüş -> koruma devreye girer
+    orig_move = wg.move_5m
+    try:
+        wg.move_5m = lambda s: -0.04
+        r = wg.check("BTCUSDT")
+        assert r["blocked"] is True
+        assert "BALİNA / HABER ŞÜPHESİ - 30 DK BEKLEME" in r["reason"]
+        assert wg.status()["active"] is True
+        assert wg.status()["remaining_min"] <= 30
+
+        # 2) Aktif cooldown sırasında tekrar kontrol -> hâlâ engelli
+        orig_kl = wg._load
+        r2 = wg.check("BTCUSDT")
+        assert r2["blocked"] is True
+    finally:
+        wg.move_5m = orig_move
+        # cooldown'u temizle
+        wg._save({})
+
+    # 3) %1 düşüş -> koruma devreye girmez
+    try:
+        wg.move_5m = lambda s: -0.01
+        r3 = wg.check("BTCUSDT")
+        assert r3["blocked"] is False
+        assert wg.status()["active"] is False
+    finally:
+        wg.move_5m = orig_move
+        wg._save({})
+
+    # 4) %4 yükseliş de engellenir
+    try:
+        wg.move_5m = lambda s: 0.04
+        assert wg.check("BTCUSDT")["blocked"] is True
+    finally:
+        wg.move_5m = orig_move
+        wg._save({})
+
+    # 5) Gate artık 15 kontrol
+    assert len(check_gate.CHECKS) == 15
+    assert check_gate.CHECKS[14] == "balina/haber koruması"
+
+    # 6) Panel
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "Son 5 Dk Hareket" in panel and "Balina Koruması" in panel and "Kalan Bekleme" in panel
 
 
 def test_readiness_checklist() -> None:

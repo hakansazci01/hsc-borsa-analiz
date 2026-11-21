@@ -28,6 +28,7 @@ CHECKS = [
     "komisyon filtresi (3x)",
     "bakiye yeterli (%10)",
     "sembol işlem görüyor",
+    "balina/haber koruması",
 ]
 
 
@@ -106,6 +107,15 @@ def run(symbol: str, price: float | None = None,
     # 14) sembol
     tradable = t.tradeable_pairs()
     add(symbol in tradable, f"sembol {symbol} {'işlem görüyor' if symbol in tradable else 'listede yok'}")
+    # 15) balina/haber koruması (5 dk %3+ hareket -> 30 dk bekle)
+    try:
+        from ui import whale_guard
+
+        wg = whale_guard.check(symbol)
+        add(not wg["blocked"], wg["reason"],
+            f"5dk hareket %{wg['move_pct']:.2f} — normal ✅")
+    except Exception:
+        add(True, "", "balina kontrolü atlandı")
 
     passed = sum(1 for r in results if r["ok"])
     return {
