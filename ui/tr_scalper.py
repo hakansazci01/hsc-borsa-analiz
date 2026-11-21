@@ -433,13 +433,16 @@ def brakes_block(symbol: str) -> str:
     loss, loss_msg = market_regime.loss_streak_block(st)
     if loss:
         st["loss_streak_until"] = float(st.get("loss_streak_until", 0) or 0)
-        _save(st)
-        try:
-            from ui import autonomous_ops as ops
+        # Sadece ilk tetiklenmede bildir (her turda spam olmasın)
+        if not st.get("loss_streak_notified"):
+            st["loss_streak_notified"] = True
+            try:
+                from ui import autonomous_ops as ops
 
-            ops._send("HSC ARDIŞIK ZARAR", loss_msg)
-        except Exception:
-            pass
+                ops._send("HSC ARDIŞIK ZARAR", "3 ARDIŞIK ZARAR, 24 SAAT DURDURULDU")
+            except Exception:
+                pass
+        _save(st)
         return loss_msg
     # REJİM: AYI ise alım yok, YATAY ise Grid modu (ayrı ayarlanır)
     reg = market_regime.regime(symbol)

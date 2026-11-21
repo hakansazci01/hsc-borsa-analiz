@@ -148,13 +148,23 @@ def grid_decision(current_price: float, anchor: float, bought: int, sold: int,
 
 
 def loss_streak_block(state: dict[str, Any]) -> tuple[bool, str]:
-    """Üst üste 3 zarar -> 24 saat dur."""
+    """Üst üste 3 zarar -> 24 saat dur; süre bitince sayacı sıfırla, tekrar dene."""
     until = float(state.get("loss_streak_until", 0) or 0)
     if time.time() < until:
         left = int(until - time.time())
-        return True, f"3 ardışık zarar: {left//3600} sa {left%3600//60} dk kaldı"
+        return True, f"3 ARDIŞIK ZARAR, 24 SAAT DURDURULDU — {left//3600} sa {left%3600//60} dk kaldı"
+    # 24 saat dolduysa sayacı sıfırla
+    if until and time.time() >= until:
+        state["loss_streak"] = 0
+        state["loss_streak_until"] = 0
+        state["loss_streak_notified"] = False
     streak = int(state.get("loss_streak", 0) or 0)
     if streak >= LOSS_STREAK_LIMIT:
         state["loss_streak_until"] = time.time() + LOSS_COOLDOWN_SEC
         return True, "3 ARDIŞIK ZARAR, 24 SAAT DURDURULDU"
     return False, ""
+
+
+def loss_streak_count(state: dict[str, Any]) -> int:
+    """Panel için: üst üste kaç zarar var (0-3)."""
+    return min(int(state.get("loss_streak", 0) or 0), LOSS_STREAK_LIMIT)

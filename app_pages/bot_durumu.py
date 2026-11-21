@@ -221,6 +221,22 @@ def _panel():
               help=f"1.5 × ATR = {atr_info['distance']:,.2f} · stop {atr_info['stop']:,.2f}")
     st.caption("Stop mesafesi = 1.5 × ATR(14) — NORMAL ve GRID modlarında geçerli. "
                "Sabit %3 stop kaldırıldı.")
+
+    # ARDIŞIK ZARAR FRENİ göstergesi
+    from ui import market_regime as _mr
+
+    ls = _mr.loss_streak_count(tr_scalper._load())
+    _lc = "#ef4444" if ls >= 3 else ("#eab308" if ls >= 2 else "#22c55e")
+    st.markdown(
+        f'<div style="text-align:center;padding:6px 0 10px 0;">'
+        f'<span style="font-size:20px;font-weight:800;color:{_lc};letter-spacing:1px;">'
+        f'ARDIŞIK ZARAR: {ls} / 3</span></div>',
+        unsafe_allow_html=True,
+    )
+    _until = float(tr_scalper._load().get("loss_streak_until", 0) or 0)
+    if _until > time.time():
+        st.error(f"24 saatlik fren aktif — kalan {int((_until-time.time())//3600)} sa "
+                 f"{int((_until-time.time())%3600//60)} dk", icon=":material/block:")
     st.caption(
         f"Komisyon filtresi: beklenen kâr ≥ {tr_scalper.MIN_EXPECTED_RR:.0f}× komisyon "
         f"(oran %{tr_scalper.COMMISSION*100:.2f}) · "

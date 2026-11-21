@@ -652,6 +652,46 @@ def test_step3_atr_stop() -> None:
     assert "ATR(14)" in panel and "STOP MESAFESİ" in panel
 
 
+def test_step4_loss_streak() -> None:
+    """Adım 4: 3 ardışık zarar -> 24 saat fren; 2 zarar -> fren yok; süre bitince sıfır."""
+    import time as _time
+    from pathlib import Path
+
+    from ui import market_regime as mr
+
+    # 1) İki zarar: fren YOK
+    s2 = {"loss_streak": 2}
+    blocked, _ = mr.loss_streak_block(s2)
+    assert blocked is False
+    assert mr.loss_streak_count(s2) == 2
+
+    # 2) Üç zarar: fren VAR + mesaj
+    s3 = {"loss_streak": 3}
+    blocked, msg = mr.loss_streak_block(s3)
+    assert blocked is True
+    assert "3 ARDIŞIK ZARAR, 24 SAAT DURDURULDU" in msg
+    assert s3["loss_streak_until"] > _time.time()
+    assert mr.loss_streak_count(s3) == 3
+
+    # 3) Fren aktifken tekrar çağrı: hâlâ engelli, kalan süre yazıyor
+    blocked2, msg2 = mr.loss_streak_block(s3)
+    assert blocked2 is True and "kaldı" in msg2
+
+    # 4) 24 saat doldu: sayaç sıfırlanır, tekrar denemeye açılır
+    s3["loss_streak_until"] = _time.time() - 1
+    blocked3, _ = mr.loss_streak_block(s3)
+    assert blocked3 is False
+    assert s3["loss_streak"] == 0 and s3["loss_streak_notified"] is False
+
+    # 5) Bildirim mesajı kodda tam
+    src = (Path(__file__).resolve().parent.parent / "ui" / "tr_scalper.py").read_text(encoding="utf-8")
+    assert '"3 ARDIŞIK ZARAR, 24 SAAT DURDURULDU"' in src
+
+    # 6) Panel göstergesi
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "ARDIŞIK ZARAR:" in panel and "/ 3" in panel
+
+
 def test_readiness_checklist() -> None:
     from ui.live_readiness import assess
 
