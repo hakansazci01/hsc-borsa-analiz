@@ -195,7 +195,8 @@ def test_step1_daily_engine_and_brakes() -> None:
     # 1dk scalper kapalı: buy() doğrudan çağrılamaz (daily_engine/veya limit kontrolü)
     res = t.buy("XRP_TRY")
     assert res.get("ok") is False
-    assert ("ENGELLENDİ" in res.get("reason", "") or "limitini aşıyor" in res.get("reason", ""))
+    assert ("ENGELLENDİ" in res.get("reason", "") or "limitini aşıyor" in res.get("reason", "")
+            or "14-CHECK GATE" in res.get("reason", ""))
     # motor günlük EMA50 stratejisini kullanıyor
     assert tr_runner.CYCLE is t.cycle
     assert t.STRATEGY_NAME.startswith("günlük EMA50")
@@ -244,7 +245,7 @@ def test_confirmation_phrase_gate() -> None:
         gates = t.config_gate()
         assert any("Onay ifadesi" in g for g in gates), "phrase yanlışken RED bekleniyor"
         assert t.buy("BTCUSDT").get("ok") is False
-        assert "Onay ifadesi" in t.buy("BTCUSDT").get("reason", "")
+        assert "confirmation phrase" in t.buy("BTCUSDT").get("reason", "")
 
         # 5) enabled=true + phrase doğru -> config_gate temiz (STOP/file ayrı)
         t.set_confirmed_phrase("HSC-BINANCE-TR-ARM")
@@ -764,6 +765,105 @@ def test_correlation_protection() -> None:
     assert "correlation_guard.guard_entry" in src
     panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
     assert "ENGELLENDİ" in panel and "Korelasyon koruması" in panel
+
+
+def test_check_gate() -> None:
+    """14-check gate: başarılı 14/14, başarısız senaryoda hangi kontrol engelledi."""
+    from pathlib import Path
+
+    from ui import check_gate
+
+    # 1) 14 kontrol tanımlı ve sıralı
+    # Test izolasyonu: phrase durumunu doğru ayarla
+    check_gate.t.set_confirmed_phrase("HSC-BINANCE-TR-ARM")
+
+    assert len(check_gate.CHECKS) == 14
+    assert check_gate.CHECKS[0] == "enabled = true"
+    assert check_gate.CHECKS[7] == "rejim AYI değil"
+    assert check_gate.CHECKS[13] == "sembol işlem görüyor"
+
+    # 2) Başarılı senaryo: monkeypatch ile tüm kontrolleri OK yap
+    from ui import tr_scalper as t
+
+    orig = {
+        "cfg": t.cfg, "phrase": t.is_phrase_confirmed, "stop": t.STOP_FILE,
+        "bal": t.available_try, "size": t.position_size_try,
+        "vol": t.volatility_block, "comm": t.commission_gate,
+        "pairs": t.tradeable_pairs, "price": t.price,
+    }
+    try:
+        t.cfg = lambda: {"enabled": True}
+        t.is_phrase_confirmed = lambda: True
+        check_gate.t.STOP_FILE = Path(__file__).resolve().parent.parent / "users" / "NO_SUCH_STOP_FILE"
+        t.available_try = lambda: 506.26
+        t.position_size_try = lambda balance=None: 50.63
+        t.volatility_block = lambda s: (False, "normal")
+        t.commission_gate = lambda s, e, q, p: (True, "OK")
+        t.tradeable_pairs = lambda: ("BTCUSDT", "ETHUSDT")
+        t.price = lambda s: 58000.0
+
+        # Diğer modülleri de OK yap (orijinalleri sakla)
+        import ui.risk_brakes as rb
+        import ui.market_regime as mr
+        import ui.correlation_guard as cg
+
+        other = {
+            "rb_hist": rb.update_from_history, "rb_daily": rb.daily_loss_breached,
+            "rb_dd": rb.drawdown_breached, "rb_crash": rb.crash_detected,
+            "mr_loss": mr.loss_streak_block, "mr_regime": mr.regime,
+            "mr_mtf": mr.mtf_confirm, "cg": cg.guard_entry,
+        }
+        rb.update_from_history = lambda h: {}
+        rb.daily_loss_breached = lambda: (False, "")
+        rb.drawdown_breached = lambda b: (False, "")
+        rb.crash_detected = lambda s: (False, "")
+        mr.loss_streak_block = lambda s: (False, "")
+        mr.regime = lambda s: {"name": "BOĞA", "bear": False, "range": False, "adx": 30}
+        mr.mtf_confirm = lambda s: {"ok": True, "daily": True, "h4": True}
+        cg.guard_entry = lambda o, n: {"allowed": True, "corr": 0.2, "reason": "OK"}
+
+        r = check_gate.run("BTCUSDT", price=58000.0)
+        assert r["ok"] is True
+        assert r["passed"] == 14 and r["total"] == 14
+        assert "14/14 GEÇTİ" in r["summary"]
+
+        # geri yükle
+        rb.update_from_history = other["rb_hist"]
+        rb.daily_loss_breached = other["rb_daily"]
+        rb.drawdown_breached = other["rb_dd"]
+        rb.crash_detected = other["rb_crash"]
+        mr.loss_streak_block = other["mr_loss"]
+        mr.regime = other["mr_regime"]
+        mr.mtf_confirm = other["mr_mtf"]
+        cg.guard_entry = other["cg"]
+    finally:
+        t.cfg = orig["cfg"]
+        t.is_phrase_confirmed = orig["phrase"]
+        check_gate.t.STOP_FILE = orig["stop"]
+        t.available_try = orig["bal"]
+        t.position_size_try = orig["size"]
+        t.volatility_block = orig["vol"]
+        t.commission_gate = orig["comm"]
+        t.tradeable_pairs = orig["pairs"]
+        t.price = orig["price"]
+
+    # 3) Başarısız senaryo: 8. kontrol (rejim AYI) engeller
+    import ui.market_regime as mr2
+
+    orig_regime = mr2.regime
+    try:
+        mr2.regime = lambda s: {"name": "AYI", "bear": True, "range": False, "adx": 30}
+        r2 = check_gate.run("BTCUSDT", price=58000.0)
+        assert r2["ok"] is False
+        assert r2["failed_at"] == 8
+        assert "8. rejim AYI değil" in r2["summary"]
+    finally:
+        mr2.regime = orig_regime
+
+    # 4) Panel 14 kontrol listesini gösteriyor
+    panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
+    assert "14-CHECK GATE" in panel and "SON EMİR KONTROLLERİ" in panel
+    check_gate.t.set_confirmed_phrase("HSC-BINANCE-TR-ARM")  # sonraki testler için
 
 
 def test_readiness_checklist() -> None:

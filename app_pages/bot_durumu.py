@@ -274,6 +274,33 @@ def _panel():
     )
     st.caption(f"Kural: korelasyon > {correlation_guard.CORR_LIMIT} ise aynı anda alım yok · "
                f"son {correlation_guard.CORR_DAYS} günlük kapanış")
+
+    # 14-CHECK GATE
+    st.divider()
+    st.subheader("14-CHECK GATE — son emir kontrolleri", divider="gray")
+    from ui import check_gate
+
+    gate = check_gate.last()
+    if gate:
+        gpass, gtotal = int(gate.get("passed", 0)), int(gate.get("total", 14))
+        ok_color = "#22c55e" if gate.get("ok") else "#ef4444"
+        st.markdown(
+            f'<div style="text-align:center;padding:8px 0 12px 0;">'
+            f'<span style="font-size:22px;font-weight:800;color:{ok_color};letter-spacing:1px;">'
+            f'SON EMİR KONTROLLERİ: {gate.get("summary", "—")}</span></div>',
+            unsafe_allow_html=True,
+        )
+        st.progress(gpass / gtotal if gtotal else 0)
+        st.dataframe(
+            pd.DataFrame([{
+                "#": r["no"], "Kontrol": r["check"],
+                "Sonuç": "✅" if r["ok"] else "❌", "Not": r["note"],
+            } for r in gate.get("results", [])]),
+            use_container_width=True, hide_index=True,
+        )
+    else:
+        st.info("Henüz alım denemesi olmadı — gate çalıştığında 14 kontrol burada görünür.",
+                icon=":material/info:")
     st.caption(
         f"Komisyon filtresi: beklenen kâr ≥ {tr_scalper.MIN_EXPECTED_RR:.0f}× komisyon "
         f"(oran %{tr_scalper.COMMISSION*100:.2f}) · "

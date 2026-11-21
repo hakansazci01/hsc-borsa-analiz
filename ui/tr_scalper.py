@@ -233,6 +233,17 @@ def position_exit(pos: dict[str, Any], px: float, ma: float,
     return ""
 
 
+def _log_gate(gate: dict[str, Any]) -> None:
+    """Başarısız gate kontrolünü loga + ntfy'ye yazar."""
+    try:
+        from ui import autonomous_ops as ops
+
+        ops._log("14-CHECK GATE: " + gate["summary"])
+        ops._send("HSC EMİR ENGELLENDİ", gate["summary"])
+    except Exception:
+        pass
+
+
 # ------------------------------------------------------------------- emir
 def _order(symbol: str, side: int, qty: float) -> dict[str, Any]:
     payload = {"symbol": symbol, "side": side, "type": 2, "quantity": str(qty)}
@@ -259,7 +270,17 @@ def _order(symbol: str, side: int, qty: float) -> dict[str, Any]:
 
 def buy(symbol: str, qty_override: float | None = None,
         grid_part: float | None = None) -> dict[str, Any]:
-    """GERÇEK ALIŞ — tüm kilitler burada uygulanır. Grid parçası toplam limiti aşmaz."""
+    """GERÇEK ALIŞ — 14-check gate + tüm kilitler."""
+    try:
+        from ui import check_gate
+
+        gate = check_gate.run(symbol)
+        check_gate.save(gate)
+        if not gate["ok"]:
+            _log_gate(gate)
+            return {"ok": False, "reason": "14-CHECK GATE: " + gate["summary"]}
+    except ImportError:
+        pass
     gates = config_gate()
     if STOP_FILE.exists():
         gates.append("STOP_FILE etkin")
