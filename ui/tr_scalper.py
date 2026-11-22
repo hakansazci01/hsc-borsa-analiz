@@ -360,7 +360,11 @@ def _order(symbol: str, side: int, qty: float) -> dict[str, Any]:
     if not ok and "BELİRSİZ" in str(data):
         # 5xx/timeout: emir GİTMİŞ OLABİLİR — clientId ile sorgula, tekrar gönderme.
         try:
-            qok, qdata = _request("/open/v1/orders", {"clientId": client_id}, signed=True)
+            cid = ((data.get("data") or {}).get("clientId")
+                   if isinstance(data, dict) else None)
+            if not cid:
+                raise ValueError("5xx yanıtında clientId yok — tekrar gönderilmez")
+            qok, qdata = _request("/open/v1/orders", {"clientId": cid}, signed=True)
             body2 = ((qdata or {}).get("data") or {}) if isinstance(qdata, dict) else {}
             if qok and body2.get("orderId"):
                 res = {"ok": True, "data": qdata,
@@ -376,6 +380,20 @@ def _order(symbol: str, side: int, qty: float) -> dict[str, Any]:
         res = {"ok": False, "reason": f"{data.get('code')}: {data.get('msg')}"}
     else:
         res = {"ok": True, "data": data}
+        # Gerçek dolum slippage'ını CUSUM'a besle (model %0,05)
+        try:
+            from ui import safety_guards
+            b0 = ((data or {}).get("data") or {}) if isinstance(data, dict) else {}
+            actual = float(b0.get("executedPrice") or 0)
+            expected = price(symbol) or actual
+            if actual > 0 and expected > 0:
+                slip = abs(actual - expected) / expected * 100
+                cs = safety_guards.record_slippage(slip)
+                from ui import autonomous_ops as _ao
+                _ao._log(f"CUSUM: gerçek slippage %{slip:.2f} kaydedildi "
+                         f"(model %{cs['expected_pct']:.2f}) → %{cs['cusum_pct']:.2f} {cs['state']}")
+        except Exception as _ce:
+            print(f"CUSUM kayıt hatası: {type(_ce).__name__}: {_ce}", flush=True)
     try:
         from ui.trade_notify import order_alert
 

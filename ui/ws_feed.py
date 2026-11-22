@@ -116,6 +116,20 @@ def _mini_ticker_loop() -> None:
             _stop.wait(RECONNECT_SEC)
 
 
+def handle_user_message(msg: dict[str, Any]) -> str | None:
+    """ExecutionReport eventini loglar — test edilebilir tek nokta."""
+    if not isinstance(msg, dict) or msg.get("e") != "executionReport":
+        return None
+    status = str(msg.get("X") or "")
+    st = _load()
+    st.update(last_user_event=status, user_at=time.time(),
+              at=time.strftime("%Y-%m-%d %H:%M:%S"))
+    _save(st)
+    log(f"WS ExecutionReport: {status} · orderId={msg.get('i')} "
+        f"· filled={msg.get('z')}/{msg.get('q')}")
+    return status
+
+
 def _user_stream_loop() -> None:
     """ExecutionReport push — NEW / PARTIAL / FILLED / CANCEL anında loglanır."""
     import websocket
@@ -125,7 +139,9 @@ def _user_stream_loop() -> None:
     while not _stop.is_set():
         try:
             ok, data = t._request("/open/v1/user-listen-token", signed=True, method="POST")
-            token = ((data or {}).get("data") or {}).get("listenToken") if isinstance(data, dict) else None
+            body = ((data or {}).get("data") or {}) if isinstance(data, dict) else {}
+            token = body.get("token") or body.get("listenToken")  # TR API 'token' döndürür
+            expires = float(body.get("expirationTime", 0) or 0)
             if not ok or not token:
                 _stop.wait(30)
                 continue
@@ -134,15 +150,12 @@ def _user_stream_loop() -> None:
             ws.send(json.dumps({"method": "SUBSCRIBE", "params": [token], "id": 1}))
             log("WS user data BAĞLANDI — ExecutionReport push aktif")
             while not _stop.is_set():
+                # Token süresi dolmak üzereyse yenile (30 dk)
+                if expires and time.time() * 1000 > expires - 30 * 60 * 1000:
+                    log("WS token yenileniyor (30 dk)")
+                    break
                 msg = json.loads(ws.recv())
-                if msg.get("e") == "executionReport":
-                    st_status = msg.get("X")
-                    st = _load()
-                    st.update(last_user_event=st_status, user_at=time.time(),
-                              at=time.strftime("%Y-%m-%d %H:%M:%S"))
-                    _save(st)
-                    log(f"WS ExecutionReport: {st_status} · orderId={msg.get('i')} "
-                        f"· filled={msg.get('z')}/{msg.get('q')}")
+                handle_user_message(msg)
             ws.close()
         except Exception as exc:
             log(f"WS user stream koptu ({type(exc).__name__}) — clientId + REST sorgu yedekte")
