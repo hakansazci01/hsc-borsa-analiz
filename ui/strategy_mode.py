@@ -116,17 +116,23 @@ def bear_params(regime_name: str) -> tuple[float | None, float]:
 
 
 def day_guard() -> str | None:
-    """Günlük 10 işlem / 3 zararlı işlem freni — dönen metin varsa işlem yok."""
+    """İŞLEM SAYISI SINIRI YOK — sadece PORTFÖY günlük %10 zarar freni.
+
+    Tek işlemin zararı durdurmaz; portföy toplamı %10'a (₺552.67) ulaşırsa durur.
+    """
     st = _state()
     today = time.strftime("%Y-%m-%d")
     if st.get("day") != today:
         st.update(day=today, day_trades=0, day_losses=0)
         _save(st)
-        _log(f"YENİ GÜN: {today} — işlem sayacı sıfırlandı")
-    if int(st.get("day_trades", 0)) >= MAX_DAY_TRADES:
-        return f"GÜNLÜK İŞLEM LİMİTİ: {st['day_trades']}/{MAX_DAY_TRADES} — ertesi güne kadar dur"
-    if int(st.get("day_losses", 0)) >= MAX_DAY_LOSSES:
-        return f"GÜNLÜK ZARAR LİMİTİ: {st['day_losses']}/{MAX_DAY_LOSSES} — ertesi güne kadar dur"
+        _log(f"YENİ GÜN: {today} — portföy sayacı sıfırlandı")
+    try:
+        from ui import risk_brakes
+        breached, msg = risk_brakes.daily_loss_breached()
+        if breached:
+            return f"PORTFÖY FRENİ: {msg}"
+    except Exception:
+        pass
     return None
 
 

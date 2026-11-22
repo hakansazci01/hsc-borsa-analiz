@@ -39,8 +39,15 @@ RSI_BUY = 35.0
 RSI_SELL = 70.0
 TAKE_PCT = 0.015        # %1.5 — komisyonun 7.5 katı
 BB_PERIOD, BB_STD = 20, 2.0
-DCA_DROP = 0.01         # %1 düşüşte kademe
+DCA_DROP = 0.01         # %1 düşüşte kademe (mevcut grid kademesi)
 MAX_LADDERS = 3
+# YENİ PORTFÖY MODU — sınırsız işlem, 5 eşzamanlı pozisyon, %5 boyut
+MAX_POSITIONS = 5
+POS_PCT = 0.05
+RESCUE_DROP = 0.02      # %2 düşüşte DCA kurtarma (yarı miktar)
+RESCUE_EXIT = 0.01      # ortalamanın %1 üstünde kara geçiş
+RESCUE_MAX = 2          # en fazla 2 kurtarma kademesi
+STOP_DROP = 0.05        # %5+ düşüşte ATR stop — inatlaşma yok
 MIN_TAKE_PCT = 0.005    # komisyona giriş yok
 SLIPPAGE = 0.005
 FEE = 0.001
@@ -147,6 +154,23 @@ def buy_signal(ind: dict[str, Any]) -> tuple[bool, str]:
     return (near_low and oversold and bb), why
 
 
+def rescue_decision(avg_entry: float, price: float, rescues: int) -> tuple[str, str]:
+    """DCA kurtarma: %2 düşüşte yarı kademe ekle, ortalamanın %1 üstünde çık.
+
+    %5+ düşüşte inatlaşma yok — ATR stop. En fazla 2 kademe.
+    """
+    if avg_entry <= 0:
+        return "HOLD", "giriş fiyatı yok"
+    drop = (avg_entry - price) / avg_entry
+    if drop >= STOP_DROP:
+        return "STOP", f"%{drop*100:.2f} düşüş ≥ %5 — ATR stop, inatlaşma yok"
+    if rescues > 0 and price >= avg_entry * (1 + RESCUE_EXIT):
+        return "EXIT", f"ortalamanın %{RESCUE_EXIT*100:.0f} üstünde — kara geçildi"
+    if drop >= RESCUE_DROP and rescues < RESCUE_MAX:
+        return "ADD", f"%{drop*100:.2f} düşüş ≥ %2 — kurtarma kademesi {rescues+1}/{RESCUE_MAX}"
+    return "HOLD", ""
+
+
 def sell_signal(ind: dict[str, Any], entry: float, atr_stop: float | None = None) -> str | None:
     """Geriye uyumlu basit kontrol (backtest/eskiler). Canlıda sell_decision kullanılır."""
     gain = (ind["price"] - entry) / entry if entry else 0.0
@@ -235,7 +259,8 @@ def cycle() -> list[str]:
                    if _bear_cap else ""))
 
     st = t._load()
-    pos = st.get("position")
+    # 5 eşzamanlı pozisyon: listeden yönetilecek olanı seç (eskiler tekil alanla uyumlu)
+    pos = st.get("position") or (st.get("positions") or [None])[0]
     if pos:
         sym = pos["symbol"]
         ind = indicators(sym)
@@ -277,30 +302,36 @@ def cycle() -> list[str]:
                 sm.day_record(float(res.get("net", 0) or 0))
             logs.append(f"SAT {sym} {'OK' if res.get('ok') else 'HATA'} — {why}")
             return logs
-        # DCA: %1 düşüşte bir %10 kademe daha (en fazla 3)
-        last = float(pos.get("last_buy", entry) or entry)
-        ladder = int(pos.get("ladders", 0) or 0)
-        if ladder < MAX_LADDERS and ind["price"] <= last * (1 - DCA_DROP):
+        # DCA KURTARMA — %2 düşüşte yarı kademe, ortalamanın %1 üstünde çık, %5'te stop
+        avg = float(pos.get("avg_entry", entry) or entry)
+        rescues = int(pos.get("rescues", 0) or 0)
+        act, note = rescue_decision(avg, ind["price"], rescues)
+        logs.append(f"DCA KURTARMA: {sym} — {note}")
+        if act in ("STOP", "EXIT"):
+            res = t.sell(sym, float(pos["qty"]), f"{MOD_ADI}: {note}")
+            logs.append(f"SAT ({'ATR stop' if act == 'STOP' else 'kurtarma kârı'}) {sym} "
+                        f"{'OK' if res.get('ok') else 'HATA'} — {note}")
+            return logs
+        if act == "ADD":
             _vpct, _vnot = volatility_position(ind["atr_pct"])
             _bal = t.available_try()
-            cap = min(t.position_size_try(_bal, sym), _bal * _vpct) if _vpct > 0 else 0
+            cap = min(t.position_size_try(_bal, sym), _bal * _vpct, _bal * POS_PCT / 2) \
+                if _vpct > 0 else 0
             if cap <= 0:
-                return logs + [f"DCA ALINMADI: {_vnot}"]
-            logs.append(f"VOLATİLİTE FİLTRESİ (DCA): {sym} — {_vnot}")
+                return logs + [f"KURTARMA ALINMADI: {_vnot}"]
             flt = t._filters(sym)
-            qty = _qty(cap, ind["price"], flt["step"] or 0.00000001)
-            qty = max(qty, flt["min_qty"])
+            qty = max(_qty(cap, ind["price"], flt["step"] or 0.00000001), flt["min_qty"])
             res = t._order(sym, 0, qty)
             if res.get("ok"):
                 old_qty = float(pos.get("qty", 0))
-                pos["entry"] = round((entry * old_qty + ind["price"] * qty) / (old_qty + qty), 8)
+                pos["avg_entry"] = round((avg * old_qty + ind["price"] * qty) / (old_qty + qty), 8)
                 pos["qty"] = round(old_qty + qty, 8)
-                pos["ladders"] = ladder + 1
-                pos["last_buy"] = ind["price"]
+                pos["rescues"] = rescues + 1
                 t._save({**t._load(), "position": pos})
-                logs.append(f"DCA {ladder+1}/{MAX_LADDERS}: {sym} +{qty} adet @ {ind['price']:.2f}")
+                logs.append(f"KURTARMA {rescues+1}/{RESCUE_MAX}: {sym} +{qty} adet "
+                            f"@ {ind['price']:.2f} · yeni ortalama {pos['avg_entry']:.2f}")
             else:
-                logs.append(f"DCA emri reddedildi: {str(res.get('reason'))[:100]}")
+                logs.append(f"KURTARMA emri reddedildi: {str(res.get('reason'))[:100]}")
         else:
             gain = (ind["price"] - entry) / entry if entry else 0.0
             age_h = (__import__("time").time() - float(pos.get("entry_ts", __import__("time").time()))) / 3600.0
@@ -376,15 +407,21 @@ def cycle() -> list[str]:
     if not res.get("ok"):
         return logs + [f"ALIM HATA ({sym}): {str(res.get('reason'))[:120]}"]
     body = ((res.get("data") or {}).get("data") or {})
-    t._save({**t._load(), "position": {
-        "symbol": sym, "qty": qty, "entry": best["price"],
+    _cur = t._load()
+    _poss = _cur.get("positions", [])
+    if len(_poss) >= MAX_POSITIONS:
+        return logs + [f"PORTFÖY DOLU: {len(_poss)}/{MAX_POSITIONS} — yeni pozisyon açılmadı"]
+    _poss.append({
+        "symbol": sym, "qty": qty, "entry": best["price"], "avg_entry": best["price"],
         "entry_ts": __import__("time").time(),
         "time": __import__("time").strftime("%Y-%m-%d %H:%M:%S"),
         "order_id": body.get("orderId") or body.get("id"),
         "cost": round(best["price"] * qty, 4), "strategy": MOD_ADI,
-        "ladders": 0, "last_buy": best["price"],
+        "rescues": 0, "ladders": 0, "last_buy": best["price"],
         "atr_stop": market_regime.atr_stop(best["price"], sym)["stop"],
-    }, "mode": MOD_ADI})
+    })
+    t._save({**_cur, "positions": _poss, "mode": MOD_ADI})
+    logs.append(f"PORTFÖY: {len(_poss)}/{MAX_POSITIONS} açık pozisyon")
     try:
         from ui import disaster_recovery
         disaster_recovery.backup("hızlı kâr alımı")

@@ -178,8 +178,26 @@ def _panel():
     _gun = strategy_mode._state()
     st.caption(
         f"**Bugün:** {len(_today_rows)} işlem, {_day_kar} kârlı, {_day_zarar} zararlı, "
-        f"Net Kar: {_day_net:+.2f} TL (trades.csv · günlük fren: "
-        f"{_gun.get('day_trades', 0)}/10, {_gun.get('day_losses', 0)}/3)"
+        f"Net Kar: {_day_net:+.2f} TL — işlem/zararlı işlem sınırı YOK, "
+        "sadece portföy %10 freni var"
+    )
+    # PORTFÖY DURUMU — 5 pozisyon, açık K/Z, zararın karla kapatılması
+    _sc = tr_scalper._load()
+    _poss = _sc.get("positions", [])
+    _open_n = len(_poss) + (1 if _sc.get("position") else 0)
+    _open_pnl = 0.0
+    for _p in _poss:
+        try:
+            _cp = tr_scalper.price(_p["symbol"])
+            _open_pnl += (float(_cp) - float(_p["entry"])) * float(_p["qty"])
+        except Exception:
+            pass
+    _offset = "Evet" if _day_kar > 0 and _day_zarar > 0 else "Hayır"
+    st.subheader("Portföy Durumu", divider="gray")
+    st.caption(
+        f"Açık Pozisyon **{_open_n}/5** · Toplam Açık K/Z **{_open_pnl:+.2f} TL** · "
+        f"Bugün Kapanan İşlem **{len(_today_rows)}** · Bugün Net **{_day_net:+.2f} TL** · "
+        f"Bir işlemin zararı diğer işlemin kârıyla kapatıldı mı? **{_offset}**"
     )
 
     # SON İŞLEM — yukarıda okunan trades.csv'nin son satırı

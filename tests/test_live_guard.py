@@ -1543,6 +1543,7 @@ def test_quick_profit_module(tmp_path, monkeypatch) -> None:
 
 def test_auto_regime_mode(tmp_path, monkeypatch) -> None:
     """BOĞA→EMA50, YATAY/AYI→KÜÇÜK KÂR; AYI %7 + RSI<25; günlük 10/3 freni."""
+    from ui import quick_profit as q
     from ui import strategy_mode as sm
 
     monkeypatch.setattr(sm, "STATE", tmp_path / "auto_mode_state.json")
@@ -1559,16 +1560,21 @@ def test_auto_regime_mode(tmp_path, monkeypatch) -> None:
     assert sm.current_auto("BOĞA")[0] == sm.EMA50
     assert sm._state()["previous"] == sm.QUICK
 
-    for _ in range(10):
+    # İŞLEM SAYISI ve ZARARLI İŞLEM SINIRI KALKTI — sadece portföy %10 freni var
+    for _ in range(15):
         sm.day_record(1.0)
-    assert "10" in (sm.day_guard() or "")
+    assert sm.day_guard() is None          # 15 işlem de serbest
     st = sm._state()
-    st["day"] = "2000-01-01"       # yeni gün simülasyonu
+    st["day"] = "2000-01-01"
     sm._save(st)
     assert sm.day_guard() is None
-    for _ in range(3):
+    for _ in range(5):
         sm.day_record(-1.0)
-    assert "3" in (sm.day_guard() or "")
+    assert sm.day_guard() is None          # 5 zararlı da durdurmaz
+    assert q.MAX_POSITIONS == 5 and q.POS_PCT == 0.05
+    assert q.rescue_decision(100, 98, 0)[0] == "ADD"
+    assert q.rescue_decision(100, 101.1, 1)[0] == "EXIT"
+    assert q.rescue_decision(100, 94, 1)[0] == "STOP"
 
 
 def test_quick_profit_scoring_volatility() -> None:
