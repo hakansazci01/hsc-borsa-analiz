@@ -110,3 +110,42 @@ def status() -> dict[str, Any]:
 def buy_allowed() -> tuple[bool, str]:
     s = status()
     return (not s["halt"]), s["msg"]
+
+
+# ------------------------------------------- 3) SON 10 İŞLEM WIN RATE FRENİ
+WIN_RATE_WINDOW = 10
+WIN_RATE_MIN_PCT = 30.0
+
+
+def recent_trade_stats(window: int = WIN_RATE_WINDOW) -> dict[str, Any]:
+    """trades.csv'den son N kapamış işlemin gerçek win rate'i.
+
+    Sembol '—' olan satırlar slippage kaydıdır, işlem sayılmaz.
+    """
+    import csv as _csv
+
+    from ui import tr_scalper as t
+
+    rows: list[dict[str, Any]] = []
+    if t.TRADES_CSV.exists():
+        try:
+            with t.TRADES_CSV.open(encoding="utf-8-sig", newline="") as fh:
+                rows = list(_csv.DictReader(fh))
+        except Exception:
+            rows = []
+    closed = [r for r in rows if str(r.get("sembol", "")).strip() not in ("", "—")]
+    recent = closed[-window:]
+    pnls = [float(r.get("net_kar_zarar", 0) or 0) for r in recent]
+    wins = sum(1 for x in pnls if x > 0)
+    rate = round(wins / len(pnls) * 100, 1) if pnls else 0.0
+    return {"trades": len(pnls), "wins": wins, "losses": len(pnls) - wins,
+            "win_rate": rate, "window": window}
+
+
+def win_rate_allowed() -> tuple[bool, str]:
+    """Son 10 işlemde win rate <%30 ise yeni alım DUR (log + panel)."""
+    s = recent_trade_stats()
+    if s["trades"] >= WIN_RATE_WINDOW and s["win_rate"] < WIN_RATE_MIN_PCT:
+        return False, (f"WIN RATE FRENİ: son {s['trades']} işlemde %{s['win_rate']:.0f} "
+                       f"< %{WIN_RATE_MIN_PCT:.0f} — yeni alım durduruldu")
+    return True, ""

@@ -210,6 +210,25 @@ def _panel():
         f"Net Kar: {_day_net:+.2f} TL — işlem/zararlı işlem sınırı YOK, "
         "sadece portföy %10 freni var"
     )
+    # KÂR / ZARAR İSTATİSTİĞİ — vaat değil, trades.csv'den gerçek rakam
+    from ui import trade_stats as _ts
+
+    _ks = _ts.stats()
+    st.subheader("Kâr Zarar İstatistiği", divider="gray")
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Bugün İşlem", f"{_ks['today_trades']}",
+              delta=f"{_ks['today_wins']} kârlı / {_ks['today_losses']} zararlı")
+    k2.metric("Bugün Net K/Z", f"{_ks['today_net']:+.2f} ₺")
+    k3.metric("Son 7 Gün Net", f"{_ks['week_net']:+.2f} ₺")
+    k4.metric("Win Rate", f"%{_ks['win_rate']:.0f}",
+              help=f"Tüm zamanlar: {_ks['all_trades']} kapamış işlem")
+    st.caption(
+        f"Ortalama kâr: **%{_ks['avg_win_pct']:+.2f}** · "
+        f"ortalama zarar: **%{_ks['avg_loss_pct']:+.2f}** · "
+        f"en iyi coin: **{_ks['best_coin']} ({_ks['best_coin_net']:+.2f} ₺)** · "
+        f"en kötü coin: **{_ks['worst_coin']} ({_ks['worst_coin_net']:+.2f} ₺)** "
+        "— komisyon ve slippage dahil gerçek net"
+    )
     # PORTFÖY DURUMU — 5 pozisyon, açık K/Z, zararın karla kapatılması
     _sc = tr_scalper._load()
     _poss = _sc.get("positions", [])

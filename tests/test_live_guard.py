@@ -333,7 +333,9 @@ def test_autonomous_ops() -> None:
     for name in b["files"]:
         assert (dr.BACKUPS / name).exists()
     assert not hasattr(ops, "backup_files")  # eski ikinci fonksiyon yok
-    assert (ops.BACKUPS / f"{time.strftime('%Y%m%d')}_config.yaml").exists()
+    # backup() timestampli kayıt yazar: YYYYMMDD_HHMMSS_config.yaml
+    assert any(n.startswith(time.strftime("%Y%m%d")) and n.endswith("_config.yaml")
+               for n in b["files"]), "günlük config yedeği bulunamadı"
     # 6) sağlık kontrolü
     h = ops.health_check()
     assert "api_ok" in h and "balance" in h and "failures" in h
@@ -1270,49 +1272,54 @@ def test_volatility_position_size() -> None:
     assert "ATR Durumu" in panel and "Pozisyon Boyutu" in panel
 
 
-def test_disaster_recovery() -> None:
-    """Açık pozisyon kurtarma, bozuk yedeke fallback, 3 yere yedek, gate 16."""
+def test_disaster_recovery(tmp_path, monkeypatch) -> None:
+    """Açık pozisyon kurtarma, bozuk yedeke fallback, 3 yere yedek, gate 16.
+
+    CANLI state ASLA değiştirilmez — tüm yollar tmp_path'e yönlendirilir.
+    """
     import json
     from pathlib import Path
 
     from ui import check_gate, disaster_recovery as dr, tr_scalper as t
 
-    # 1) 3 yere yedek
+    # KRİTİK: test canlı tr_daily_state.json / backups / recovery dosyalarına
+    # dokunmamalı; botun açık pozisyonu silinmesin diye hepsi izole edilir.
+    _backups = tmp_path / "backups"
+    _state = tmp_path / "tr_daily_state.json"
+    _recovery = tmp_path / "recovery.json"
+    monkeypatch.setattr(dr, "BACKUPS", _backups)
+    monkeypatch.setattr(dr, "RECOVERY", _recovery)
+    monkeypatch.setattr(dr, "STATE", _state)
+    monkeypatch.setattr(dr, "SOURCES", [t.TRADES_CSV, _state, t.ROOT / "config.yaml"])
+    monkeypatch.setattr(t, "STATE", _state)
+
+    # 1) 3 yere yedek (izole state dosyası önce oluşturulur)
+    _state.write_text(json.dumps({"cycle_count": 0, "positions": []}), encoding="utf-8")
     rec = dr.backup("test")
     assert rec["ok"] is True and len(rec["files"]) == 3
     assert any("trades.csv" in f for f in rec["files"])
     assert any("tr_daily_state.json" in f for f in rec["files"])
     assert any("config.yaml" in f for f in rec["files"])
 
-    # 2) Açık pozisyon kurtarma: state'e pozisyon yaz, bozuk ana dosya + geçerli yedek
-    original = t.STATE.read_text(encoding="utf-8") if t.STATE.exists() else None
-    original_recovery = dr.RECOVERY.read_text(encoding="utf-8") if dr.RECOVERY.exists() else None
-    try:
-        good = {"position": {"symbol": "BTC_TRY", "qty": 0.1, "entry": 100.0},
-                "history": []}
-        from datetime import datetime
-        valid = dr.BACKUPS / f"{datetime.now().strftime('%Y%m%d')}_000000_tr_daily_state.json"
-        valid.write_text(json.dumps(good), encoding="utf-8")
-        # Ana dosyayı boz
-        t.STATE.write_text("{BOZUK JSON", encoding="utf-8")
-        r = dr.recover()
-        assert r["ok"] is True
-        assert r["open_position"] == "BTC_TRY"  # pozisyon hatırlandı
-        assert valid.name in r["restored_from"]
-        valid.unlink()
-    finally:
-        if original is not None:
-            t.STATE.write_text(original, encoding="utf-8")
-        if original_recovery is not None:
-            dr.RECOVERY.write_text(original_recovery, encoding="utf-8")
+    # 2) Açık pozisyon kurtarma: izole state'e pozisyon yaz, bozuk ana + geçerli yedek
+    good = {"position": {"symbol": "BTC_TRY", "qty": 0.1, "entry": 100.0},
+            "history": []}
+    from datetime import datetime
+    valid = dr.BACKUPS / f"{datetime.now().strftime('%Y%m%d')}_000000_tr_daily_state.json"
+    valid.write_text(json.dumps(good), encoding="utf-8")
+    _state.write_text("{BOZUK JSON", encoding="utf-8")
+    r = dr.recover()
+    assert r["ok"] is True
+    assert r["open_position"] == "BTC_TRY"  # pozisyon hatırlandı
+    assert valid.name in r["restored_from"]
+    valid.unlink()
 
     # 3) İkisi de bozuksa YEDEK BOZUK + işlem engeli
-    # backups altındaki geçerli state yedeklerini geçici kaldır
     saved_backups = list(dr.BACKUPS.glob("*_tr_daily_state.json"))
     for b in saved_backups:
         b.rename(b.with_suffix(".hold"))
     try:
-        t.STATE.write_text("{BOZUK", encoding="utf-8")
+        _state.write_text("{BOZUK", encoding="utf-8")
         msgs = []
         orig_send = dr.autonomous_ops._send
         dr.autonomous_ops._send = lambda title, msg: (msgs.append((title, msg)), True)[1]
@@ -1326,10 +1333,6 @@ def test_disaster_recovery() -> None:
             hold = b.with_suffix(".hold")
             if hold.exists():
                 hold.rename(b)
-        if original is not None:
-            t.STATE.write_text(original, encoding="utf-8")
-        if original_recovery is not None:
-            dr.RECOVERY.write_text(original_recovery, encoding="utf-8")
 
     # 4) Gate artık 16 kontrol
     assert len(check_gate.CHECKS) == 19
@@ -1443,12 +1446,15 @@ def test_manual_intervention_log(tmp_path, monkeypatch) -> None:
     assert "trades.csv SADECE bot işlemleri" in panel
 
 
-def test_bear_cash_strategy(monkeypatch) -> None:
+def test_bear_cash_strategy(tmp_path, monkeypatch) -> None:
     """Ayı rejiminde resmî NAKİTTE BEKLEME stratejisi, alım/Grid yok, short yok.
 
     Bu test ESKİ EMA50 modunu doğrular — yeni mod panelden ayrı seçilir.
+    CANLI state asla değiştirilmez (t._save({}) izole dosyaya yazar).
     """
     from ui import strategy_mode as sm
+    from ui import tr_scalper as _t
+    monkeypatch.setattr(_t, "STATE", tmp_path / "bear_state.json")
 
     # Bu test ESKİ EMA50 akışını doğrular — otomatik modu sabitle
     monkeypatch.setattr(sm, "get", lambda: sm.EMA50)

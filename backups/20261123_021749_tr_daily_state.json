@@ -1,0 +1,21 @@
+{
+  "cycle_count": 1,
+  "positions": [
+    {
+      "symbol": "XLM_TRY",
+      "qty": 39.0,
+      "entry": 6.438,
+      "avg_entry": 6.438,
+      "entry_ts": 1795389469.2161584,
+      "time": "2026-11-23 02:17:49",
+      "order_id": 1389969539,
+      "cost": 251.082,
+      "strategy": "SÜREKLİ KÜÇÜK KAR",
+      "rescues": 0,
+      "ladders": 0,
+      "last_buy": 6.438,
+      "atr_stop": 5.932714
+    }
+  ],
+  "mode": "SÜREKLİ KÜÇÜK KAR"
+}

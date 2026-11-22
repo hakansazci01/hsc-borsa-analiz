@@ -31,21 +31,79 @@ SYMBOLS: tuple[str, ...] = tuple(s for coins, _ in TIERS.values() for s in coins
 
 
 def should_buy(r: dict[str, Any]) -> tuple[bool, str]:
-    """CANLI alım kararı — backtest'in kârlı bölgesiyle birebir aynı.
+    """CANLI alım kararı — SÜREKLİ GRID.
 
-    Backtest (30g): RSI<45 + BB %5 üstü + 1s dip %1 + ATR%0.5-4
-    → 127 işlem, %82.7 kârlı, +%29.7. RSI 45 üstü gevşek girişler -%14.67 verdi.
+    BB alt bandı artık ALIM ENGELİ DEĞİL; sadece skor bileşeni (scan -> bb_puan).
+    Giriş: skor + RSI<45 + 1s dip + ATR aralığı. Katman 1 için %0.5 pullback
+    ayrıca grid_anchor üzerinden control edilir (cycle içinde).
     """
     checks = {
         "skor": float(r.get("score", 0)) >= MIN_SCORE,
         "RSI<45": float(r.get("rsi", 100)) < 45.0,
         "1s dip": float(r.get("price", 0)) <= float(r.get("low1h", 0)) * 1.01,
-        "BB alt bandı": float(r.get("price", 0)) <= float(r.get("lower", 0)) * 1.05,
         "ATR aralığı": 0.5 <= float(r.get("atr_pct", 0)) <= 4.0,
     }
     failed = [k for k, ok in checks.items() if not ok]
     detail = " · ".join(f"{k} {'OK' if ok else 'X'}" for k, ok in checks.items())
     return not failed, detail
+
+
+# --------------------------------------------------------- SÜREKLİ GRID
+GRID_LAYERS = 3                       # coin başına en fazla 3 alım katmanı
+GRID_STEPS = (0.005, 0.010, 0.015)    # katman 1/2/3 — anchor'dan düşüş
+GRID_BUY_PCT = 0.05                   # her katmanın HEDEF büyüklüğü (bakiye %5)
+COIN_HARD_CAP = 0.07                  # coin başına SABİT üst limit %7 (değişmez)
+
+
+def grid_anchor_update(st: dict[str, Any], symbol: str, price: float) -> tuple[dict[str, Any], float]:
+    """Coin'in grid referansını (izleyen zirve) güncelle."""
+    anchors = dict(st.get("grid_anchors", {}) or {})
+    old = float(anchors.get(symbol, price) or price)
+    anchor = max(old, float(price))   # fiyat yükselirse referans yukarı kayar
+    anchors[symbol] = round(anchor, 8)
+    st["grid_anchors"] = anchors
+    return st, anchor
+
+
+def grid_decision(pos: dict[str, Any], price: float) -> tuple[str, str]:
+    """Mevcut pozisyonda yeni katman açılabilir mi? → (HOLD|ADD, neden)."""
+    anchor = float(pos.get("grid_anchor") or pos.get("entry") or 0)
+    layers = int(pos.get("grid_layers", 1) or 1)
+    if anchor <= 0:
+        return "HOLD", "grid referansı yok"
+    if layers >= GRID_LAYERS:
+        return "HOLD", f"{GRID_LAYERS} katman dolu — 4. alım yok, TP satışı bekleniyor"
+    threshold = GRID_STEPS[layers]
+    drop = (anchor - float(price)) / anchor
+    if drop >= threshold:
+        return ("ADD", f"KATMAN {layers+1}: fiyat {float(price):.4f} / referans "
+                       f"{anchor:.4f} · düşüş %{drop*100:.2f} ≥ %{threshold*100:.1f}")
+    return ("HOLD", f"KATMAN {layers+1} için %{threshold*100:.1f} düşüş gerekli "
+                    f"(şu an %{drop*100:.2f})")
+
+
+def _active_position(st: dict[str, Any]) -> tuple[dict[str, Any], bool]:
+    """Aktif pozisyonu tekil alandan veya positions listesinden oku → (pos, listede_mi)."""
+    p = st.get("position")
+    if p:
+        return p, False
+    lp = st.get("positions") or []
+    return (lp[0], True) if lp else ({}, False)
+
+
+def _save_active_position(pos: dict[str, Any], in_list: bool) -> None:
+    """Pozisyonu hangi kapta tutuluyorsa oraya geri yaz (çift kayıt olmasın)."""
+    from ui import tr_scalper as t
+
+    cur = t._load()
+    if in_list:
+        lp = cur.get("positions") or []
+        if lp:
+            lp[0] = pos
+        cur["positions"] = lp
+    else:
+        cur["position"] = pos
+    t._save(cur)
 
 
 def confidence_pct(score: float) -> float:
@@ -353,7 +411,7 @@ def cycle() -> list[str]:
             t._save({**st, "positions": _alive})
             st = t._load()
     # 5 eşzamanlı pozisyon: listeden yönetilecek olanı seç (eskiler tekil alanla uyumlu)
-    pos = st.get("position") or (st.get("positions") or [None])[0]
+    pos, _in_list = _active_position(st)
     if pos:
         # STALE >120 sn: TP dahil hiçbir satış yapma, sadece izle
         from ui import safety_guards
@@ -369,7 +427,7 @@ def cycle() -> list[str]:
         # TP3 trailing zirvesini her turda yukarı güncelle
         if int(pos.get("tp_stage", 0)) >= 3 and ind["price"] > float(pos.get("peak_tp", 0) or 0):
             pos["peak_tp"] = ind["price"]
-            t._save({**t._load(), "position": pos})
+            _save_active_position(pos, _in_list)
         action, ratio, why, locked = sell_decision(pos, ind, atr["stop"])
         if locked > float(pos.get("locked_sl", 0) or 0):
             pos["locked_sl"] = locked
@@ -391,22 +449,32 @@ def cycle() -> list[str]:
                                 flt["step"] or 0.00000001), flt["min_qty"])
             res = t.sell(sym, sell_qty, f"{MOD_ADI}: {why}", partial=True)
             if res.get("ok"):
-                np = t._load().get("position") or pos
+                np, np_in_list = _active_position(t._load())
+                if not np:
+                    np, np_in_list = pos, _in_list
                 np["tp_stage"] = 1 if action == "PARTIAL" else 2
                 if locked:
                     np["locked_sl"] = locked
-                t._save({**t._load(), "position": np})
+                # GRID: TP satışı bir katman slotunu boşaltır, referansı yeniler
+                _freed = max(1, int(np.get("grid_layers", 1) or 1) - 1)
+                np["grid_layers"] = _freed
+                np["grid_anchor"] = ind["price"]
+                _save_active_position(np, np_in_list)
                 sm.day_record(float(res.get("net", 0) or 0))
+                logs.append(f"GRID: TP satışı sonrası katman {int(pos.get('grid_layers',1))}→{_freed}, "
+                            f"yeni referans {ind['price']:.4f}")
             logs.append(f"KDEMELİ SATIŞ {'TP1' if action == 'PARTIAL' else 'TP2'} {sym} "
                         f"{'OK' if res.get('ok') else 'HATA'} · {sell_qty} adet · {why}")
             return logs
         if action == "TRAIL":
-            np = t._load().get("position") or pos
+            np, np_in_list = _active_position(t._load())
+            if not np:
+                np, np_in_list = pos, _in_list
             np["tp_stage"] = 3
             np["peak_tp"] = ind["price"]
             if locked:
                 np["locked_sl"] = locked
-            t._save({**t._load(), "position": np})
+            _save_active_position(np, np_in_list)
             logs.append(f"TP3 TRAILING AKTİF {sym} · zirve {ind['price']:.4f} "
                         f"· kalan %{100*(1-TP1_RATIO-TP2_RATIO):.0f} · {why}")
             return logs
@@ -416,6 +484,44 @@ def cycle() -> list[str]:
                 sm.day_record(float(res.get("net", 0) or 0))
             logs.append(f"SAT {sym} {'OK' if res.get('ok') else 'HATA'} — {why}")
             return logs
+        # SÜREKLİ GRID — katman 2/3: fiyat referanstan %1 / %1.5 düştüğünde ek alım
+        gdec, gnote = grid_decision(pos, ind["price"])
+        logs.append(f"GRID: {sym} — {gnote}")
+        if gdec == "ADD":
+            _wr_ok, _wr_msg = safety_guards.win_rate_allowed()
+            if not _wr_ok:
+                return logs + [_wr_msg]
+            _bal = t.available_try()
+            avg = float(pos.get("avg_entry", entry) or entry)
+            exposure = avg * float(pos.get("qty", 0) or 0)
+            remaining = max(0.0, _bal * COIN_HARD_CAP - exposure)
+            target = _bal * GRID_BUY_PCT
+            spend = min(target, remaining)
+            _layers = int(pos.get("grid_layers", 1) or 1)
+            if spend <= 0:
+                return logs + [f"GRID KATMAN {_layers+1} ALINMADI: coin üst limiti "
+                               f"%{COIN_HARD_CAP*100:.0f} dolu (₺{exposure:.2f})"]
+            flt = t._filters(sym)
+            gqty = max(_qty(spend, ind["price"], flt["step"] or 0.00000001), flt["min_qty"])
+            gres = t._order(sym, 0, gqty)
+            if gres.get("ok"):
+                old_qty = float(pos.get("qty", 0) or 0)
+                new_qty = old_qty + gqty
+                pos["avg_entry"] = round((avg * old_qty + ind["price"] * gqty) / new_qty, 8)
+                pos["qty"] = round(new_qty, 8)
+                pos["cost"] = round(exposure + spend, 4)
+                pos["grid_layers"] = _layers + 1
+                _save_active_position(pos, _in_list)
+                _cap_note = (" · coin %7 üst limiti nedeniyle hedef %5'ten küçültüldü"
+                             if spend < target - 0.01 else "")
+                logs.append(f"GRID ALIM KATMAN {_layers+1}/{GRID_LAYERS} {sym} OK · "
+                            f"{gqty} adet @ {ind['price']:.4f} · ₺{spend:.2f} "
+                            f"(hedef ₺{target:.2f}){_cap_note} · yeni ort. {pos['avg_entry']:.4f}")
+            else:
+                logs.append(f"GRID KATMAN {_layers+1} emri reddedildi: "
+                            f"{str(gres.get('reason'))[:100]}")
+            return logs
+
         # DCA KURTARMA — %2 düşüşte yarı kademe, ortalamanın %1 üstünde çık, %5'te stop
         avg = float(pos.get("avg_entry", entry) or entry)
         rescues = int(pos.get("rescues", 0) or 0)
@@ -426,7 +532,9 @@ def cycle() -> list[str]:
             logs.append(f"SAT ({'ATR stop' if act == 'STOP' else 'kurtarma kârı'}) {sym} "
                         f"{'OK' if res.get('ok') else 'HATA'} — {note}")
             return logs
-        if act == "ADD":
+        if act == "ADD" and int(pos.get("grid_layers", 1) or 1) >= GRID_LAYERS:
+            logs.append(f"KURTARMA ATLANDI: 3 grid katmanı dolu — 4. alım yok, TP bekleniyor")
+        elif act == "ADD":
             _vpct, _vnot = volatility_position(ind["atr_pct"])
             _bal = t.available_try()
             cap = min(t.position_size_try(_bal, sym), _bal * _vpct, _bal * POS_PCT / 2) \
@@ -441,7 +549,7 @@ def cycle() -> list[str]:
                 pos["avg_entry"] = round((avg * old_qty + ind["price"] * qty) / (old_qty + qty), 8)
                 pos["qty"] = round(old_qty + qty, 8)
                 pos["rescues"] = rescues + 1
-                t._save({**t._load(), "position": pos})
+                _save_active_position(pos, _in_list)
                 logs.append(f"KURTARMA {rescues+1}/{RESCUE_MAX}: {sym} +{qty} adet "
                             f"@ {ind['price']:.2f} · yeni ortalama {pos['avg_entry']:.2f}")
             else:
@@ -462,8 +570,9 @@ def cycle() -> list[str]:
                         _ao._log(_msg)
                     except Exception:
                         pass
+            _kademe = int(pos.get("grid_layers", pos.get("ladders", 0)) or 0)
             logs.append(f"Pozisyon {sym}: fiyat {ind['price']:.2f} / giriş {entry:.2f} · "
-                        f"RSI {ind['rsi']:.1f} · kademe {ladder}/{MAX_LADDERS} — bekleniyor")
+                        f"RSI {ind['rsi']:.1f} · kademe {_kademe}/{GRID_LAYERS} — bekleniyor")
         return logs
 
     # KORELASYON: aynı anda en fazla 1 pozisyon — 1. kapanmadan 2. açılmaz
@@ -494,12 +603,27 @@ def cycle() -> list[str]:
         from ui import autonomous_ops as _ao
         _ao._log(buy_halt_msg)
         return logs + [buy_halt_msg]
+    wr_ok, wr_msg = safety_guards.win_rate_allowed()
+    if not wr_ok:
+        from ui import autonomous_ops as _ao
+        _ao._log(wr_msg)
+        return logs + [wr_msg]
     logs.append(f"FİYAT TAZELİĞİ: {fresh_msg}")
     ok, why = should_buy(best)
     if not ok:
         return logs + [f"ALIM YOK: {best['symbol']} — {why}"]
     logs.append(f"ALIM KARARI: {why}")
     sym = best["symbol"]
+    # GRID KATMAN 1: referans zirveden %0.5 pullback olmadan ilk giriş yok
+    _cur = t._load()
+    _cur, anchor = grid_anchor_update(_cur, sym, best["price"])
+    t._save(_cur)
+    _drop = (anchor - best["price"]) / anchor if anchor else 0.0
+    if _drop < GRID_STEPS[0]:
+        return logs + [f"GRID KATMAN 1: %{_drop*100:.2f} pullback < %{GRID_STEPS[0]*100:.1f} "
+                       f"— referans {anchor:.4f}, alım bekleniyor"]
+    logs.append(f"GRID KATMAN 1 tetik: referans {anchor:.4f} → fiyat {best['price']:.4f} "
+                f"(%{_drop*100:.2f} düşüş)")
     _tier, _tier_pct = tier_of(sym)
     logs.append(f"KADEME: {sym} → {_tier} · POZİSYON: "
                 f"%{confidence_pct(best['score'])*100:.0f} (skora göre)")
@@ -553,6 +677,7 @@ def cycle() -> list[str]:
         "order_id": body.get("orderId") or body.get("id"),
         "cost": round(best["price"] * qty, 4), "strategy": MOD_ADI,
         "rescues": 0, "ladders": 0, "last_buy": best["price"],
+        "grid_anchor": anchor, "grid_layers": 1,
         "atr_stop": market_regime.atr_stop(best["price"], sym)["stop"],
     })
     t._save({**_cur, "positions": _poss, "mode": MOD_ADI})

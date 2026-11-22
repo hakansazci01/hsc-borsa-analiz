@@ -529,8 +529,15 @@ def sell(symbol: str, qty: float, reason: str, partial: bool = False) -> dict[st
         return {"ok": False, "reason": str(data)[:200]}
 
     st = _load()
-    pos = st.get("position") or {}
-    entry = float(pos.get("entry", px))
+    # Aktif pozisyon tekil alanda YA DA positions listesinde olabilir.
+    # İkisini de kontrol et — yoksa TP satışında K/Z sıfır kaydedilirdi.
+    in_list = False
+    pos = st.get("position")
+    if not pos:
+        _lp = st.get("positions") or []
+        pos = _lp[0] if _lp else {}
+        in_list = bool(_lp)
+    entry = float(pos.get("entry", px)) if pos else px
     gross = (px - entry) * qty
     fee_rate = live_commission()   # API'den doğrulanmış gerçek oran
     fee = (entry + px) * qty * fee_rate
@@ -553,11 +560,20 @@ def sell(symbol: str, qty: float, reason: str, partial: bool = False) -> dict[st
                 pos["qty"] = remaining
                 pos["partial_done"] = True
                 pos["partial_profit"] = round(float(pos.get("partial_profit", 0)) + net, 4)
-                st["position"] = pos
+                if in_list:
+                    st["positions"][0] = pos
+                else:
+                    st["position"] = pos
+            else:
+                if in_list:
+                    st["positions"] = st["positions"][1:]
+                else:
+                    st.pop("position", None)
+        else:
+            if in_list:
+                st["positions"] = st["positions"][1:]
             else:
                 st.pop("position", None)
-        else:
-            st.pop("position", None)
         if _dust > 0:
             st["dust"] = {
                 "asset": symbol.split("_")[0], "qty": round(_dust, 8),

@@ -85,8 +85,9 @@ def recover() -> dict[str, Any]:
             # Geçerli yedeği ana state'e geri yükle (açık pozisyon korunur)
             if path != STATE:
                 shutil.copy2(path, STATE)
+            _p = data.get("position") or (data.get("positions") or [None])[0]
             rec = {"ok": True, "restored_from": path.name, "tried": tried,
-                   "open_position": data.get("position", {}).get("symbol") if data.get("position") else None,
+                   "open_position": _p.get("symbol") if _p else None,
                    "at": time.strftime("%Y-%m-%d %H:%M:%S")}
             _save_recovery(rec)
             autonomous_ops._log(f"KURTARMA BAŞARILI: {path.name} · "
