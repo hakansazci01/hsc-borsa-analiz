@@ -11,8 +11,8 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from ui import (auto_open, autonomous, autonomous_ops, risk_brakes, tr_journal,
-                tr_monitor, tr_runner, tr_scalper)
+from ui import (auto_open, autonomous, autonomous_ops, risk_brakes, strategy_mode,
+                tr_journal, tr_monitor, tr_runner, tr_scalper)
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -82,15 +82,17 @@ def _panel():
         f"Kanıt: enabled={enabled} · phrase={phrase} · STOP_FILE={stop} · "
         f"config_gate={gate} · WATCHDOG={w_alive} · SCHEDULER={s_alive} · MOTOR={r_alive}"
     )
-    # GÜVENLİK — withdraw izni açıksa her gün kırmızı uyarı
-    try:
-        _ok, _acc = tr_scalper._request("/open/v1/account/spot", signed=True)
-        _can_wd = int((((_acc or {}).get("data") or {}).get("canWithdraw", 0)) or 0)
-    except Exception:
-        _can_wd = 0
-    if _can_wd:
+    # GÜVENLİK — API ANAHTARI çekme izni (kullanıcı Binance TR API Yönetimi'nden doğruladı).
+    # canWithdraw hesap durumudur, anahtar izni DEĞİL — o yüzden kullanılmıyor.
+    _wd = bool(strategy_mode._load_cfg().get("security", {}).get(
+        "withdraw_permission", True))
+    if _wd:
         st.error("⚠️ **Withdraw izni açık** — Binance TR'den kapatın, "
                  "bot withdraw olmadan da çalışır.", icon=":material/warning:")
+    else:
+        st.success("✅ Withdraw kapalı - Güvenli")
+        st.caption("Binance TR API Yönetimi ekranında Çekme İşlemleri kapalı "
+                   "(kullanıcı doğrulaması) — bot çekme yapmaz.")
     # TOZ BİRİKMESİ — bot sadece uyarır, API dönüşümü denemez (endpoint yok)
     _dust = tr_scalper._load().get("dust") or {}
     if float(_dust.get("qty", 0) or 0) > 0:
@@ -134,8 +136,6 @@ def _panel():
                  help=f"aralık {interval} sn")
 
     # --- BAKİYE / POZİSYON / İŞLEM (canlı API + gerçek kayıt) ---
-    from ui import strategy_mode as strategy_mode
-
     # trades.csv TEK doğruluk kaynağı — komisyon + slippage dahil gerçek net
     import csv as _csv
 

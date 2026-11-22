@@ -97,6 +97,13 @@ alerts:
   ntfy_topic: "borsa-hsc-tr-2026" # ntfy.sh abonelik konusu (degistirilebilir)
   email_enabled: false           # Gmail SMTP (uygulama sifresi gerekir)
 
+# GÜVENLİK — API anahtarında ÇEKME izni durumu (kullanıcı Binance TR API Yönetimi
+# ekranından doğruladı: "Çekme İşlemlerinizi Etkinleştirin" kutucuğu BOŞ = kapalı).
+# NOT: /open/v1/account/spot yanıtındaki canWithdraw HESAP durumudur, ANAHTAR izni değildir;
+# Binance TR'de anahtar iznini okuyan endpoint yok (404). Bu yüzden doğrulama kaynağı budur.
+security:
+  withdraw_permission: false
+
 # STRATEJI MODU — EMA50 Pullback (orijinal) / QUICK_PROFIT (SÜREKLİ KÜÇÜK KAR)
 # Panelden degistirilir. EMA50 kodu silinmedi, yeni mod yanina eklendi.
 strategy:
