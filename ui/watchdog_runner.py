@@ -17,7 +17,13 @@ def _claim() -> bool:
         if LOCK.exists():
             pid = int(LOCK.read_text(encoding="utf-8").strip() or 0)
             if pid and psutil.pid_exists(pid) and pid != os.getpid():
-                return False
+                try:
+                    cmd = " ".join(psutil.Process(pid).cmdline() or [])
+                except Exception:
+                    cmd = ""
+                # Sadece gerçek watchdog PID'i kilidi tutar; wslhost.exe vb. devralınır.
+                if "ui.watchdog_runner" in cmd:
+                    return False
     except Exception:
         pass
     LOCK.parent.mkdir(parents=True, exist_ok=True)

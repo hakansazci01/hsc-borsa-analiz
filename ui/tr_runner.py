@@ -26,18 +26,16 @@ CYCLE = tr_scalper.cycle   # günlük EMA50 (1dk scalper kaldırıldı)
 
 
 def _pid_alive(pid: int) -> bool:
+    """PID yaşayan bir MOTOR mu? (wslhost.exe gibi PID yeniden kullanımını engelle)."""
     try:
         import psutil
 
-        return psutil.pid_exists(pid) and psutil.Process(pid).is_running()
+        p = psutil.Process(pid)
+        cmd = " ".join(p.cmdline() or [])
+        exe = (p.exe() or "").lower()
+        return "python" in exe and "ui.tr_runner" in cmd
     except Exception:
-        try:
-            import os
-
-            os.kill(pid, 0)
-            return True
-        except Exception:
-            return False
+        return False
 
 
 def _acquire_lock() -> bool:
