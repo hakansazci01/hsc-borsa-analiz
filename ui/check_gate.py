@@ -34,8 +34,10 @@ CHECKS = [
 
 
 def run(symbol: str, price: float | None = None,
-        expected_return: float | None = None) -> dict[str, Any]:
-    """16 kontrolü sırayla çalıştır. İlk başarısızlıkta durur."""
+        expected_return: float | None = None,
+        mode: str = "EMA50_PULLBACK") -> dict[str, Any]:
+    """16 kontrolü sırayla çalıştır. SÜREKLİ KÜÇÜK KAR modunda 8/9 uyarlanır."""
+    quick = str(mode).upper() == "QUICK_PROFIT"
     px = price if price is not None else t.price(symbol)
     results: list[dict[str, Any]] = []
     failed_at: int | None = None
@@ -70,11 +72,17 @@ def run(symbol: str, price: float | None = None,
     # 7) ardışık zarar
     ls, lsmsg = market_regime.loss_streak_block(st)
     add(not ls, lsmsg or "ardışık zarar < 3")
-    # 8) rejim AYI değil
+    # 8) rejim — EMA50'de AYI alınmaz; SÜREKLİ KÜÇÜK KAR'da AYI'da %7 + RSI<25
     reg = market_regime.regime(symbol)
-    add(not reg["bear"], f"rejim={reg['name']} (AYI ise alınmaz)")
-    # 9) MTF onayı (sadece NORMAL modda — GRID modunda bu kontrol atlanır)
-    if reg["range"]:
+    if quick:
+        add(True, "", ok_note=f"rejim={reg['name']} — AYI ise %7 pozisyon + RSI<25")
+    else:
+        add(not reg["bear"], f"rejim={reg['name']} (AYI ise alınmaz)")
+    # 9) MTF — SÜREKLİ KÜÇÜK KAR 1s RSI+BB ile çalışır, günlük/4s MTF aranmaz
+    if quick:
+        results.append({"no": 9, "check": CHECKS[8], "ok": True,
+                        "note": "SÜREKLİ KÜÇÜK KAR — MTF aranmaz (1s RSI + Bollinger)"})
+    elif reg["range"]:
         results.append({"no": 9, "check": CHECKS[8], "ok": True,
                         "note": "GRID modu — MTF onayı aranmaz"})
     else:

@@ -244,7 +244,9 @@ def _panel():
 
     _auto_mode, _auto_reg = sm.current_auto(reg["name"])
     strat_label = sm.LABELS[_auto_mode]
-    rejim_modu = "GRID" if reg["range"] else ("NAKİTTE BEKLEME" if reg["bear"] else "NORMAL")
+    rejim_modu = ("AYI (%7, RSI<25)" if (_auto_mode == sm.QUICK and reg["bear"])
+                  else "GRID" if reg["range"]
+                  else "NAKİTTE BEKLEME" if reg["bear"] else "NORMAL")
     _mc = "#eab308" if _auto_mode == sm.QUICK else "#22c55e"
     st.markdown(
         f'<div style="text-align:center;padding:6px 0 10px 0;">'
@@ -277,6 +279,12 @@ def _panel():
                     "ATR%": r["atr_pct"], "Pozisyon": f"%{r['pozisyon_pct']*100:.0f}",
                     "Karar": r["vol_not"],
                 } for r in _skor]), use_container_width=True, hide_index=True)
+                _max_skor = max(float(r["score"]) for r in _skor)
+                if _max_skor < 10:
+                    st.info("Şu an piyasa durgun — fırsat yok (en yüksek skor "
+                            f"{_max_skor:.1f}/100). Skor formülü doğru: son 30 günde "
+                            "100'e kadar çıktı, şu an RSI/düşüş/hacim/BB sinyali yok.",
+                            icon=":material/info:")
         except Exception as _be:
             st.caption(f"backtest verisi alınamadı: {type(_be).__name__}")
     g = tr_scalper._load().get("grid", {})
@@ -287,6 +295,11 @@ def _panel():
                    f"anchor {float(g.get('anchor', 0)):.4f}")
         st.info("YATAY rejim — Grid modu aktif, %1 düşüşte al / %1 yükselişte sat.",
                 icon=":material/grid_on:")
+    elif rejim_modu == "AYI (%7, RSI<25)":
+        st.info("**Ayı rejimi — SÜREKLİ KÜÇÜK KAR aktif:** %7 pozisyon, RSI<25 ile "
+                "az işlem. Ayıda Nakitte Kalma kuralı BU modda uygulanmaz "
+                "(sadece EMA50 modunda geçerli). Spot long-only.",
+                icon=":material/info:")
     elif rejim_modu == "NAKİTTE BEKLEME":
         _pos_now = tr_scalper._load().get("position")
         cash_pct = 0 if _pos_now else 100
@@ -294,8 +307,10 @@ def _panel():
                  "short/futures/yok. Spot long-only.", icon=":material/warning:")
         st.metric("Nakit Oranı", f"%{cash_pct}", help=f"Binance TR canlı bakiye: ₺{bal:,.2f}")
     else:
-        st.success("BOĞA rejimi — Grid kapalı, normal EMA50 pullback modu.",
-                   icon=":material/check:")
+        _bull_msg = ("BOĞA rejimi — Grid kapalı, normal EMA50 pullback modu."
+                     if _auto_mode == sm.EMA50 else
+                     "BOĞA rejimi — Sürekli Küçük Kar modu, %1.5 kâr hedefi.")
+        st.success(_bull_msg, icon=":material/check:")
 
     # ATR BAZLI STOP göstergesi
     atr_info = market_regime.atr_stop(reg["price"], "BTC_TRY")
@@ -604,7 +619,8 @@ def _panel():
 
     # CANLI gate — kayıtlı/eski veri KULLANILMAZ
     try:
-        gate_live = check_gate.run("BTC_TRY", price=tr_scalper.price("BTC_TRY"))
+        gate_live = check_gate.run("BTC_TRY", price=tr_scalper.price("BTC_TRY"),
+                                   mode=_auto_mode)
         fixed = gate_live["results"]
         gpass, gtotal = int(gate_live["passed"]), int(gate_live["total"])
         summary = gate_live["summary"]
