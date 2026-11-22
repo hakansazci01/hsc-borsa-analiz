@@ -37,6 +37,14 @@ def _load() -> dict[str, Any]:
 def _save(d: dict[str, Any]) -> None:
     STATE.parent.mkdir(parents=True, exist_ok=True)
     STATE.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
+    # CUSUM fill-quality takibi — her gerçek dolum kaydında birikim güncellenir
+    try:
+        last = d.get("last") or {}
+        if "slippage_pct" in last:
+            from ui import safety_guards
+            safety_guards.record_slippage(float(last["slippage_pct"]))
+    except Exception:
+        pass
 
 
 def slippage(expected: float, actual: float) -> dict[str, Any]:

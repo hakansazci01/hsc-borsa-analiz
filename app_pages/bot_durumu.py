@@ -169,6 +169,23 @@ def _panel():
         f"Kâr Kilidi ₺{tr_scalper.PROFIT_LOCK_TRY:.2f}"
     )
     st.caption("Skor 35-50: %5 · 50-70: %6 · 70+: %7 · Üst limit %7 (asla %10'a çıkmaz)")
+    # STALE-DATA + SLIPPAGE CUSUM — güvenlik frenleri
+    from ui import safety_guards as _sg
+
+    _fresh_ok, _fresh_msg = _sg.stale_check()
+    if _fresh_ok:
+        st.caption(f"✅ Fiyat Tazeliği: **{_fresh_msg}**")
+    else:
+        st.error(f"⚠️ Fiyat Tazeliği: **BAYAT** — {_fresh_msg} — Alım Durduruldu",
+                 icon=":material/warning:")
+    _sgst = _sg.status()
+    if _sgst["state"] == "ALARM":
+        st.error(f"🚨 {_sgst['msg']}", icon=":material/error:")
+    elif _sgst["state"] == "UYARI":
+        st.warning(_sgst["msg"], icon=":material/warning:")
+    else:
+        st.caption(f"✅ Slippage CUSUM: **%{_sgst['cusum_pct']:.2f} - Normal** "
+                   f"(model %{_sgst['expected_pct']:.2f} · son 5 ort. %{_sgst['recent5_avg_pct']:.2f})")
     # OFI / L2 DEPTH — temiz mi toxic mi
     from ui import order_flow as _ofi_mod
 

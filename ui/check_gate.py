@@ -32,6 +32,7 @@ CHECKS = [
     "yedek sağlam mı (felaket kurtarma)",
     "OFI / L2 depth temiz",
     "skor güveni (%5-7)",
+    "stale-data: tick yaşı < 60 sn",
 ]
 
 
@@ -153,6 +154,13 @@ def run(symbol: str, price: float | None = None,
     else:
         results.append({"no": 18, "check": CHECKS[17], "ok": True,
                         "note": "EMA50 modu — sabit pozisyon"})
+    # 19) Stale-data — tick yaşı < 60 sn (WS/REST en tazesi)
+    try:
+        from ui import safety_guards
+        fresh, msg = safety_guards.stale_check()
+        add(fresh, msg, f"tick taze ✅ ({msg})")
+    except Exception:
+        add(True, "", "stale kontrolü atlandı (fail-open)")
 
     passed = sum(1 for r in results if r["ok"])
     return {

@@ -355,6 +355,11 @@ def cycle() -> list[str]:
     # 5 eşzamanlı pozisyon: listeden yönetilecek olanı seç (eskiler tekil alanla uyumlu)
     pos = st.get("position") or (st.get("positions") or [None])[0]
     if pos:
+        # STALE >120 sn: TP dahil hiçbir satış yapma, sadece izle
+        from ui import safety_guards
+        sell_ok, stale_msg = safety_guards.stale_check(sell=True)
+        if not sell_ok:
+            return logs + [stale_msg]
         sym = pos["symbol"]
         ind = indicators(sym)
         if not ind:
@@ -480,6 +485,16 @@ def cycle() -> list[str]:
                 f"— kademe: {best['vol_not']}")
     if best["pozisyon_pct"] <= 0:
         return logs + [f"ALIM YOK: {best['vol_not']}"]
+    from ui import safety_guards
+    fresh_ok, fresh_msg = safety_guards.stale_check()
+    if not fresh_ok:
+        return logs + [fresh_msg]
+    buy_ok, buy_halt_msg = safety_guards.buy_allowed()
+    if not buy_ok:
+        from ui import autonomous_ops as _ao
+        _ao._log(buy_halt_msg)
+        return logs + [buy_halt_msg]
+    logs.append(f"FİYAT TAZELİĞİ: {fresh_msg}")
     ok, why = should_buy(best)
     if not ok:
         return logs + [f"ALIM YOK: {best['symbol']} — {why}"]
