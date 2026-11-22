@@ -8,13 +8,15 @@ Başlamadan önce eski .venv/global runner kopyalarını temizler (çift süreç
 
 from __future__ import annotations
 
+import os
 import sys
 import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
-AUTOSTART_LOG = ROOT / "users" / "autostart.log"
+# Masaüstü simgesi HSC_START_LOG=manual_start.log geçirir; aksi halde autostart.log
+AUTOSTART_LOG = ROOT / "users" / os.environ.get("HSC_START_LOG", "autostart.log")
 
 
 def _autolog(msg: str) -> None:
@@ -54,7 +56,10 @@ def _kill_old_runners() -> int:
 
 
 def main() -> None:
-    _autolog("Bilgisayar açıldı, bot başlatılıyor...")
+    _label = ("Masaüstünden başlatıldı"
+              if os.environ.get("HSC_START_SOURCE") == "masaustu"
+              else "Bilgisayar açıldı")
+    _autolog(f"{_label}, bot başlatılıyor...")
     try:
         n = _kill_old_runners()
         _autolog(f"Eski süreç temizliği: {n} kopya kapatıldı")
