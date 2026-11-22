@@ -71,6 +71,7 @@ def _request(
     *,
     signed: bool = False,
     method: str = "GET",
+    _retry: int = 1,
 ) -> tuple[bool, Any]:
     params = dict(params or {})
     headers: dict[str, str] = {"Accept": "application/json"}
@@ -96,6 +97,14 @@ def _request(
         with urllib.request.urlopen(req, timeout=15) as resp:
             return True, json.loads(resp.read().decode())
     except urllib.error.HTTPError as exc:
+        # 429 = rate limit, 418 = IP ban başlangıcı. Retry-After'a uy, bir kez dene.
+        if exc.code in (429, 418):
+            wait = min(float(exc.headers.get("Retry-After", 1) or 1), 5.0)
+            if _retry > 0 and exc.code == 429:
+                time.sleep(wait)
+                return _request(path, params, signed=signed, method=method,
+                                _retry=_retry - 1)
+            return False, f"HTTP {exc.code}: rate limit — {wait:.0f} sn beklenmeli"
         return False, f"HTTP {exc.code}: {exc.read().decode()[:200]}"
     except Exception as exc:
         return False, f"Bağlantı hatası ({type(exc).__name__})"

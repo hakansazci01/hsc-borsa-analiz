@@ -255,10 +255,25 @@ def cycle() -> list[str]:
     _mode, _reg = sm.current_auto()
     _bear_cap, _rsi_max = sm.bear_params(_reg)
     logs.append(f"REJİM: {_reg} — MOD: {sm.LABELS[_mode]}"
-                + (f" (AYI: %{_bear_cap*100:.0f} pozisyon, RSI<{_rsi_max:.0f})"
+                + (f" (AYI: %{POS_PCT*100:.0f} pozisyon, RSI<{_rsi_max:.0f})"
                    if _bear_cap else ""))
 
     st = t._load()
+    # RECONCILIATION: state'deki pozisyonlar ile gerçek API bakiyesini doğrula.
+    # API bakiyesi yoksa hayalet pozisyonu temizle (fill olmadı / elle satıldı).
+    _poss = st.get("positions", [])
+    if _poss:
+        _alive = []
+        for _p in _poss:
+            _bal = t.asset_balance(_p["symbol"].split("_")[0]) or 0
+            if _bal >= float(_p.get("qty", 0)) * 0.5:
+                _alive.append(_p)
+            else:
+                logs.append(f"RECONCILE: {_p['symbol']} API bakiyesi {_bal:.6f} < "
+                            f"pozisyon {float(_p.get('qty',0)):.6f} — hayalet pozisyon temizlendi")
+        if len(_alive) != len(_poss):
+            t._save({**st, "positions": _alive})
+            st = t._load()
     # 5 eşzamanlı pozisyon: listeden yönetilecek olanı seç (eskiler tekil alanla uyumlu)
     pos = st.get("position") or (st.get("positions") or [None])[0]
     if pos:
