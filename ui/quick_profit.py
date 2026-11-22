@@ -219,8 +219,12 @@ def sell_signal(ind: dict[str, Any], entry: float, atr_stop: float | None = None
 
 
 # --- AKILLI SATIŞ: kademeli + trailing + zaman stopu ---
-FIRST_TAKE_PCT = 0.008       # %0.8 → yarısı
-FIRST_TAKE_RATIO = 0.5
+TP1_PCT = 0.008              # %0.8 → ilk %40
+TP1_RATIO = 0.40
+TP2_PCT = 0.015              # %1.5 → ikinci %40 (orijinal pozisyondan)
+TP2_RATIO = 0.40
+TP3_PCT = 0.025              # %2.5 → kalan %20 trailing moda
+TRAIL_PULLBACK = 0.005       # zirveden %0.5 geri çekilmede sat
 TRAIL_BE_GAIN = 0.008        # %0.8 → stop girişe (breakeven)
 TRAIL_LOCK_GAIN = 0.012      # %1.2 → stop %0.5 kara
 TRAIL_LOCK_PCT = 0.005
@@ -248,11 +252,20 @@ def sell_decision(pos: dict[str, Any], ind: dict[str, Any],
     elif gain >= TRAIL_BE_GAIN - eps:
         locked = max(locked, entry)
 
-    if gain >= TAKE_PCT - eps:  # %1.5 → kalan %50
-        return "FULL", 1.0, f"kademeli 2/2: kâr %{gain*100:.2f} ≥ %1.5 — tam kapanış", locked
-    if gain >= FIRST_TAKE_PCT - eps and not pos.get("first_take_done"):
-        return "PARTIAL", FIRST_TAKE_RATIO, \
-            f"kademeli 1/2: kâr %{gain*100:.2f} ≥ %0.8 — yarısat", locked
+    stage = int(pos.get("tp_stage", 0))
+    peak = max(float(pos.get("peak_tp", entry) or 0), price)
+    if stage >= 3 and price <= peak * (1 - TRAIL_PULLBACK) + eps:
+        return "FULL", 1.0, \
+            f"TP3 trailing: zirve {peak:.4f}'den %{TRAIL_PULLBACK*100:.1f} geri çekildi", locked
+    if gain >= TP3_PCT - eps and stage < 3:
+        return "TRAIL", 1.0, \
+            f"TP3: kâr %{gain*100:.2f} ≥ %2.5 — kalan %20 trailing moda", locked
+    if gain >= TP2_PCT - eps and stage < 2:
+        return "PARTIAL2", TP2_RATIO, \
+            f"TP2: kâr %{gain*100:.2f} ≥ %1.5 — %40 daha sat", locked
+    if gain >= TP1_PCT - eps and stage < 1:
+        return "PARTIAL", TP1_RATIO, \
+            f"TP1: kâr %{gain*100:.2f} ≥ %0.8 — %40 sat + breakeven", locked
     if locked and price <= locked:
         return "FULL", 1.0, f"trailing stop {locked:.4f} değdi (kâr %{gain*100:.2f})", locked
     if ind["rsi"] > RSI_SELL:
@@ -318,6 +331,10 @@ def cycle() -> list[str]:
             return [f"{sym}: 1s veri yok — pozisyon korunuyor"]
         entry = float(pos.get("entry", 0))
         atr = market_regime.atr_stop(ind["price"], sym)
+        # TP3 trailing zirvesini her turda yukarı güncelle
+        if int(pos.get("tp_stage", 0)) >= 3 and ind["price"] > float(pos.get("peak_tp", 0) or 0):
+            pos["peak_tp"] = ind["price"]
+            t._save({**t._load(), "position": pos})
         action, ratio, why, locked = sell_decision(pos, ind, atr["stop"])
         if locked > float(pos.get("locked_sl", 0) or 0):
             pos["locked_sl"] = locked
@@ -331,20 +348,32 @@ def cycle() -> list[str]:
                 _ao._log(_msg)
             except Exception:
                 pass
-        if action == "PARTIAL":
+        if action in ("PARTIAL", "PARTIAL2"):
             flt = t._filters(sym)
-            half = max(_qty(float(pos["qty"]) * ratio, ind["price"],
-                            flt["step"] or 0.00000001), flt["min_qty"])
-            res = t.sell(sym, half, f"{MOD_ADI}: {why}", partial=True)
+            # TP2 orijinal pozisyonun %40'ı — kalan qty'nin 2/3'ü (0.4/0.6)
+            factor = ratio if action == "PARTIAL" else ratio / (1 - TP1_RATIO)
+            sell_qty = max(_qty(float(pos["qty"]) * factor, ind["price"],
+                                flt["step"] or 0.00000001), flt["min_qty"])
+            res = t.sell(sym, sell_qty, f"{MOD_ADI}: {why}", partial=True)
             if res.get("ok"):
                 np = t._load().get("position") or pos
-                np["first_take_done"] = True
+                np["tp_stage"] = 1 if action == "PARTIAL" else 2
                 if locked:
                     np["locked_sl"] = locked
                 t._save({**t._load(), "position": np})
                 sm.day_record(float(res.get("net", 0) or 0))
-            logs.append(f"KDEMELİ SATIŞ 1/2 {sym} {'OK' if res.get('ok') else 'HATA'} "
-                        f"· {half} adet · {why}")
+            logs.append(f"KDEMELİ SATIŞ {'TP1' if action == 'PARTIAL' else 'TP2'} {sym} "
+                        f"{'OK' if res.get('ok') else 'HATA'} · {sell_qty} adet · {why}")
+            return logs
+        if action == "TRAIL":
+            np = t._load().get("position") or pos
+            np["tp_stage"] = 3
+            np["peak_tp"] = ind["price"]
+            if locked:
+                np["locked_sl"] = locked
+            t._save({**t._load(), "position": np})
+            logs.append(f"TP3 TRAILING AKTİF {sym} · zirve {ind['price']:.4f} "
+                        f"· kalan %{100*(1-TP1_RATIO-TP2_RATIO):.0f} · {why}")
             return logs
         if action == "FULL":
             res = t.sell(sym, float(pos["qty"]), f"{MOD_ADI}: {why}")
@@ -519,7 +548,7 @@ def backtest(days: int = 30, symbols: list[str] | tuple[str, ...] | None = None)
                 if (0.5 <= ap <= 4.0 and px <= low24 * 1.01
                         and r < 45 and px <= lo * 1.05):
                     pos = {"entry": px * (1 + SLIPPAGE), "units": 1,
-                           "ladders": 0, "last": px}
+                           "ladders": 0, "last": px, "stage": 0, "peak": px, "realized": 0.0}
                 continue
             gain = (px - pos["entry"]) / pos["entry"]
             if gain >= TAKE_PCT or r > RSI_SELL:

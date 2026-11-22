@@ -535,17 +535,26 @@ def _panel():
 
     # KISMİ KÂR ALIMI
     st.divider()
-    st.subheader("Kısmî kâr alımı", divider="gray")
+    st.subheader("Kademeli Kâr Alımı", divider="gray")
     _p = tr_scalper._load().get("position") or {}
-    if _p:
-        pp = tr_scalper.partial_profit(_p, _p.get("entry", 0))
+    if _auto_mode == sm.QUICK:
+        _stage = int(_p.get("tp_stage", 0))
+        k1, k2, k3 = st.columns(3)
+        k1.metric("TP1 %0.8 → %40", "Satıldı ✅" if _stage >= 1 else "Bekliyor",
+                  help="Stop giriş fiyatına çekilir (breakeven)")
+        k2.metric("TP2 %1.5 → %40", "Satıldı ✅" if _stage >= 2 else "Bekliyor")
+        k3.metric("TP3 %2.5 → %20", "Trailing aktif ♻️" if _stage >= 3 else "Bekliyor",
+                  help="Zirveden %0.5 geri çekilmede satılır")
+        st.caption("Sürekli Küçük Kar: %0.8'de %40 + breakeven · %1.5'te %40 · "
+                   "%2.5'te kalan %20 trailing. DCA kurtarma aynen çalışır.")
+    elif _p:
         k1, k2, k3 = st.columns(3)
         k1.metric("Kısmî Satış", "Yapıldı ✅" if _p.get("partial_done") else "Yapılmadı")
         k2.metric("Cebe Konan Kâr", f"{float(_p.get('partial_profit', 0)):+.2f} ₺")
         k3.metric("Kalan Pozisyon", f"₺{float(_p.get('qty', 0)) * float(_p.get('entry', 0)):.2f}")
-        st.caption("%5 karda pozisyonun %50'si satılır, kalanı trailing TP ile devam eder · sadece NORMAL mod")
+        st.caption("%5 karda pozisyonun %50'si satılır · EMA50 modu")
     else:
-        st.info("Açık pozisyon yok — kısmî satış pasif.", icon=":material/info:")
+        st.info("Açık pozisyon yok — kademeli satış pasif.", icon=":material/info:")
 
     # TRAILING TAKE-PROFIT
     st.divider()

@@ -1610,16 +1610,18 @@ def test_quick_profit_smart_exit() -> None:
     a = q.sell_decision(base, {"price": 100.5, "rsi": 50}, None, now)
     assert a[0] == "HOLD"
     a = q.sell_decision(base, {"price": 100.8, "rsi": 50}, None, now)
-    assert a[0] == "PARTIAL" and a[1] == 0.5 and a[3] >= 100.0   # breakeven
-    done = {**base, "first_take_done": True, "locked_sl": 100.0}
+    assert a[0] == "PARTIAL" and a[1] == 0.4 and a[3] >= 100.0   # TP1 %40 + breakeven
+    done = {**base, "tp_stage": 1, "locked_sl": 100.0}
     a = q.sell_decision(done, {"price": 101.0, "rsi": 50}, None, now)
-    assert a[0] == "HOLD"                                        # yarı tekrar satılmaz
+    assert a[0] == "HOLD"                                        # TP1 tekrar satılmaz
     a = q.sell_decision(done, {"price": 101.2, "rsi": 50}, None, now)
     assert a[3] >= 100.5                                         # %0.5 kâr kilidi
     a = q.sell_decision(done, {"price": 101.5, "rsi": 50}, None, now)
-    assert a[0] == "FULL" and "2/2" in a[2]
-    a = q.sell_decision({**base, "locked_sl": 100.5, "first_take_done": True},
-                        {"price": 100.4, "rsi": 50}, None, now)
+    assert a[0] == "PARTIAL2" and "TP2" in a[2]
+    a = q.sell_decision({**done, "tp_stage": 2}, {"price": 102.5, "rsi": 50}, None, now)
+    assert a[0] == "TRAIL" and "TP3" in a[2]
+    a = q.sell_decision({**base, "tp_stage": 3, "peak_tp": 102.5,
+                         "locked_sl": 100.5}, {"price": 101.9, "rsi": 50}, None, now)
     assert a[0] == "FULL" and "trailing" in a[2]
     a = q.sell_decision({**base, "entry_ts": now - 5 * 3600},
                         {"price": 100.0, "rsi": 50}, None, now)
