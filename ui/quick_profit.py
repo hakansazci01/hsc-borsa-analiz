@@ -48,6 +48,36 @@ def should_buy(r: dict[str, Any]) -> tuple[bool, str]:
     return not failed, detail
 
 
+def confidence_pct(score: float) -> float:
+    """Sinyal güveniyle pozisyon: 35-50 → %5, 50-70 → %6, 70+ → %7. Üst sınır %7."""
+    if score >= 70.0:
+        return 0.07
+    if score >= 50.0:
+        return 0.06
+    return 0.05
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def dynamic_watchlist() -> tuple[str, ...]:
+    """30 coin içinden her saat: 24h hacim + 1h mutlak değişim + düşük RSI ile Top-10."""
+    from ui import quant_lab
+
+    ranked = []
+    for s in SYMBOLS:
+        df = quant_lab.fetch(s, "1h", 25)
+        if df is None or len(df) < 25:
+            continue
+        c = df["Close"]
+        vol24 = float(df["Volume"].tail(24).sum())
+        change1h = abs(float(c.iloc[-1]) - float(c.iloc[-2])) / float(c.iloc[-2]) * 100
+        rsi = float(quant_lab.rsi(c, 14).iloc[-1])
+        score = vol24 / 1e6 + change1h * 10 + max(0.0, 25 - rsi)
+        ranked.append((score, s))
+    ranked.sort(reverse=True)
+    out = tuple(s for _, s in ranked[:10])
+    return out if len(out) >= 5 else SYMBOLS[:10]
+
+
 def tier_of(symbol: str) -> tuple[str, float]:
     for name, (coins, pct) in TIERS.items():
         if symbol in coins:
@@ -436,7 +466,9 @@ def cycle() -> list[str]:
     if extra:
         return logs + [f"KORELASYON: {len(extra)} açık pozisyon var — "
                        "1. pozisyon kapanmadan yeni coin açılmaz"]
-    rows = scan(list(t.SYMBOLS))
+    watch = dynamic_watchlist()
+    logs.append(f"DİNAMİK TOP-10 (saatlik): {', '.join(watch)}")
+    rows = scan(list(watch))
     if not rows:
         return ["1s veri yok — fırsat taraması yapılamadı"]
     logs.append("SKOR TABLOSU (0-100): " + " | ".join(
@@ -445,7 +477,6 @@ def cycle() -> list[str]:
         for r in rows[:8]))
     best = rows[0]
     logs.append(f"VOLATİLİTE FİLTRESİ: {best['symbol']} — ATR %{best['atr_pct']:.2f} "
-                f"· POZİSYON %{POS_PCT*100:.0f} (₺{t.available_try()*POS_PCT:.2f}) "
                 f"— kademe: {best['vol_not']}")
     if best["pozisyon_pct"] <= 0:
         return logs + [f"ALIM YOK: {best['vol_not']}"]
@@ -455,7 +486,15 @@ def cycle() -> list[str]:
     logs.append(f"ALIM KARARI: {why}")
     sym = best["symbol"]
     _tier, _tier_pct = tier_of(sym)
-    logs.append(f"KADEME: {sym} → {_tier} (%{_tier_pct*100:.0f} pozisyon)")
+    logs.append(f"KADEME: {sym} → {_tier} · POZİSYON: "
+                f"%{confidence_pct(best['score'])*100:.0f} (skora göre)")
+    # OFI / L2 DEPTH — sadece alım freni, alımı zorlamaz
+    from ui import order_flow
+    ofi = order_flow.check(sym)
+    logs.append(f"OFI: {ofi['state']} · bid %{ofi['bid_pct']} · "
+                f"spread %{ofi['spread_pct']:.2f}" + (f" · {ofi['reason']}" if ofi["reason"] else ""))
+    if not ofi["ok"]:
+        return logs + ["OFI: Toxic flow, alım atlandı"]
     brake = t.brakes_block(sym)
     # Ayıda Nakitte Kalma SADECE EMA50 modunda geçerli — Sürekli Küçük Kar
     # modunda AYI'da %5 + RSI<25 ile alım yapılır (diğer frenler aynen çalışır).
@@ -475,11 +514,10 @@ def cycle() -> list[str]:
         except Exception:
             pass
     bal = t.available_try()
-    cap = min(t.position_size_try(bal, sym), bal * best["pozisyon_pct"], bal * _tier_pct)
-    if _bear_cap:
-        cap = min(cap, bal * _bear_cap)
-    logs.append(f"POZİSYON: {cap / bal * 100:.0f}% · ₺{cap:.2f} "
-                f"(bakiye ₺{bal:.2f}{', AYI %7 üst sınır' if _bear_cap else ''})")
+    _conf = confidence_pct(best["score"])
+    cap = min(t.position_size_try(bal, sym), bal * _conf)   # üst sınır %7
+    logs.append(f"POZİSYON: %{_conf*100:.0f} · ₺{cap:.2f} "
+                f"(skor {best['score']:.1f}, üst limit %7)")
     if cap <= 0:
         return logs + ["bakiye yetersiz"]
     flt = t._filters(sym)

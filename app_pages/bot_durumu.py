@@ -163,11 +163,22 @@ def _panel():
     from ui import quick_profit as _qp
     _br = risk_brakes.status()
     st.caption(
-        f"POZİSYON: %{_qp.POS_PCT*100:.0f} · ₺{bal*_qp.POS_PCT:.2f} · "
+        f"POZİSYON: %5-7 · Skora göre · ₺{bal*0.05:.2f}-{bal*0.07:.2f} · "
         f"günlük zarar limiti ₺{float(_br.get('daily_limit_try', 0)):.2f} (%10) · "
         f"Trailing DD ₺{float(_br.get('day_peak_balance', 0)) * 0.15:.2f} (%15) · "
         f"Kâr Kilidi ₺{tr_scalper.PROFIT_LOCK_TRY:.2f}"
     )
+    st.caption("Skor 35-50: %5 · 50-70: %6 · 70+: %7 · Üst limit %7 (asla %10'a çıkmaz)")
+    # OFI / L2 DEPTH — temiz mi toxic mi
+    from ui import order_flow as _ofi_mod
+
+    _ofi = _ofi_mod.check("BTC_TRY")
+    if _ofi["state"] == "Toxic":
+        st.error(f"**OFI: Toxic** — bid %{_ofi['bid_pct']}, spread %{_ofi['spread_pct']:.2f} "
+                 f"· {_ofi['reason']} (alım atlanır)", icon=":material/warning:")
+    else:
+        st.caption(f"✅ OFI: **Temiz** · bid %{_ofi['bid_pct']} · "
+                   f"spread %{_ofi['spread_pct']:.2f} · {_ofi['at']}")
     if pos:
         age = int(time.time() - float(pos.get("entry_ts", time.time())))
         k.metric("AÇIK POZİSYON", f"{pos['symbol']} · ₺{pos['cost']:.2f}",
@@ -300,9 +311,13 @@ def _panel():
                       f"{_bt['islem']} işlem · {_bt['karli']} kârlı · {_bt['toplam_kar_pct']:+.2f}%",
                       help=f"hedef %{quick_profit.TAKE_PCT*100:.1f} · komisyon çift yön %0.2 · "
                            f"slippage %{quick_profit.SLIPPAGE*100:.1f}")
+            _watch = _qp.dynamic_watchlist()
+            st.caption(f"**Dinamik Top-10:** {', '.join(_watch)} · "
+                       f"Son güncelleme: {time.strftime('%H:%M')}")
             st.caption("**Akıllı Sepet — 30 coin taranıyor "
                        "(8 Güvenli + 12 Hacimli + 10 Fırsatçı)** · "
-                       "aynı anda max 5 pozisyon (her biri %5 · ₺276.33)")
+                       "Dinamik Top-10 bugün bu coin'lere öncelik veriyor · "
+                       "aynı anda max 5 pozisyon (skora göre %5-7)")
             _skor = quick_profit.scan(list(tr_scalper.SYMBOLS))
             if _skor:
                 st.subheader("30 coin skor tablosu (0-100)", divider="gray")

@@ -742,7 +742,7 @@ def test_check_gate() -> None:
     # Test izolasyonu: phrase durumunu doğru ayarla
     check_gate.t.set_confirmed_phrase("HSC-BINANCE-TR-ARM")
 
-    assert len(check_gate.CHECKS) == 16
+    assert len(check_gate.CHECKS) == 18
     assert check_gate.CHECKS[0] == "enabled = true"
     assert check_gate.CHECKS[7] == "rejim AYI değil"
     assert check_gate.CHECKS[13] == "sembol işlem görüyor"
@@ -794,8 +794,8 @@ def test_check_gate() -> None:
 
         r = check_gate.run("BTC_TRY", price=58000.0)
         assert r["ok"] is True
-        assert r["passed"] == 16 and r["total"] == 16
-        assert "16/16 GEÇTİ" in r["summary"]
+        assert r["passed"] == 18 and r["total"] == 18
+        assert "18/18 GEÇTİ" in r["summary"]
 
         # geri yükle
         rb.update_from_history = other["rb_hist"]
@@ -884,7 +884,7 @@ def test_websocket_and_order_book(tmp_path, monkeypatch) -> None:
     from ui import check_gate
 
     r = check_gate.run("BTC_TRY", price=58000.0)
-    assert r["total"] == 16
+    assert r["total"] == 18
 
     # 6) Panel göstergeleri
     panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
@@ -1157,7 +1157,7 @@ def test_whale_guard() -> None:
         wg._save({})
 
     # 5) Gate artık 15 kontrol
-    assert len(check_gate.CHECKS) == 16
+    assert len(check_gate.CHECKS) == 18
     assert check_gate.CHECKS[14] == "balina/haber koruması"
 
     # 6) Panel
@@ -1327,7 +1327,7 @@ def test_disaster_recovery() -> None:
             dr.RECOVERY.write_text(original_recovery, encoding="utf-8")
 
     # 4) Gate artık 16 kontrol
-    assert len(check_gate.CHECKS) == 16
+    assert len(check_gate.CHECKS) == 18
     assert check_gate.CHECKS[15] == "yedek sağlam mı (felaket kurtarma)"
 
     # 5) Panel

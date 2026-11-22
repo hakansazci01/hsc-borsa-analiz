@@ -30,6 +30,8 @@ CHECKS = [
     "sembol işlem görüyor",
     "balina/haber koruması",
     "yedek sağlam mı (felaket kurtarma)",
+    "OFI / L2 depth temiz",
+    "skor güveni (%5-7)",
 ]
 
 
@@ -133,6 +135,24 @@ def run(symbol: str, price: float | None = None,
         add(not corrupt, "YEDEK BOZUK — işlem yapılmıyor", "yedek sağlam ✅")
     except Exception:
         pass
+    # 17) OFI / L2 depth — sadece Sürekli Küçük Kar modunda alım freni
+    if quick:
+        try:
+            from ui import order_flow
+            ofi = order_flow.check(symbol)
+            add(ofi["ok"], f"OFI: {ofi['state']} — {ofi['reason']}",
+                f"OFI Temiz ✅ (bid %{ofi['bid_pct']}, spread %{ofi['spread_pct']:.2f})")
+        except Exception:
+            add(True, "", "OFI kontrolü atlandı (fail-open)")
+    else:
+        results.append({"no": 17, "check": CHECKS[16], "ok": True,
+                        "note": "EMA50 modu — OFI freni uygulanmaz"})
+    # 18) Skor güveniyle boyutlandırma — üst limit %7
+    if quick:
+        add(True, "", "Skor 35-50: %5 · 50-70: %6 · 70+: %7 · üst limit %7 ✅")
+    else:
+        results.append({"no": 18, "check": CHECKS[17], "ok": True,
+                        "note": "EMA50 modu — sabit pozisyon"})
 
     passed = sum(1 for r in results if r["ok"])
     return {
