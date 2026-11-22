@@ -160,6 +160,13 @@ def _panel():
     j, k, l = st.columns(3)
     j.metric("BİNANCE TR BAKİYE (CANLI)", f"₺{bal:,.2f}",
              help="Her panel yenilemesinde Binance TR API'den (imzalı /open/v1/account/spot) çekilir.")
+    _br = risk_brakes.status()
+    st.caption(
+        f"POZİSYON: %10 · ₺{tr_scalper.position_size_try(bal):.2f} · "
+        f"günlük zarar limiti ₺{float(_br.get('daily_limit_try', 0)):.2f} (%10) · "
+        f"Trailing DD ₺{float(_br.get('day_peak_balance', 0)) * 0.15:.2f} (%15) · "
+        f"Kâr Kilidi ₺{tr_scalper.PROFIT_LOCK_TRY:.2f}"
+    )
     if pos:
         age = int(time.time() - float(pos.get("entry_ts", time.time())))
         k.metric("AÇIK POZİSYON", f"{pos['symbol']} · ₺{pos['cost']:.2f}",

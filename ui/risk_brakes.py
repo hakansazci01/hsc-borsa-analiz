@@ -58,6 +58,10 @@ def reset_daily_if_needed(balance: float) -> dict[str, Any]:
     if balance > float(st.get("peak_balance", 0) or 0):
         st["peak_balance"] = balance
         st["peak_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    # Yeni sermaye (para yatırma / kâr bileşimi): günlük %10 limiti yeni
+    # bakiyeden hesaplanmalı — eski gün başı bakiyesinde kalmasın.
+    if balance > float(st.get("day_open_balance", 0) or 0):
+        st["day_open_balance"] = balance
     _save(st)
     return st
 
