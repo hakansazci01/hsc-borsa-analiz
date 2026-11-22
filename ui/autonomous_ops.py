@@ -304,6 +304,11 @@ def watchdog_once() -> dict[str, Any]:
     motor = process_state("ui.tr_runner")
     sched = process_state("ui.autonomous_scheduler")
     watch = process_state("ui.watchdog_runner")
+    try:                       # WS sessizse 60 sn içinde yeniden bağlan
+        from ui import ws_feed
+        ws_feed.health_check()
+    except Exception:
+        pass
     actions: list[str] = []
     if not watch[0]:
         pid = _start_module("ui.watchdog_runner")

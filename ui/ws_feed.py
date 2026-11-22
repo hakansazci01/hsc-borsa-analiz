@@ -157,3 +157,26 @@ def start() -> None:
     _thread = threading.Thread(target=_mini_ticker_loop, name="hsc-ws-market", daemon=True)
     _thread.start()
     threading.Thread(target=_user_stream_loop, name="hsc-ws-user", daemon=True).start()
+
+
+def health_check() -> bool:
+    """Watchdog'dan çağrılır — 120 sn sessizse WS'i yeniden başlat.
+
+    Dönen değer: yeniden bağlatma yapıldıysa True.
+    """
+    global _thread
+    s = status()
+    if s["connected"]:
+        return False
+    if not (s["connected"] is False):
+        return False
+    age = s.get("age")
+    if age is not None and age < 120:
+        return False
+    log(f"WS sessiz ({age} sn) — yeniden bağlanılıyor")
+    _stop.set()
+    time.sleep(1)
+    _stop.clear()
+    _thread = threading.Thread(target=_mini_ticker_loop, name="hsc-ws-market", daemon=True)
+    _thread.start()
+    return True

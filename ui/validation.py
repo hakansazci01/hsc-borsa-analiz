@@ -102,6 +102,17 @@ def crypto_walk_forward(df: pd.DataFrame, windows: int = 4) -> tuple[dict[str, A
                       "Bu dönemde EMA50 pullback koşulu gerçekleşmedi (ayı rejimi / "
                       "fiyat EMA50 altında); AL sinyali yok."),
         })
+    if len(rows) >= 2:
+        # Fold stabilitesi — "karlılık" değil, tutarlılık kontrolü (2026 kılavuzları)
+        diffs = [abs(float(r["Eğitim getiri %"]) - float(r["Test getiri %"]))
+                 for r in rows]
+        counts = [int(r["Test işlem"]) for r in rows]
+        spread = max(diffs)
+        count_ratio = (max(counts) + 1) / (min(counts) + 1) if counts else 1.0
+        stable = spread <= 10.0 and count_ratio <= 3.0
+        for r in rows:
+            r["Stabilite"] = ("STABİL" if stable else
+                              f"DENGESİZ (getiri farkı %{spread:.1f}, işlem oranı {count_ratio:.1f}x)")
     return tuple(rows)
 
 
