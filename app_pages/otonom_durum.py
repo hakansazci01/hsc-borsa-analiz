@@ -159,8 +159,8 @@ def _dashboard():
         veya 15 dakikadan uzun durgunluk.
         """
     )
-    coins = ("BTCUSDT", "ETHUSDT", "XRPUSDT", "DOGEUSDT",
-             "ADAUSDT", "LINKUSDT", "BNBUSDT", "SOLUSDT")
+    coins = ("BTC_TRY", "ETH_TRY", "XRP_TRY", "DOGE_TRY",
+             "ADA_TRY", "LINK_TRY", "BNB_TRY", "SOL_TRY")
     trig_rows = []
     for sym in coins:
         frame = quant_lab.fetch(sym, "1d", 200)

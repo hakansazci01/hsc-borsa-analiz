@@ -60,7 +60,7 @@ def set_local_armed(enabled: bool) -> None:
 
 
 def _symbol(symbol: str) -> str:
-    """BTCUSDT / BTC-USDT -> BTC_USDT (Binance TR formagi)."""
+    """BTC_TRY / BTC-USDT -> BTC_USDT (Binance TR formagi)."""
     value = str(symbol).upper().replace("-", "_").replace("/", "_")
     return value if "_" in value else value[:-4] + "_" + value[-4:]
 

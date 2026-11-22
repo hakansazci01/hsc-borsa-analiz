@@ -80,7 +80,7 @@ def crypto_walk_forward(df: pd.DataFrame, windows: int = 4) -> tuple[dict[str, A
         te = window_stats(test_end, train_end)
         # 16-CHECK GATE: mevcut durumu rapora ekle (stratejiyi değiştirmez)
         try:
-            gate = check_gate.run("BTCUSDT", price=float(df["Close"].iloc[-1]))
+            gate = check_gate.run("BTC_TRY", price=float(df["Close"].iloc[-1]))
             gate_txt = gate["summary"]
         except Exception:
             gate_txt = "gate kontrolü yapılamadı"

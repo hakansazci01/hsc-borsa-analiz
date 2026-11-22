@@ -183,14 +183,14 @@ def _panel():
         with tpath.open(encoding="utf-8-sig", newline="") as fh:
             comm_total = sum(float(r.get("komisyon", 0) or 0)
                              for r in list(_csv.DictReader(fh))[-10:])
-    vstate = tr_scalper.volatility_state("BTCUSDT")
+    vstate = tr_scalper.volatility_state("BTC_TRY")
     v1, v2 = st.columns(2)
     v1.metric("KOMİSYON (son 10 işlem)", f"₺{comm_total:.4f}")
     v2.metric("VOLATİLİTE", "YÜKSEK ⚠️" if vstate["high"] else "Normal ✅",
               help=vstate["reason"])
     from ui import market_regime
 
-    reg = market_regime.regime("BTCUSDT")
+    reg = market_regime.regime("BTC_TRY")
     _rc = {"BOĞA": "#22c55e", "AYI": "#ef4444", "YATAY": "#eab308"}.get(reg["name"], "#94a3b8")
     st.markdown(
         f'<div style="text-align:center;padding:8px 0 12px 0;">'
@@ -234,7 +234,7 @@ def _panel():
                    icon=":material/check:")
 
     # ATR BAZLI STOP göstergesi
-    atr_info = market_regime.atr_stop(reg["price"], "BTCUSDT")
+    atr_info = market_regime.atr_stop(reg["price"], "BTC_TRY")
     a1, a2 = st.columns(2)
     a1.metric("ATR(14)", f"{atr_info['atr']:,.2f}")
     a2.metric("STOP MESAFESİ", f"%{atr_info['pct']:.2f}",
@@ -261,7 +261,7 @@ def _panel():
     # MULTI-TIMEFRAME ONAY (sadece NORMAL modda)
     st.divider()
     st.subheader("Zaman dilimi onayı (NORMAL mod)", divider="gray")
-    mtf = market_regime.mtf_confirm("BTCUSDT")
+    mtf = market_regime.mtf_confirm("BTC_TRY")
     daily_txt = "ONAYLI ✅" if mtf.get("daily") else "ONAYSIZ ❌"
     h4_txt = "ONAYLI ✅" if mtf.get("h4") else "ONAYSIZ ❌"
     decision = "AL" if mtf.get("ok") else "BEKLE"
@@ -279,14 +279,14 @@ def _panel():
     from ui import correlation_guard
 
     open_pos = tr_scalper._load().get("position") or {}
-    new_sig = "ETHUSDT" if open_pos.get("symbol") == "BTCUSDT" else "BTCUSDT"
+    new_sig = "ETH_TRY" if open_pos.get("symbol") == "BTC_TRY" else "BTC_TRY"
     cg = correlation_guard.guard_entry(open_pos.get("symbol"), new_sig)
     c1, c2 = st.columns(2)
     c1.metric("Açık Pozisyon", open_pos.get("symbol", "Yok"))
     c2.metric("Yeni Sinyal", f"{new_sig} — Korelasyon: {cg['corr'] if cg['corr'] is not None else '—'}"
               + (" — ENGELLENDİ" if not cg["allowed"] else " — İZİN"))
     st.caption(cg["reason"])
-    corr_pairs = ("BTCUSDT", "ETHUSDT", "XRPUSDT", "DOGEUSDT")
+    corr_pairs = ("BTC_TRY", "ETH_TRY", "XRP_TRY", "DOGE_TRY")
     st.dataframe(
         pd.DataFrame(correlation_guard.matrix(corr_pairs),
                      columns=["Coin", "BTC", "ETH", "XRP", "DOGE"]),
@@ -360,7 +360,7 @@ def _panel():
     st.subheader("Volatiliteye göre pozisyon boyutu", divider="gray")
     from ui import vol_position
 
-    vs = vol_position.atr_state("BTCUSDT")
+    vs = vol_position.atr_state("BTC_TRY")
     vcolor = {"Normal": "#22c55e", "Yüksek": "#eab308", "Çok Yüksek": "#ef4444"}.get(vs["state"], "#94a3b8")
     st.markdown(
         f'<div style="text-align:center;padding:6px 0 10px 0;">'
@@ -514,7 +514,7 @@ def _panel():
     # HACİM ANALİZİ — sadece gösterge, stratejiye/sinyale dokunmaz
     from ui import quant_lab
     try:
-        _vf = quant_lab.fetch("BTCUSDT", "1h", 30)
+        _vf = quant_lab.fetch("BTC_TRY", "1h", 30)
         if _vf is not None and len(_vf) >= 21:
             _last_v = float(_vf["Volume"].iloc[-1])
             _avg_v = float(_vf["Volume"].iloc[-21:-1].mean())
@@ -540,7 +540,7 @@ def _panel():
 
     # CANLI gate — kayıtlı/eski veri KULLANILMAZ
     try:
-        gate_live = check_gate.run("BTCUSDT", price=tr_scalper.price("BTCUSDT"))
+        gate_live = check_gate.run("BTC_TRY", price=tr_scalper.price("BTC_TRY"))
         fixed = gate_live["results"]
         gpass, gtotal = int(gate_live["passed"]), int(gate_live["total"])
         summary = gate_live["summary"]

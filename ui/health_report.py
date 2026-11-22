@@ -45,7 +45,7 @@ def build() -> dict[str, Any]:
                f"₺{float(pos.get('cost', 0)):.2f}") if pos else "Yok"
     ds = disaster_recovery.status()
     backups = list(disaster_recovery.BACKUPS.glob(f"{time.strftime('%Y%m%d')}_*"))
-    reg = market_regime.regime("BTCUSDT")
+    reg = market_regime.regime("BTC_TRY")
     plan = ("Rejim AYI, beklemeye devam" if reg["bear"] else
             "Rejim YATAY, Grid modu hazır" if reg["range"] else
             "Rejim BOĞA, EMA50 pullback sinyali kollanacak")

@@ -80,7 +80,7 @@ def _log(msg: str) -> None:
 
 
 def btc_price() -> float | None:
-    frame = quant_lab.fetch("BTCUSDT", "4h", 10)
+    frame = quant_lab.fetch("BTC_TRY", "4h", 10)
     return float(frame["Close"].iloc[-1]) if frame is not None and not frame.empty else None
 
 

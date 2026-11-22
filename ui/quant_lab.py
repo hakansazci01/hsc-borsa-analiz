@@ -16,12 +16,14 @@ import numpy as np
 import pandas as pd
 
 FEE = 0.001  # her yon, Binance TR spot VIP0
-SYMBOLS = ("BTCUSDT", "ETHUSDT", "XRPUSDT", "DOGEUSDT", "ADAUSDT", "LTCUSDT", "LINKUSDT")
+SYMBOLS = ("BTC_TRY", "ETH_TRY", "XRP_TRY", "DOGE_TRY", "ADA_TRY", "LTC_TRY", "LINK_TRY")
 TIMEFRAMES = ("15m", "1h", "4h", "1d")
 
 
 def fetch(symbol: str, tf: str, limit: int = 1000) -> pd.DataFrame | None:
-    url = f"https://api.binance.me/api/v1/klines?symbol={symbol}&interval={tf}&limit={limit}"
+    # Binance TR klines sembolde '_' kabul etmez: BTC_TRY -> BTCTRY
+    plain = symbol.replace("_", "")
+    url = f"https://api.binance.me/api/v1/klines?symbol={plain}&interval={tf}&limit={limit}"
     for attempt in range(3):
         try:
             with urllib.request.urlopen(url, timeout=20) as resp:
@@ -166,7 +168,7 @@ def research() -> dict[str, Any]:
     valid = df[(df["train_exp"] > 0) & (df["test_exp"] > 0)]
     best = df.sort_values("train_exp", ascending=False).iloc[0]
     # 4h son seri rejimi
-    last_frame = fetch("BTCUSDT", "1d", 200)
+    last_frame = fetch("BTC_TRY", "1d", 200)
     return {
         "ok": True,
         "series": fetched,

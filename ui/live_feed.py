@@ -84,7 +84,7 @@ def refresh_book(symbol: str) -> dict[str, Any]:
     """Order book'u gerçek Binance TR REST'ten çek (WS depth alternatifi)."""
     from ui import tr_scalper
 
-    sym = symbol if "_" in symbol else symbol[:-4] + "_TRY"  # BTCUSDT -> BTC_TRY
+    sym = symbol if "_" in symbol else symbol[:-4] + "_TRY"  # BTC_TRY -> BTC_TRY
     ok, data = tr_scalper._request(
         "/open/v1/market/depth", {"symbol": sym}
     )

@@ -95,8 +95,9 @@ def test_binance_tr_adapter_locked() -> None:
             )
         assert not result.get("ok")
         send.assert_not_called()
-        assert binance_tr_bot._symbol("BTCUSDT") == "BTC_USDT"
-        assert binance_tr_bot._symbol("btc-usdt") == "BTC_USDT"
+        # Sembol standardı TRY: BTC_TRY -> BTC_TRY (USDT paritesi yok)
+        assert binance_tr_bot._symbol("BTC_TRY") == "BTC_TRY"
+        assert binance_tr_bot._symbol("btc-try") == "BTC_TRY"
     finally:
         _clean()
 
@@ -110,8 +111,8 @@ def test_tr_scalper_bounds() -> None:
     assert t.MAX_HOLD_DAYS == 90
     assert t.COMMISSION == 0.001
     assert "quant_lab.signals" in str(t.signal.__doc__ or "")
-    assert set(t.SYMBOLS).issubset({"BTCUSDT", "ETHUSDT", "XRPUSDT", "DOGEUSDT",
-                                     "ADAUSDT", "LINKUSDT", "BNBUSDT", "SOLUSDT"})
+    assert set(t.SYMBOLS).issubset({"BTC_TRY", "ETH_TRY", "XRP_TRY", "DOGE_TRY",
+                                     "ADA_TRY", "LINK_TRY", "BNB_TRY", "SOL_TRY"})
 
 
 def test_quant_lab_verdict_logic() -> None:
@@ -205,8 +206,8 @@ def test_confirmation_phrase_gate() -> None:
         t.set_confirmed_phrase("YANLIS")
         gates = t.config_gate()
         assert any("Onay ifadesi" in g for g in gates), "phrase yanlışken RED bekleniyor"
-        assert t.buy("BTCUSDT").get("ok") is False
-        assert "confirmation phrase" in t.buy("BTCUSDT").get("reason", "")
+        assert t.buy("BTC_TRY").get("ok") is False
+        assert "confirmation phrase" in t.buy("BTC_TRY").get("reason", "")
 
         # 5) enabled=true + phrase doğru -> config_gate temiz (STOP/file ayrı)
         t.set_confirmed_phrase("HSC-BINANCE-TR-ARM")
@@ -466,7 +467,7 @@ def test_professional_features() -> None:
     # 4) VOLATİLİTE FİLTRESİ
     assert t.VOLATILITY_PCT == 0.03
     assert t.VOLATILITY_COOLDOWN == 3600
-    v = t.volatility_state("BTCUSDT")
+    v = t.volatility_state("BTC_TRY")
     assert "high" in v and "range_pct" in v
 
     # 5) trades.csv komisyon oranı sütunu
@@ -493,7 +494,7 @@ def test_regime_grid_atr_and_mtf() -> None:
     from ui import tr_scalper as t
 
     # 1) REJİM tespiti — gerçek veriden AYI/BOĞA/YATAY
-    r = mr.regime("BTCUSDT")
+    r = mr.regime("BTC_TRY")
     assert r["name"] in ("AYI", "BOĞA", "YATAY")
     assert "adx" in r and "range" in r
     assert mr.TREND_ADX == 25.0
@@ -508,7 +509,7 @@ def test_regime_grid_atr_and_mtf() -> None:
     assert abs(plan["part"] * 5 - plan["total"]) < 0.01
 
     # 3) ATR BAZLI STOP — 1.5 * ATR(14)
-    stp = mr.atr_stop(100.0, "BTCUSDT")
+    stp = mr.atr_stop(100.0, "BTC_TRY")
     assert stp["atr"] > 0 and stp["stop"] < 100.0
     assert abs(stp["stop"] - (100.0 - stp["distance"])) < 0.0001
     assert mr.ATR_MULT == 1.5
@@ -524,7 +525,7 @@ def test_regime_grid_atr_and_mtf() -> None:
     assert mr.LOSS_COOLDOWN_SEC == 86400
 
     # 5) MULTI-TIMEFRAME — günlük + 4s onayı
-    mtf = mr.mtf_confirm("BTCUSDT")
+    mtf = mr.mtf_confirm("BTC_TRY")
     assert "ok" in mtf and "daily" in mtf and "h4" in mtf
     assert mtf["ok"] is bool(mtf["daily"] and mtf["h4"])
 
@@ -675,7 +676,7 @@ def test_step5_mtf_confirmation() -> None:
     assert evaluate(False, True) == "BEKLE"
 
     # Gerçek mtf_confirm fonksiyonu aynı mantığı kullanıyor
-    mtf = mr.mtf_confirm("BTCUSDT")
+    mtf = mr.mtf_confirm("BTC_TRY")
     assert mtf["ok"] is bool(mtf["daily"] and mtf["h4"])
 
     # 4) Kod: MTF sadece NORMAL modda, GRID modunda aranmıyor
@@ -702,27 +703,27 @@ def test_correlation_protection() -> None:
     assert cg.CORR_DAYS == 30
 
     # Gerçek veriden korelasyonlar
-    btc_eth = cg.correlation("BTCUSDT", "ETHUSDT")
-    btc_xrp = cg.correlation("BTCUSDT", "XRPUSDT")
+    btc_eth = cg.correlation("BTC_TRY", "ETH_TRY")
+    btc_xrp = cg.correlation("BTC_TRY", "XRP_TRY")
     assert btc_eth is not None and btc_xrp is not None
 
     # BTC açıkken ETH: yüksek korelasyon -> ENGELLİ
-    g1 = cg.guard_entry("BTCUSDT", "ETHUSDT")
+    g1 = cg.guard_entry("BTC_TRY", "ETH_TRY")
     assert btc_eth > 0.85
     assert g1["allowed"] is False
     assert "KORELASYON YÜKSEK, ALIM ENGELLENDİ" in g1["reason"]
 
     # BTC açıkken XRP: düşük korelasyon -> İZİN
-    g2 = cg.guard_entry("BTCUSDT", "XRPUSDT")
+    g2 = cg.guard_entry("BTC_TRY", "XRP_TRY")
     assert btc_xrp <= 0.85
     assert g2["allowed"] is True
 
     # Pozisyon yoksa izin
-    g3 = cg.guard_entry(None, "ETHUSDT")
+    g3 = cg.guard_entry(None, "ETH_TRY")
     assert g3["allowed"] is True
 
     # Aynı coin ise izin
-    g4 = cg.guard_entry("BTCUSDT", "BTCUSDT")
+    g4 = cg.guard_entry("BTC_TRY", "BTC_TRY")
     assert g4["allowed"] is True
 
     # Kod ve panel
@@ -764,7 +765,7 @@ def test_check_gate() -> None:
         t.position_size_try = lambda balance=None: 50.63
         t.volatility_block = lambda s: (False, "normal")
         t.commission_gate = lambda s, e, q, p: (True, "OK")
-        t.tradeable_pairs = lambda: ("BTCUSDT", "ETHUSDT")
+        t.tradeable_pairs = lambda: ("BTC_TRY", "ETH_TRY")
         t.price = lambda s: 58000.0
 
         # Diğer modülleri de OK yap (orijinalleri sakla)
@@ -792,7 +793,7 @@ def test_check_gate() -> None:
         mr.mtf_confirm = lambda s: {"ok": True, "daily": True, "h4": True}
         cg.guard_entry = lambda o, n: {"allowed": True, "corr": 0.2, "reason": "OK"}
 
-        r = check_gate.run("BTCUSDT", price=58000.0)
+        r = check_gate.run("BTC_TRY", price=58000.0)
         assert r["ok"] is True
         assert r["passed"] == 16 and r["total"] == 16
         assert "16/16 GEÇTİ" in r["summary"]
@@ -825,7 +826,7 @@ def test_check_gate() -> None:
     orig_regime = mr2.regime
     try:
         mr2.regime = lambda s: {"name": "AYI", "bear": True, "range": False, "adx": 30}
-        r2 = check_gate.run("BTCUSDT", price=58000.0)
+        r2 = check_gate.run("BTC_TRY", price=58000.0)
         assert r2["ok"] is False
         assert r2["failed_at"] == 8
         assert "8. rejim AYI değil" in r2["summary"]
@@ -853,7 +854,7 @@ def test_websocket_and_order_book(tmp_path, monkeypatch) -> None:
     assert live_feed.PRESSURE_LIMIT == 0.70
 
     # 1) WS bağlantısı (gerçek Binance TR)
-    feed = live_feed.Feed("BTCUSDT")
+    feed = live_feed.Feed("BTC_TRY")
     connected = feed.connect(max_attempts=1)
     assert connected is True
     assert live_feed.status()["connected"] is True
@@ -883,7 +884,7 @@ def test_websocket_and_order_book(tmp_path, monkeypatch) -> None:
     # 5) Gate 11. kontrolde book engeli
     from ui import check_gate
 
-    r = check_gate.run("BTCUSDT", price=58000.0)
+    r = check_gate.run("BTC_TRY", price=58000.0)
     assert r["total"] == 16
 
     # 6) Panel göstergeleri
@@ -901,7 +902,7 @@ def test_smart_basket() -> None:
     assert sb.FUNDING_LIMIT == 0.01
 
     # 1) Funding: spot'ta veri yok -> N/A, uydurulmaz
-    fr = sb.funding_rate("BTCUSDT")
+    fr = sb.funding_rate("BTC_TRY")
     assert fr["available"] is False and fr["rate"] is None
 
     # 2) 8 coin skor tablosu
@@ -1091,7 +1092,7 @@ def test_slippage_and_fill(tmp_path, monkeypatch) -> None:
         calls.append(1)
         return {"code": 0, "data": {"status": "NEW", "filledQty": "0"}}
 
-    r = og.retry_order(never_fill, "BTCUSDT", "AL", 100.0)
+    r = og.retry_order(never_fill, "BTC_TRY", "AL", 100.0)
     assert len(calls) == 3
     assert r["status"] == "İptal" and r["attempt"] == 3
 
@@ -1101,7 +1102,7 @@ def test_slippage_and_fill(tmp_path, monkeypatch) -> None:
         return {"code": 0, "data": {"status": "FILLED", "avgPrice": "100.20", "filledQty": "0.5"}}
 
     before = len(calls)
-    r2 = og.retry_order(fill_first, "BTCUSDT", "AL", 100.0)
+    r2 = og.retry_order(fill_first, "BTC_TRY", "AL", 100.0)
     assert len(calls) == before + 1  # tek denemede doldu
     assert r2["status"] == "Doldu" and abs(r2["slippage_pct"] - 0.20) < 0.01
 
@@ -1123,7 +1124,7 @@ def test_whale_guard() -> None:
     orig_move = wg.move_5m
     try:
         wg.move_5m = lambda s: -0.04
-        r = wg.check("BTCUSDT")
+        r = wg.check("BTC_TRY")
         assert r["blocked"] is True
         assert "BALİNA / HABER ŞÜPHESİ - 30 DK BEKLEME" in r["reason"]
         assert wg.status()["active"] is True
@@ -1131,7 +1132,7 @@ def test_whale_guard() -> None:
 
         # 2) Aktif cooldown sırasında tekrar kontrol -> hâlâ engelli
         orig_kl = wg._load
-        r2 = wg.check("BTCUSDT")
+        r2 = wg.check("BTC_TRY")
         assert r2["blocked"] is True
     finally:
         wg.move_5m = orig_move
@@ -1141,7 +1142,7 @@ def test_whale_guard() -> None:
     # 3) %1 düşüş -> koruma devreye girmez
     try:
         wg.move_5m = lambda s: -0.01
-        r3 = wg.check("BTCUSDT")
+        r3 = wg.check("BTC_TRY")
         assert r3["blocked"] is False
         assert wg.status()["active"] is False
     finally:
@@ -1151,7 +1152,7 @@ def test_whale_guard() -> None:
     # 4) %4 yükseliş de engellenir
     try:
         wg.move_5m = lambda s: 0.04
-        assert wg.check("BTCUSDT")["blocked"] is True
+        assert wg.check("BTC_TRY")["blocked"] is True
     finally:
         wg.move_5m = orig_move
         wg._save({})
@@ -1284,7 +1285,7 @@ def test_disaster_recovery() -> None:
     original = t.STATE.read_text(encoding="utf-8") if t.STATE.exists() else None
     original_recovery = dr.RECOVERY.read_text(encoding="utf-8") if dr.RECOVERY.exists() else None
     try:
-        good = {"position": {"symbol": "BTCUSDT", "qty": 0.1, "entry": 100.0},
+        good = {"position": {"symbol": "BTC_TRY", "qty": 0.1, "entry": 100.0},
                 "history": []}
         valid = dr.BACKUPS / "20991231_000000_tr_daily_state.json"
         valid.write_text(json.dumps(good), encoding="utf-8")
@@ -1292,7 +1293,7 @@ def test_disaster_recovery() -> None:
         t.STATE.write_text("{BOZUK JSON", encoding="utf-8")
         r = dr.recover()
         assert r["ok"] is True
-        assert r["open_position"] == "BTCUSDT"  # pozisyon hatırlandı
+        assert r["open_position"] == "BTC_TRY"  # pozisyon hatırlandı
         assert "20991231_000000" in r["restored_from"]
         valid.unlink()
     finally:
@@ -1454,11 +1455,11 @@ def test_bear_cash_strategy() -> None:
                                "adx": 40, "price": 100, "ema50": 120,
                                "reason": "test ayı"}
         # 1) brakes_block açık mesaj
-        msg = t.brakes_block("BTCUSDT")
+        msg = t.brakes_block("BTC_TRY")
         assert "AYI REJİMİ - NAKİTTE KALMA STRATEJİSİ AKTİF, ALIM YOK" in msg
 
         # 2) alım reddediliyor (buy config gate + fren)
-        res = t.buy("BTCUSDT")
+        res = t.buy("BTC_TRY")
         assert res.get("ok") is False
 
         # 3) cycle modu ve log mesajı
@@ -1491,7 +1492,7 @@ def test_crypto_walk_forward() -> None:
     from ui import quant_lab
     from ui.validation import crypto_walk_forward
 
-    df = quant_lab.fetch("BTCUSDT", "1d", 90)
+    df = quant_lab.fetch("BTC_TRY", "1d", 90)
     assert df is not None and len(df) == 90
 
     wf = crypto_walk_forward(df, windows=4)

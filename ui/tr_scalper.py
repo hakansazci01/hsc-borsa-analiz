@@ -32,8 +32,8 @@ STATE = ROOT / "users" / "tr_daily_state.json"
 STOP_FILE = ROOT / "users" / "TR_SCALPER_STOP"
 TRADES_CSV = ROOT / "trades.csv"
 STRATEGY_NAME = "günlük EMA50 pullback (quant_lab)"
-SYMBOLS = ("BTCUSDT", "ETHUSDT", "XRPUSDT", "DOGEUSDT",
-           "ADAUSDT", "LINKUSDT", "BNBUSDT", "SOLUSDT")
+SYMBOLS = ("BTC_TRY", "ETH_TRY", "XRP_TRY", "DOGE_TRY",
+           "ADA_TRY", "LINK_TRY", "BNB_TRY", "SOL_TRY")
 MAX_HOLD_DAYS = 90
 # Sabit %3 stop KALDIRILDI — stop mesafesi = 1.5 * ATR(14) (market_regime.atr_stop)
 COMMISSION = 0.001            # Binance TR spot VIP0, her yön
