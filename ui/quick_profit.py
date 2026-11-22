@@ -30,6 +30,24 @@ TIERS: dict[str, tuple[tuple[str, ...], float]] = {
 SYMBOLS: tuple[str, ...] = tuple(s for coins, _ in TIERS.values() for s in coins)
 
 
+def should_buy(r: dict[str, Any]) -> tuple[bool, str]:
+    """CANLI alım kararı — backtest'in kârlı bölgesiyle birebir aynı.
+
+    Backtest (30g): RSI<45 + BB %5 üstü + 1s dip %1 + ATR%0.5-4
+    → 127 işlem, %82.7 kârlı, +%29.7. RSI 45 üstü gevşek girişler -%14.67 verdi.
+    """
+    checks = {
+        "skor": float(r.get("score", 0)) >= MIN_SCORE,
+        "RSI<45": float(r.get("rsi", 100)) < 45.0,
+        "1s dip": float(r.get("price", 0)) <= float(r.get("low1h", 0)) * 1.01,
+        "BB alt bandı": float(r.get("price", 0)) <= float(r.get("lower", 0)) * 1.05,
+        "ATR aralığı": 0.5 <= float(r.get("atr_pct", 0)) <= 4.0,
+    }
+    failed = [k for k, ok in checks.items() if not ok]
+    detail = " · ".join(f"{k} {'OK' if ok else 'X'}" for k, ok in checks.items())
+    return not failed, detail
+
+
 def tier_of(symbol: str) -> tuple[str, float]:
     for name, (coins, pct) in TIERS.items():
         if symbol in coins:
@@ -44,6 +62,7 @@ MAX_LADDERS = 3
 # YENİ PORTFÖY MODU — sınırsız işlem, 5 eşzamanlı pozisyon, %5 boyut
 MAX_POSITIONS = 5
 POS_PCT = 0.05
+MIN_SCORE = 30.0     # backtest'te kârlı bölgeyle uyumlu skor eşiği
 RESCUE_DROP = 0.02      # %2 düşüşte DCA kurtarma (yarı miktar)
 RESCUE_EXIT = 0.01      # ortalamanın %1 üstünde kara geçiş
 RESCUE_MAX = 2          # en fazla 2 kurtarma kademesi
@@ -69,8 +88,19 @@ def indicators(symbol: str, tf: str = "1h", limit: int = 120) -> dict[str, Any] 
     atr = float(tr.rolling(14).mean().iloc[-1])
     price = float(c.iloc[-1])
     ref = float(c.iloc[-25]) if len(c) > 25 else float(c.iloc[0])
+    # Akıllı bot göstergeleri: momentum (ROC), VWAP mesafesi, EMA9/21 kesişimi
+    mom = (price - float(c.iloc[-5])) / float(c.iloc[-5]) * 100 if len(c) > 5 else 0.0
+    typical = (h + l + c) / 3
+    vol_sum = float(v.tail(20).sum())
+    vwap = float((typical * v).tail(20).sum() / vol_sum) if vol_sum else price
+    e9, e21 = quant_lab.ema(c, 9), quant_lab.ema(c, 21)
+    ema_cross = bool(len(c) > 2 and e9.iloc[-1] > e21.iloc[-1] and e9.iloc[-2] <= e21.iloc[-2])
     return {
         "df": df,
+        "mom": round(mom, 3),
+        "vwap": round(vwap, 4),
+        "vwap_dist": round((price - vwap) / vwap * 100, 3) if vwap else 0.0,
+        "ema_cross": ema_cross,
         "price": price,
         "rsi": float(rsi.iloc[-1]),
         "lower": float(lower.iloc[-1]),
@@ -128,13 +158,18 @@ def scan(symbols: list[str] | tuple[str, ...]) -> list[dict[str, Any]]:
         dp = drop_points(ind["drop_pct"])
         vp = 20.0 if ind["vol_ratio"] > 1.0 else 0.0
         bp = 20.0 if ind["price"] <= ind["lower"] * 1.001 else 0.0
-        score = round(rp + dp + vp + bp, 1)
+        mp = 15.0 if ind["mom"] >= 1.0 else (10.0 if ind["mom"] >= 0.5 else 0.0)
+        wp = 10.0 if ind["vwap_dist"] <= -0.2 else 0.0
+        ep = 10.0 if ind["ema_cross"] else 0.0
+        score = min(100.0, round(rp + dp + vp + bp + mp + wp + ep, 1))
         pos_pct, vol_reason = volatility_position(ind["atr_pct"])
         tier, tier_pct = tier_of(s)
         rows.append({
             "symbol": s, "score": score, "kademe": tier, "tier_pct": tier_pct,
             "rsi_puan": round(rp, 1), "dusur_puan": round(dp, 1),
             "hacim_puan": vp, "bb_puan": bp,
+            "mom_puan": mp, "vwap_puan": wp, "ema_puan": ep,
+            "mom": ind["mom"], "vwap_dist": ind["vwap_dist"],
             "rsi": round(ind["rsi"], 1), "dus_pct": ind["drop_pct"],
             "vol_oran": ind["vol_ratio"], "atr_pct": ind["atr_pct"],
             "pozisyon_pct": pos_pct, "vol_not": vol_reason,
@@ -385,13 +420,10 @@ def cycle() -> list[str]:
                 f"— kademe: {best['vol_not']}")
     if best["pozisyon_pct"] <= 0:
         return logs + [f"ALIM YOK: {best['vol_not']}"]
-    ok, why = buy_signal(best)
-    if _bear_cap and best["rsi"] >= _rsi_max:
-        ok = False
-        why += (f" · AYI rejiminde RSI<{_rsi_max:.0f} gerekli "
-                f"(şu an {best['rsi']:.1f}) — az işlem")
+    ok, why = should_buy(best)
     if not ok:
-        return logs + [f"ALIM KOŞULU YOK: {best['symbol']} — {why}"]
+        return logs + [f"ALIM YOK: {best['symbol']} — {why}"]
+    logs.append(f"ALIM KARARI: {why}")
     sym = best["symbol"]
     _tier, _tier_pct = tier_of(sym)
     logs.append(f"KADEME: {sym} → {_tier} (%{_tier_pct*100:.0f} pozisyon)")
@@ -484,7 +516,8 @@ def backtest(days: int = 30, symbols: list[str] | tuple[str, ...] | None = None)
             ap = float(atr_pct_series.iloc[i]) if atr_pct_series.iloc[i] == atr_pct_series.iloc[i] else 0.0
             if pos is None:
                 # VOLATİLİTE FİLTRESİ backtest'te de aktif: %0.5 altı / %4 üstü alınmaz
-                if 0.5 <= ap <= 4.0 and px <= low24 * 1.005 and r < RSI_BUY and px <= lo * 1.01:
+                if (0.5 <= ap <= 4.0 and px <= low24 * 1.01
+                        and r < 45 and px <= lo * 1.05):
                     pos = {"entry": px * (1 + SLIPPAGE), "units": 1,
                            "ladders": 0, "last": px}
                 continue

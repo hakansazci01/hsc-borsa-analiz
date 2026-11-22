@@ -311,6 +311,8 @@ def _panel():
                     "RSI": f"{r['rsi']:.1f}", "RSI puanı": r["rsi_puan"],
                     "Düşüş": r["dusur_puan"],
                     "Hacim": r["hacim_puan"], "BB": r["bb_puan"],
+                    "Mom": r.get("mom_puan", 0), "VWAP": r.get("vwap_puan", 0),
+                    "EMA": r.get("ema_puan", 0),
                     "ATR%": r["atr_pct"], "Pozisyon": "%5 · ₺276.33",
                     "Karar": r["vol_not"],
                 } for r in _skor]), use_container_width=True, hide_index=True)
