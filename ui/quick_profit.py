@@ -379,8 +379,12 @@ def cycle() -> list[str]:
     _tier, _tier_pct = tier_of(sym)
     logs.append(f"KADEME: {sym} → {_tier} (%{_tier_pct*100:.0f} pozisyon)")
     brake = t.brakes_block(sym)
-    if brake:
+    # Ayıda Nakitte Kalma SADECE EMA50 modunda geçerli — Sürekli Küçük Kar
+    # modunda AYI'da %5 + RSI<25 ile alım yapılır (diğer frenler aynen çalışır).
+    if brake and "AYI REJİMİ - NAKİTTE KALMA" not in brake:
         return logs + [f"FREN ({sym}): {brake}"]
+    if brake:
+        logs.append(f"FREN ATLANDI ({sym}): Ayıda Nakitte Kalma sadece EMA50 modunda geçerli")
     if _tier == "Fırsatçı":
         if float(best.get("dus_pct", 0) or 0) >= 3.0:
             return logs + ["KADEME 3: son 1s %3+ düşüş — 60 dk bekleme, alım yok"]

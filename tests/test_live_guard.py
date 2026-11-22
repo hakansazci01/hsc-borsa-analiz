@@ -655,7 +655,7 @@ def test_step4_loss_streak() -> None:
 
     # 6) Panel göstergesi
     panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
-    assert "ARDIŞIK ZARAR:" in panel and "/ 3" in panel
+    assert "ARDIŞIK ZARAR SINIRI YOK" in panel   # 3 zararlı sınırı kaldırıldı
 
 
 def test_step5_mtf_confirmation() -> None:
@@ -933,7 +933,7 @@ def test_smart_basket() -> None:
     src = (Path(__file__).resolve().parent.parent / "ui" / "tr_scalper.py").read_text(encoding="utf-8")
     assert "smart_basket.select()" in src and "3. POZİSYON ENGELLENDİ" in src
     panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
-    assert "Sepet Sıralaması" in panel and "Seçilen Coin" in panel and "Funding Rate" in panel
+    assert "30 coin taranıyor" in panel and "max 5 pozisyon" in panel  # eski 8-coin sepeti kaldırıldı
 
 
 def test_auto_optimization() -> None:

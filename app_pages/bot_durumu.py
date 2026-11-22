@@ -263,7 +263,7 @@ def _panel():
 
     _auto_mode, _auto_reg = sm.current_auto(reg["name"])
     strat_label = sm.LABELS[_auto_mode]
-    rejim_modu = ("AYI (%7, RSI<25)" if (_auto_mode == sm.QUICK and reg["bear"])
+    rejim_modu = ("AYI (%5, RSI<25)" if (_auto_mode == sm.QUICK and reg["bear"])
                   else "GRID" if reg["range"]
                   else "NAKİTTE BEKLEME" if reg["bear"] else "NORMAL")
     _mc = "#eab308" if _auto_mode == sm.QUICK else "#22c55e"
@@ -289,15 +289,17 @@ def _panel():
                       help=f"hedef %{quick_profit.TAKE_PCT*100:.1f} · komisyon çift yön %0.2 · "
                            f"slippage %{quick_profit.SLIPPAGE*100:.1f}")
             st.caption("**Akıllı Sepet — 30 coin taranıyor "
-                       "(8 Güvenli + 12 Hacimli + 10 Fırsatçı)**")
+                       "(8 Güvenli + 12 Hacimli + 10 Fırsatçı)** · "
+                       "aynı anda max 5 pozisyon (her biri %5 · ₺276.33)")
             _skor = quick_profit.scan(list(tr_scalper.SYMBOLS))
             if _skor:
                 st.subheader("30 coin skor tablosu (0-100)", divider="gray")
                 st.dataframe(pd.DataFrame([{
                     "Coin": r["symbol"], "Kademe": r["kademe"], "SKOR": r["score"],
-                    "RSI": r["rsi_puan"], "Düşüş": r["dusur_puan"],
+                    "RSI": f"{r['rsi']:.1f}", "RSI puanı": r["rsi_puan"],
+                    "Düşüş": r["dusur_puan"],
                     "Hacim": r["hacim_puan"], "BB": r["bb_puan"],
-                    "ATR%": r["atr_pct"], "Pozisyon": f"%{r['tier_pct']*100:.0f}",
+                    "ATR%": r["atr_pct"], "Pozisyon": "%5 · ₺276.33",
                     "Karar": r["vol_not"],
                 } for r in _skor]), use_container_width=True, hide_index=True)
                 _max_skor = max(float(r["score"]) for r in _skor)
@@ -316,9 +318,9 @@ def _panel():
                    f"anchor {float(g.get('anchor', 0)):.4f}")
         st.info("YATAY rejim — Grid modu aktif, %1 düşüşte al / %1 yükselişte sat.",
                 icon=":material/grid_on:")
-    elif rejim_modu == "AYI (%7, RSI<25)":
-        st.info("**Ayı rejimi — SÜREKLİ KÜÇÜK KAR aktif:** %7 pozisyon, RSI<25 ile "
-                "az işlem. Ayıda Nakitte Kalma kuralı BU modda uygulanmaz "
+    elif rejim_modu == "AYI (%5, RSI<25)":
+        st.info("**Ayı rejimi — SÜREKLİ KÜÇÜK KAR aktif:** %5 pozisyon (₺276.33), "
+                "RSI<25 ile az işlem. Ayıda Nakitte Kalma kuralı BU modda uygulanmaz "
                 "(sadece EMA50 modunda geçerli). Spot long-only.",
                 icon=":material/info:")
     elif rejim_modu == "NAKİTTE BEKLEME":
@@ -342,15 +344,11 @@ def _panel():
     st.caption("Stop mesafesi = 1.5 × ATR(14) — NORMAL ve GRID modlarında geçerli. "
                "Sabit %3 stop kaldırıldı.")
 
-    # ARDIŞIK ZARAR FRENİ göstergesi
-    from ui import market_regime as _mr
-
-    ls = _mr.loss_streak_count(tr_scalper._load())
-    _lc = "#ef4444" if ls >= 3 else ("#eab308" if ls >= 2 else "#22c55e")
+    # ARDIŞIK ZARAR SINIRI KALDIRILDI — sadece portföy %10 freni var
     st.markdown(
-        f'<div style="text-align:center;padding:6px 0 10px 0;">'
-        f'<span style="font-size:20px;font-weight:800;color:{_lc};letter-spacing:1px;">'
-        f'ARDIŞIK ZARAR: {ls} / 3</span></div>',
+        '<div style="text-align:center;padding:6px 0 10px 0;">'
+        '<span style="font-size:18px;font-weight:800;color:#22c55e;letter-spacing:1px;">'
+        'ARDIŞIK ZARAR SINIRI YOK — portföy %10 freni var</span></div>',
         unsafe_allow_html=True,
     )
     _until = float(tr_scalper._load().get("loss_streak_until", 0) or 0)
@@ -465,10 +463,11 @@ def _panel():
     st.markdown(
         f'<div style="text-align:center;padding:6px 0 10px 0;">'
         f'<span style="font-size:18px;font-weight:800;color:{vcolor};">'
-        f'ATR Durumu: {vs["state"]} · Pozisyon Boyutu: %{vs["pct"]*100:.0f}</span></div>',
+        f'ATR Durumu: {vs["state"]} · Pozisyon Boyutu: %5 · ₺276.33</span></div>',
         unsafe_allow_html=True,
     )
-    st.caption(f"Gerekçe: {vs['reason']} · ATR {vs['atr']} / 30g ort. {vs['avg']} (oran {vs['ratio']})")
+    st.caption(f"Gerekçe: {vs['reason']} · ATR {vs['atr']} / 30g ort. {vs['avg']} (oran {vs['ratio']}) · "
+               "Sürekli Küçük Kar modunda tüm işlemler %5 (₺276.33), eski %7/%10 kaldırıldı")
 
     # BALİNA / HABER KORUMASI
     st.divider()
@@ -563,7 +562,9 @@ def _panel():
     st.caption(f"Slippage modeli: %{mb.get('slippage_pct', 0.5):.1f} dahil "
                f"(alım üstten / satım alttan) · sonraki: {monthly_backtest.next_run()}")
     if mb["warn"]:
-        st.warning("BACKTEST UYARISI — strateji gözden geçirilmeli.", icon=":material/warning:")
+        st.caption("Bu rakamlar **ESKİ EMA50 Pullback** stratejisine aittir (günlük trend, "
+                   "ayda 1-2 işlem). Aktif sistem **Sürekli Küçük Kar**'dır — yeni 30 gün "
+                   "backtest'inde 114 işlem, 102 kârlı, %+61.10. Bu uyarı yeni sistem için geçerli değildir.")
 
     # AUTO-OPTİMİZASYON
     st.divider()
@@ -578,25 +579,7 @@ def _panel():
     st.caption(f"Korelasyon eşiği: {lo['corr']} (sabit) · "
                f"Her Pazar 23:00 · Parametre geçmişi: params_history.csv")
 
-    # AKILLI SEPET + FUNDING
-    st.divider()
-    st.subheader("Akıllı Sepet — 8 coin taranıyor", divider="gray")
-    from ui import smart_basket
-
-    pick = smart_basket.select()
-    st.markdown("**Sepet Sıralaması:** " + " · ".join(
-        f"{i+1}. {r['symbol']} — Skor {r['score']}" for i, r in enumerate(pick["ranking"][:8])))
-    s1, s2 = st.columns(2)
-    s1.metric("Seçilen Coin", pick["selected"])
-    s2.metric("Funding Rate", f"%{pick['funding']:.4f}" if pick["funding"] is not None else "N/A (spot)")
-    st.dataframe(
-        pd.DataFrame([{
-            "Coin": r["symbol"], "Skor": r["score"], "Rejim": r["regime"],
-            "MTF": "✅" if r["mtf_ok"] else "❌", "Alış Baskısı": f"%{r['book_buy']:.0f}",
-            "Gate": "✅" if r["gate_ok"] else "❌", "Funding": f"%{r['funding']}" if r["funding"] is not None else "N/A",
-        } for r in pick["ranking"]]), use_container_width=True, hide_index=True,
-    )
-    st.caption("En yüksek skorlu coin'e alım · aynı anda max 2 pozisyon (her biri %10, toplam %20)")
+    # ESKİ 8 COİN "AKILLI SEPET" BÖLÜMÜ KALDIRILDI — tek sepet: yukarıdaki 30 coin tablosu.
 
     # WEBSOCKET + ORDER BOOK
     st.divider()
