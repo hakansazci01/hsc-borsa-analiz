@@ -75,6 +75,10 @@ def recover() -> dict[str, Any]:
     for path in candidates:
         if not path.exists():
             continue
+        from datetime import datetime, timedelta  # gelecek tarih filtresi
+        if path.name[:8].isdigit() and len(path.name[:8]) == 8 and datetime.strptime(path.name[:8], "%Y%m%d") > datetime.now() + timedelta(days=1):
+            autonomous_ops._log(f"Gelecek tarihli yedek atlandı: {path.name}")
+            continue
         tried.append(path.name)
         data = _valid_state(path)
         if data is not None:

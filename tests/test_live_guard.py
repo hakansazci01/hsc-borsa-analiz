@@ -1290,14 +1290,15 @@ def test_disaster_recovery() -> None:
     try:
         good = {"position": {"symbol": "BTC_TRY", "qty": 0.1, "entry": 100.0},
                 "history": []}
-        valid = dr.BACKUPS / "20991231_000000_tr_daily_state.json"
+        from datetime import datetime
+        valid = dr.BACKUPS / f"{datetime.now().strftime('%Y%m%d')}_000000_tr_daily_state.json"
         valid.write_text(json.dumps(good), encoding="utf-8")
         # Ana dosyayı boz
         t.STATE.write_text("{BOZUK JSON", encoding="utf-8")
         r = dr.recover()
         assert r["ok"] is True
         assert r["open_position"] == "BTC_TRY"  # pozisyon hatırlandı
-        assert "20991231_000000" in r["restored_from"]
+        assert valid.name in r["restored_from"]
         valid.unlink()
     finally:
         if original is not None:
