@@ -87,6 +87,13 @@ def run_forever() -> None:
     RUN_FLAG.write_text("running", encoding="utf-8")
     tr_scalper.STOP_FILE.unlink(missing_ok=True)
     _log("KALICI MOTOR BAŞLADI — kâr odaklı, 15 sn tur, self-healing")
+    # WS market + user data stream'i KALICI motor başlatır.
+    # launch_all.py kısa ömürlü; oradaki daemon thread'ler süreç çıkınca ölüyordu.
+    try:
+        from ui import ws_feed
+        ws_feed.start()
+    except Exception as exc:
+        _log(f"WS başlatılamadı (REST yedekte): {type(exc).__name__}")
     try:
         while True:
             try:
