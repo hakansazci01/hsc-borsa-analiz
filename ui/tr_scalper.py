@@ -645,7 +645,17 @@ def _beat(count: int = 1) -> None:
 
 
 def cycle() -> list[str]:
-    """Tek tur — AKILLI SEPET: 8 coin taranır, en yüksek skorluya alım (max 2 pozisyon)."""
+    """Tek tur — moda göre: EMA50 Pullback (orijinal) veya SÜREKLİ KÜÇÜK KAR (yeni)."""
+    # YENİ MOD: EMA50 kodunu SİLMEDEN yanına geçiş — koruma/limit modülleri ortak.
+    try:
+        from ui import strategy_mode as _sm
+
+        if _sm.get() == _sm.QUICK:
+            from ui import quick_profit
+
+            return quick_profit.cycle()
+    except Exception as exc:
+        _log(f"hızlı kâr modu hatası: {type(exc).__name__}: {exc}")
     _beat(int(_load().get("cycle_count", 0)) + 1)
     _save({**_load(), "cycle_count": int(_load().get("cycle_count", 0)) + 1})
     logs: list[str] = []

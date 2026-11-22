@@ -19,11 +19,19 @@ MODULES = (test_contracts, test_golden, test_invariants, test_bot_features, test
 
 
 class _Monkeypatch:
-    """pytest monkeypatch'inin setattr(parçası) — bağımsız runner için."""
+    """pytest monkeypatch'inin setattr(parçası) — geri alma ile."""
 
-    @staticmethod
-    def setattr(target: object, name: str, value: object) -> None:
+    def __init__(self) -> None:
+        self._undo: list[tuple[object, str, object]] = []
+
+    def setattr(self, target: object, name: str, value: object) -> None:
+        old = getattr(target, name, None)
+        self._undo.append((target, name, old))
         setattr(target, name, value)
+
+    def undo(self) -> None:
+        for target, name, value in reversed(self._undo):
+            setattr(target, name, value)
 
 
 def _call(fn):
@@ -32,9 +40,15 @@ def _call(fn):
     kwargs = {}
     if "tmp_path" in params:
         kwargs["tmp_path"] = Path(tempfile.mkdtemp(prefix="hsc_test_"))
+    patch = None
     if "monkeypatch" in params:
-        kwargs["monkeypatch"] = _Monkeypatch()
-    return fn(**kwargs)
+        patch = _Monkeypatch()
+        kwargs["monkeypatch"] = patch
+    try:
+        return fn(**kwargs)
+    finally:
+        if patch is not None:
+            patch.undo()
 
 
 def main() -> int:

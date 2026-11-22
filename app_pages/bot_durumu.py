@@ -200,30 +200,47 @@ def _panel():
     )
     st.caption(f"ADX {reg['adx']:.1f} · fiyat {reg['price']:.2f} / EMA50 {reg['ema50']:.2f} — "
                f"{reg['reason']}")
-    mode = tr_scalper._load().get("mode", "NAKİTTE BEKLEME")
-    if reg["range"]:
-        mode = "GRID"
-    elif reg["bear"]:
-        mode = "NAKİTTE BEKLEME"
-    else:
-        mode = "NORMAL"
-    _mc = {"GRID": "#eab308", "NORMAL": "#22c55e",
-           "NAKİTTE BEKLEME": "#ef4444"}[mode]
+    # STRATEJİ MODU — kullanıcı panelden seçer (EMA50 korunur, yeni mod yanında)
+    from ui import strategy_mode as sm
+
+    _sec = st.selectbox(
+        "STRATEJİ MODU", list(sm.VALID), index=list(sm.VALID).index(sm.get()),
+        format_func=lambda x: sm.LABELS[x], key="strategy_mode_select",
+    )
+    if _sec != sm.get():
+        sm.set(_sec)
+        st.rerun()
+    strat_label = sm.label()
+    # Rejim durumu ayrı gösterilir (NAKİTTE BEKLEME / GRID / NORMAL)
+    rejim_modu = "GRID" if reg["range"] else ("NAKİTTE BEKLEME" if reg["bear"] else "NORMAL")
+    _mc = "#eab308" if sm.get() == sm.QUICK else "#22c55e"
     st.markdown(
         f'<div style="text-align:center;padding:6px 0 10px 0;">'
         f'<span style="font-size:22px;font-weight:800;color:{_mc};letter-spacing:2px;">'
-        f'MOD: {mode}</span></div>',
+        f'MOD: {strat_label}</span></div>',
         unsafe_allow_html=True,
     )
+    st.caption(f"Rejim durumu: **{rejim_modu}** · strateji modu: **{strat_label}**")
+    if sm.get() == sm.QUICK:
+        try:
+            from ui import quick_profit
+
+            _bt = quick_profit.backtest(30)
+            st.metric("30 GÜN BACKTEST (SÜREKLİ KÜÇÜK KAR)",
+                      f"{_bt['islem']} işlem · {_bt['karli']} kârlı · {_bt['toplam_kar_pct']:+.2f}%",
+                      help=f"hedef %{quick_profit.TAKE_PCT*100:.1f} · komisyon çift yön %0.2 · "
+                           f"slippage %{quick_profit.SLIPPAGE*100:.1f}")
+        except Exception as _be:
+            st.caption(f"backtest verisi alınamadı: {type(_be).__name__}")
     g = tr_scalper._load().get("grid", {})
-    if mode == "GRID":
+    if rejim_modu == "GRID":
         st.caption(f"Grid kademeleri: **{int(g.get('bought', 0))} alındı / "
                    f"{int(g.get('sold', 0))} satıldı** · "
                    f"parça ₺{float(g.get('part', 0)):.2f} · %1 adım · "
                    f"anchor {float(g.get('anchor', 0)):.4f}")
         st.info("YATAY rejim — Grid modu aktif, %1 düşüşte al / %1 yükselişte sat.",
                 icon=":material/grid_on:")
-    elif mode == "NAKİTTE BEKLEME":
+    elif rejim_modu == "NAKİTTE BEKLEME":
         _pos_now = tr_scalper._load().get("position")
         cash_pct = 0 if _pos_now else 100
         st.error("**Strateji: Ayıda Nakitte Kalma Aktif** — alım yok, Grid yok, "
@@ -269,7 +286,7 @@ def _panel():
     m1.metric("Günlük", daily_txt)
     m2.metric("4 Saatlik", h4_txt)
     m3.metric("Son Karar", decision)
-    if mode == "GRID":
+    if rejim_modu == "GRID":
         st.caption("GRID modunda bu onay aranmaz — Grid kendi kuralıyla çalışır.")
     st.caption(f"Kural: günlük EMA50 sinyali + 4s EMA50 üstü = AL; 4s altı = BEKLE. · {mtf.get('reason', '')}")
 

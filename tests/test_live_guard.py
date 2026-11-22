@@ -531,7 +531,7 @@ def test_regime_grid_atr_and_mtf() -> None:
 
     # panel göstergeleri
     panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
-    assert "REJİM:" in panel and "MOD: {mode}" in panel
+    assert "REJİM:" in panel and "MOD:" in panel
     # cycle her turda rejimi logluyor
     assert 'REJİM {sym}:' in (Path(__file__).resolve().parent.parent / "ui" / "tr_scalper.py").read_text(encoding="utf-8")
 
@@ -574,7 +574,7 @@ def test_step2_grid_mode() -> None:
 
     # 5) Panel MOD göstergesi
     panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
-    assert "MOD: {mode}" in panel and "alındı /" in panel and "satıldı" in panel
+    assert "MOD:" in panel and "alındı /" in panel and "satıldı" in panel
 
 
 def test_step3_atr_stop() -> None:
@@ -1439,8 +1439,14 @@ def test_manual_intervention_log(tmp_path, monkeypatch) -> None:
     assert "trades.csv SADECE bot işlemleri" in panel
 
 
-def test_bear_cash_strategy() -> None:
-    """Ayı rejiminde resmî NAKİTTE BEKLEME stratejisi, alım/Grid yok, short yok."""
+def test_bear_cash_strategy(monkeypatch) -> None:
+    """Ayı rejiminde resmî NAKİTTE BEKLEME stratejisi, alım/Grid yok, short yok.
+
+    Bu test ESKİ EMA50 modunu doğrular — yeni mod panelden ayrı seçilir.
+    """
+    from ui import strategy_mode as sm
+
+    monkeypatch.setattr(sm, "get", lambda: sm.EMA50)
     from pathlib import Path
 
     from ui import market_regime as mr, tr_scalper as t
@@ -1506,6 +1512,41 @@ def test_crypto_walk_forward() -> None:
     # Kural aynı: 90 gün → fold 30
     assert wf[0]["Eğitim sonu"] == str(df.index[29])[:10]
     assert wf[1]["Test aralığı"].endswith(str(df.index[89])[:10])
+
+
+def test_quick_profit_module(tmp_path, monkeypatch) -> None:
+    """Yeni SÜREKLİ KÜÇÜK KAR modu — EMA50 yanında, TRY sembolleri."""
+    from ui import quick_profit as q
+    from ui import strategy_mode as sm
+    from ui import tr_scalper as t
+
+    monkeypatch.setattr(sm, "CFG", tmp_path / "config.yaml")
+    assert sm.get() == sm.EMA50            # varsayılan EMA50 korunur
+    assert sm.set(sm.QUICK) == sm.QUICK
+    assert sm.get() == sm.QUICK
+    assert sm.label() == "SÜREKLİ KÜÇÜK KAR"
+    assert sm.set(sm.EMA50) == sm.EMA50    # geri al
+
+    assert all("_TRY" in s for s in t.SYMBOLS) and t.SYMBOLS[0] == "BTC_TRY"
+    assert q.TAKE_PCT == 0.015 and q.RSI_BUY == 35 and q.RSI_SELL == 70
+    assert q.MAX_LADDERS == 3 and q.DCA_DROP == 0.01
+    ind = q.indicators("BTC_TRY")
+    assert ind and ind["price"] > 0 and 0 <= ind["rsi"] <= 100
+    ok, why = q.buy_signal(ind)
+    assert isinstance(ok, bool) and why
+    assert q.sell_signal({**ind, "price": ind["price"]}, ind["price"] / 1.02) is not None
+    rows = q.scan(list(t.SYMBOLS))
+    assert rows and rows[0]["score"] >= rows[-1]["score"]   # en fırsatlı ilk sırada
+
+
+def test_quick_profit_backtest() -> None:
+    """30 gün 1s mum — slippage %0.5 + çift yön komisyon dahil."""
+    from ui import quick_profit as q
+
+    bt = q.backtest(30)
+    assert bt["gun"] == 30 and bt["islem"] > 0
+    assert bt["karli"] + bt["zararli"] == bt["islem"]
+    assert bt["hedef"] == "%1.5" and bt["komisyon"] == "çift yön %0.2"
 
 
 def test_readiness_checklist() -> None:

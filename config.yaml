@@ -97,6 +97,11 @@ alerts:
   ntfy_topic: "borsa-hsc-tr-2026" # ntfy.sh abonelik konusu (degistirilebilir)
   email_enabled: false           # Gmail SMTP (uygulama sifresi gerekir)
 
+# STRATEJI MODU — EMA50 Pullback (orijinal) / QUICK_PROFIT (SÜREKLİ KÜÇÜK KAR)
+# Panelden degistirilir. EMA50 kodu silinmedi, yeni mod yanina eklendi.
+strategy:
+  mode: "QUICK_PROFIT"     # EMA50_PULLBACK | QUICK_PROFIT — panelden değiştirilebilir
+
 # BINANCE - varsayilan TESTNET (sanal para). Gercek anahtar siz ekleyene kadar kapali.
 binance:
   enabled: true             # yazilim tarafi acik; anahtar/env/onay kilitle bloklu kalir
