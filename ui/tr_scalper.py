@@ -201,6 +201,32 @@ def available_try() -> float:
     return asset_balance("TRY")
 
 
+_COMM_CACHE: dict[str, Any] = {"rate": 0.0, "at": 0.0}
+
+
+def live_commission() -> float:
+    """Gerçek komisyonu API'den oku (1 saat cache). Docs'tan hardcoded'a güvenme.
+
+    Binance TR takerCommission '0.00100000' döner (doğrudan oran). Global API
+    '10' döndürürse 10000'e bölünür (1 bps = 0.001).
+    """
+    now = time.time()
+    if _COMM_CACHE.get("rate") and now - float(_COMM_CACHE.get("at", 0)) < 3600:
+        return float(_COMM_CACHE["rate"])
+    try:
+        ok, data = _request("/open/v1/account/spot", signed=True)
+        if ok and isinstance(data, dict):
+            body = data.get("data") or {}
+            raw = float(body.get("takerCommission", 0) or 0)
+            rate = raw if 0 < raw < 0.1 else raw / 10000.0
+            if rate > 0:
+                _COMM_CACHE.update(rate=rate, at=now)
+                return rate
+    except Exception:
+        pass
+    return COMMISSION   # son çare: sabit %0.1
+
+
 # ------------------------------------------------------------------- state
 def _load() -> dict[str, Any]:
     try:
@@ -317,6 +343,13 @@ def _log_gate(gate: dict[str, Any]) -> None:
 
 # ------------------------------------------------------------------- emir
 def _order(symbol: str, side: int, qty: float) -> dict[str, Any]:
+    try:
+        from ui import order_guard
+        _ok, _msg = order_guard.allow_order()
+        if not _ok:
+            return {"ok": False, "reason": _msg}
+    except Exception:
+        pass
     # API bilimsel notasyonu (1e-05) reddediyor — sabit noktalı gönder.
     qty_str = f"{float(qty):.8f}".rstrip("0").rstrip(".")
     # clientId = idempotency anahtarı: timeout/5xx sonrası aynı emri tekrar
@@ -325,7 +358,20 @@ def _order(symbol: str, side: int, qty: float) -> dict[str, Any]:
     payload = {"symbol": symbol, "side": side, "type": 2,
                "quantity": qty_str, "clientId": client_id}
     ok, data = _request("/open/v1/orders", payload, signed=True, method="POST")
-    if not ok:
+    if not ok and "BELİRSİZ" in str(data):
+        # 5xx/timeout: emir GİTMİŞ OLABİLİR — clientId ile sorgula, tekrar gönderme.
+        try:
+            qok, qdata = _request("/open/v1/orders", {"clientId": client_id}, signed=True)
+            body2 = ((qdata or {}).get("data") or {}) if isinstance(qdata, dict) else {}
+            if qok and body2.get("orderId"):
+                res = {"ok": True, "data": qdata,
+                       "note": "5xx sonrası clientId ile sorgulandı — çift emir yok"}
+            else:
+                res = {"ok": False,
+                       "reason": f"5xx sonrası clientId sorgusu bulunamadı: {str(data)[:120]}"}
+        except Exception as exc:
+            res = {"ok": False, "reason": f"clientId sorgu hatası: {type(exc).__name__}"}
+    elif not ok:
         res = {"ok": False, "reason": str(data)[:200]}
     elif isinstance(data, dict) and data.get("code") not in (0, None):
         res = {"ok": False, "reason": f"{data.get('code')}: {data.get('msg')}"}
@@ -471,7 +517,8 @@ def sell(symbol: str, qty: float, reason: str, partial: bool = False) -> dict[st
     pos = st.get("position") or {}
     entry = float(pos.get("entry", px))
     gross = (px - entry) * qty
-    fee = (entry + px) * qty * COMMISSION
+    fee_rate = live_commission()   # API'den doğrulanmış gerçek oran
+    fee = (entry + px) * qty * fee_rate
     net = gross - fee
     duration_sec = round(time.time() - float(pos.get("entry_ts", time.time())), 0)
     if pos:
@@ -521,7 +568,7 @@ def sell(symbol: str, qty: float, reason: str, partial: bool = False) -> dict[st
             "tarih": time.strftime("%Y-%m-%d %H:%M:%S"), "sembol": symbol,
             "alış_fiyatı": round(entry, 6), "satış_fiyatı": round(px, 6),
             "adet": qty, "komisyon": round(fee, 4),
-            "komisyon_oranı": COMMISSION,
+            "komisyon_oranı": fee_rate,
             "net_kar_zarar": round(net, 4), "işlem_süresi": f"{duration_sec:.0f} sn",
             "strateji_adı": STRATEGY_NAME,
         })
@@ -647,7 +694,7 @@ def volatility_block(symbol: str) -> tuple[bool, str]:
 
 def commission_gate(symbol: str, expected_return_pct: float, qty: float, px: float) -> tuple[bool, str]:
     """Beklenen kâr, komisyonun en az 3 katı olmalı."""
-    fee = (px * qty) * COMMISSION * 2  # alış + satış
+    fee = (px * qty) * live_commission() * 2  # alış + satış
     expected = (px * qty) * expected_return_pct
     if expected < fee * MIN_EXPECTED_RR:
         return False, (f"komisyon filtresi: beklenen kâr {expected:.2f} TL < "

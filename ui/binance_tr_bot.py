@@ -105,7 +105,33 @@ def _request(
                 return _request(path, params, signed=signed, method=method,
                                 _retry=_retry - 1)
             return False, f"HTTP {exc.code}: rate limit — {wait:.0f} sn beklenmeli"
-        return False, f"HTTP {exc.code}: {exc.read().decode()[:200]}"
+        body = exc.read().decode()
+        try:
+            err = json.loads(body)
+            code = int(err.get("code", 0) or 0)
+            msg = str(err.get("msg", ""))[:120]
+        except Exception:
+            code, msg = 0, body[:120]
+        if code == -1021:      # timestamp recvWindow dışı — bir kez senkronize et
+            try:
+                with urllib.request.urlopen(BASE + "/open/v1/time", timeout=5) as r:
+                    server_ms = int(json.loads(r.read().decode())["data"]["serverTime"])
+                offset = server_ms - int(time.time() * 1000)
+                if _retry > 0:
+                    time.sleep(0.3)
+                    params["timestamp"] = int(time.time() * 1000) + offset
+                    return _request(path, params, signed=signed, method=method,
+                                    _retry=_retry - 1)
+            except Exception:
+                pass
+            return False, "API -1021: timestamp sapması — senkronize edilemedi"
+        if code == -1022:      # geçersiz imza — ASLA retry yapma
+            return False, "API -1022: geçersiz imza (retry YOK — key/secret kontrol et)"
+        if code == -2015:      # key / IP / izin — ASLA retry yapma
+            return False, "API -2015: key/IP/izin hatası (retry YOK — sahibine haber ver)"
+        if exc.code >= 500:
+            return False, f"HTTP {exc.code}: execution status BELİRSİZ — clientId ile sorgula"
+        return False, f"HTTP {exc.code}: {code} {msg}"
     except Exception as exc:
         return False, f"Bağlantı hatası ({type(exc).__name__})"
 

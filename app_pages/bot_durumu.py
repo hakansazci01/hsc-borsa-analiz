@@ -200,6 +200,18 @@ def _panel():
         f"Bugün Kapanan İşlem **{len(_today_rows)}** · Bugün Net **{_day_net:+.2f} TL** · "
         f"Bir işlemin zararı diğer işlemin kârıyla kapatıldı mı? **{_offset}**"
     )
+    # EKONOMİK SAĞLIK — bot process değil, para üretiyor mu izler
+    from ui import economic_health
+
+    _eh = economic_health.status()
+    if _eh["alerts"]:
+        st.warning("**Ekonomik sağlık uyarısı:** " + " · ".join(_eh["alerts"]),
+                   icon=":material/monitor_heart:")
+    else:
+        st.caption(f"✅ Ekonomik sağlık OK · son işlem {_eh['last_trade']} "
+                   f"({_eh['hours_since']} sa önce) · hata {_eh['errors_1h']}/saat · "
+                   f"bakiye ₺{_eh['balance']:,.2f} · komisyon API doğrulaması "
+                   f"%{tr_scalper.live_commission()*100:.1f}")
 
     # SON İŞLEM — yukarıda okunan trades.csv'nin son satırı
     st.divider()

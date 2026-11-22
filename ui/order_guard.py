@@ -22,6 +22,7 @@ from ui import auth, autonomous_ops, tr_scalper as t
 
 MAX_SLIPPAGE = 0.01   # %1
 MAX_RETRIES = 3
+MAX_ORDERS_PER_MIN = 20   # Binance TR ORDERS limitinin çok altında — runaway önleme
 STATE = auth.USERS_DIR / "order_guard_state.json"
 
 
@@ -45,6 +46,19 @@ def slippage(expected: float, actual: float) -> dict[str, Any]:
     pct = abs(actual - expected) / expected
     return {"pct": round(pct * 100, 4), "ok": pct <= MAX_SLIPPAGE,
             "expected": expected, "actual": actual}
+
+
+def allow_order() -> tuple[bool, str]:
+    """Dakikadaki emir sayısını sınırla — hatalı döngüde borsayı bombinga tutmaz."""
+    st = _load()
+    now = time.time()
+    recent = [float(x) for x in st.get("order_ts", []) if now - float(x) < 60]
+    if len(recent) >= MAX_ORDERS_PER_MIN:
+        return False, (f"EMİR HIZI SINIRI: {len(recent)}/{MAX_ORDERS_PER_MIN} "
+                       "— 60 sn bekleniyor")
+    st["order_ts"] = (recent + [now])[-100:]
+    _save(st)
+    return True, ""
 
 
 def check_slippage(expected: float, actual: float) -> tuple[bool, str]:
