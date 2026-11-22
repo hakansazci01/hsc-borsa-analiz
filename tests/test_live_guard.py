@@ -1071,9 +1071,11 @@ def test_slippage_and_fill(tmp_path, monkeypatch) -> None:
     """
     from pathlib import Path
 
-    from ui import order_guard as og
+    from ui import order_guard as og, safety_guards as sg
 
     monkeypatch.setattr(og, "STATE", tmp_path / "order_guard_state.json")
+    # og._save() CUSUM'a yazar — canlı safety_guards.json kirlenmesin
+    monkeypatch.setattr(sg, "STATE", tmp_path / "safety_guards.json")
     assert og.MAX_SLIPPAGE == 0.01
     assert og.MAX_RETRIES == 3
 
