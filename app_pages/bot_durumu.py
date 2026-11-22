@@ -82,6 +82,23 @@ def _panel():
         f"Kanıt: enabled={enabled} · phrase={phrase} · STOP_FILE={stop} · "
         f"config_gate={gate} · WATCHDOG={w_alive} · SCHEDULER={s_alive} · MOTOR={r_alive}"
     )
+    # GÜVENLİK — withdraw izni açıksa her gün kırmızı uyarı
+    try:
+        _ok, _acc = tr_scalper._request("/open/v1/account/spot", signed=True)
+        _can_wd = int((((_acc or {}).get("data") or {}).get("canWithdraw", 0)) or 0)
+    except Exception:
+        _can_wd = 0
+    if _can_wd:
+        st.error("⚠️ **Withdraw izni açık** — Binance TR'den kapatın, "
+                 "bot withdraw olmadan da çalışır.", icon=":material/warning:")
+    # TOZ BİRİKMESİ — bot sadece uyarır, API dönüşümü denemez (endpoint yok)
+    _dust = tr_scalper._load().get("dust") or {}
+    if float(_dust.get("qty", 0) or 0) > 0:
+        st.warning(
+            f"**Toz birikti:** {_dust['qty']} {_dust.get('asset', '')} "
+            f"(₺{float(_dust.get('try', 0)):.2f}) — Binance TR'den TRY'ye dönüştürün.",
+            icon=":material/info:",
+        )
 
     # --- ZAMANLAMA ---
     # SON CYCLE — motorun KENDİ nabzından (otonom nabız değil)
@@ -119,9 +136,26 @@ def _panel():
     # --- BAKİYE / POZİSYON / İŞLEM (canlı API + gerçek kayıt) ---
     from ui import strategy_mode as strategy_mode
 
+    # trades.csv TEK doğruluk kaynağı — komisyon + slippage dahil gerçek net
+    import csv as _csv
+
+    _tp = ROOT / "trades.csv"
+    _rows = []
+    if _tp.exists():
+        try:
+            with _tp.open(encoding="utf-8-sig", newline="") as fh:
+                _rows = list(_csv.DictReader(fh))
+        except Exception:
+            _rows = []
+    _today_rows = [r for r in _rows if str(r.get("tarih", "")).startswith(time.strftime("%Y-%m-%d"))]
+    _day_net = round(sum(float(r.get("net_kar_zarar", 0) or 0) for r in _today_rows), 4)
+    _day_kar = sum(1 for r in _today_rows if float(r.get("net_kar_zarar", 0) or 0) > 0)
+    _day_zarar = sum(1 for r in _today_rows if float(r.get("net_kar_zarar", 0) or 0) < 0)
+
     bal = tr_scalper.available_try()
     pos = tr_monitor.live_metrics()["position"]
-    summary = tr_monitor.summary()
+    summary = dict(tr_monitor.summary())
+    summary["net_pnl"] = _day_net   # tr_monitor yerine trades.csv
     hist = tr_monitor.merged_history()
     j, k, l = st.columns(3)
     j.metric("BİNANCE TR BAKİYE (CANLI)", f"₺{bal:,.2f}",
@@ -132,31 +166,19 @@ def _panel():
                  help=f"%{age // 60} dk açık")
     else:
         k.metric("AÇIK POZİSYON", "Yok ✅")
-    l.metric("BUGÜN İŞLEM / NET K/Z",
-             f"{len([x for x in hist if str(x.get('exit_time', '')).startswith(time.strftime('%Y-%m-%d'))])} / "
-             f"{summary['net_pnl']:+.2f} ₺")
+    l.metric("BUGÜN İŞLEM / NET K/Z", f"{len(_today_rows)} / {_day_net:+.2f} ₺",
+             help="trades.csv — komisyon + slippage dahil gerçek net")
     _gun = strategy_mode._state()
-    _gun_islem = int(_gun.get("day_trades", 0))
-    _gun_zarar = int(_gun.get("day_losses", 0))
     st.caption(
-        f"**Bugün:** {_gun_islem} işlem, {_gun_islem - _gun_zarar} kârlı, "
-        f"{_gun_zarar} zararlı, Net Kar: {summary['net_pnl']:+.2f} TL "
-        f"(günlük fren: {_gun_islem}/10 işlem, {_gun_zarar}/3 zararlı)"
+        f"**Bugün:** {len(_today_rows)} işlem, {_day_kar} kârlı, {_day_zarar} zararlı, "
+        f"Net Kar: {_day_net:+.2f} TL (trades.csv · günlük fren: "
+        f"{_gun.get('day_trades', 0)}/10, {_gun.get('day_losses', 0)}/3)"
     )
 
-    # SON İŞLEM — trades.csv'den gerçek kayıt (sadece gösterge)
+    # SON İŞLEM — yukarıda okunan trades.csv'nin son satırı
     st.divider()
     st.subheader("Son İşlem", divider="gray")
-    import csv as _csv
-    _tp = ROOT / "trades.csv"
-    _last_row = None
-    if _tp.exists():
-        try:
-            with _tp.open(encoding="utf-8-sig", newline="") as fh:
-                _rows = list(_csv.DictReader(fh))
-            _last_row = _rows[-1] if _rows else None
-        except Exception:
-            _last_row = None
+    _last_row = _rows[-1] if _rows else None
     if _last_row:
         _net = float(_last_row.get("net_kar_zarar", 0) or 0)
         st.markdown(

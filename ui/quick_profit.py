@@ -227,8 +227,16 @@ def cycle() -> list[str]:
         action, ratio, why, locked = sell_decision(pos, ind, atr["stop"])
         if locked > float(pos.get("locked_sl", 0) or 0):
             pos["locked_sl"] = locked
-            logs.append(f"TRAILING STOP YÜKSELTİLDİ: {locked:.4f} "
-                        f"(giriş {entry:.4f}) — zarar yok, kâr korunuyor")
+            _gain = (ind["price"] - entry) / entry if entry else 0.0
+            _msg = (f"Trailing: Stop %0.5 kara çekildi ({locked:.4f})"
+                    if _gain >= TRAIL_LOCK_GAIN else
+                    f"Trailing: Stop giriş fiyatına çekildi ({locked:.4f})")
+            logs.append(_msg)
+            try:
+                from ui import autonomous_ops as _ao
+                _ao._log(_msg)
+            except Exception:
+                pass
         if action == "PARTIAL":
             flt = t._filters(sym)
             half = max(_qty(float(pos["qty"]) * ratio, ind["price"],
@@ -275,6 +283,21 @@ def cycle() -> list[str]:
             else:
                 logs.append(f"DCA emri reddedildi: {str(res.get('reason'))[:100]}")
         else:
+            gain = (ind["price"] - entry) / entry if entry else 0.0
+            age_h = (__import__("time").time() - float(pos.get("entry_ts", __import__("time").time()))) / 3600.0
+            if age_h >= 2.0 and gain <= 0:
+                _rows = scan(list(t.SYMBOLS))
+                if len(_rows) > 1 and _rows[1]["score"] >= 80:
+                    _msg = (f"FIRSAT ÖNERİSİ: 1. pozisyon {sym} {age_h:.1f} saattir kârsız; "
+                            f"2. coin {_rows[1]['symbol']} skoru {_rows[1]['score']} — "
+                            f"zaman stopu ile kapatıp 2.'ye geçmek ister misin? "
+                            f"(OTOMATİK DEĞİŞTİRİLMEDİ)")
+                    logs.append(_msg)
+                    try:
+                        from ui import autonomous_ops as _ao
+                        _ao._log(_msg)
+                    except Exception:
+                        pass
             logs.append(f"Pozisyon {sym}: fiyat {ind['price']:.2f} / giriş {entry:.2f} · "
                         f"RSI {ind['rsi']:.1f} · kademe {ladder}/{MAX_LADDERS} — bekleniyor")
         return logs

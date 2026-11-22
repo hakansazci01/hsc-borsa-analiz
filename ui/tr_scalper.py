@@ -438,6 +438,13 @@ def sell(symbol: str, qty: float, reason: str, partial: bool = False) -> dict[st
     """GERÇEK SATIŞ + trades.csv kaydı. partial=True ise pozisyonu kapatmaz."""
     actual = asset_balance(symbol.split("_")[0]) or qty
     qty = min(qty, actual)
+    # TOZ ENGELLİYİCİ: miktarı step'e AŞAĞI yuvarla (7.3 -> 7.2), kalanı kaydet.
+    _flt = _filters(symbol)
+    _step = _flt["step"] or 0.00000001
+    qty = round(int((qty + 1e-12) / _step) * _step, 8)
+    if qty <= 0:
+        return {"ok": False, "reason": "step altı miktar — satış yapılmadı"}
+    _dust = max(0.0, actual - qty)
     px = price(symbol) or 0
     # Binance TR quoteOrderQty desteklemiyor — alımda çalışan quantity formatını kullan.
     qty_str = f"{float(qty):.8f}".rstrip("0").rstrip(".")
@@ -476,6 +483,12 @@ def sell(symbol: str, qty: float, reason: str, partial: bool = False) -> dict[st
                 st.pop("position", None)
         else:
             st.pop("position", None)
+        if _dust > 0:
+            st["dust"] = {
+                "asset": symbol.split("_")[0], "qty": round(_dust, 8),
+                "try": round(_dust * px, 2),
+                "at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            }
         _save(st)
         try:
             from ui.autonomous_ops import trade_notification
