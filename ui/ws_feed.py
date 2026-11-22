@@ -154,7 +154,10 @@ def _user_stream_loop() -> None:
                 if expires and time.time() * 1000 > expires - 30 * 60 * 1000:
                     log("WS token yenileniyor (30 dk)")
                     break
-                msg = json.loads(ws.recv())
+                try:
+                    msg = json.loads(ws.recv())
+                except (ValueError, json.JSONDecodeError):
+                    continue  # subscribe/heartbeat yanıtı JSON değil — bağlantıyı koparma
                 handle_user_message(msg)
             ws.close()
         except Exception as exc:
