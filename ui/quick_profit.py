@@ -377,6 +377,7 @@ def cycle() -> list[str]:
     """Tek tarama turu — mevcut emir/fren modüllerini kullanır, EMA50'ye dokunmaz."""
     from ui import market_regime, tr_scalper as t
 
+    from ui import micro_engine as _me
     from ui import strategy_mode as sm
 
     logs: list[str] = []
@@ -428,6 +429,30 @@ def cycle() -> list[str]:
         if int(pos.get("tp_stage", 0)) >= 3 and ind["price"] > float(pos.get("peak_tp", 0) or 0):
             pos["peak_tp"] = ind["price"]
             _save_active_position(pos, _in_list)
+        # MİKRO TP — TP1'in ALTINA eklenir (%0.4 / %0.8). Net kâr şart.
+        from ui import micro_engine as _me
+        _mact, _mratio, _mwhy = _me.micro_tp_decision(pos, ind["price"])
+        if _mact == "MICRO_TP":
+            _mflt = t._filters(sym)
+            _mqty = max(_qty(float(pos["qty"]) * _mratio, ind["price"],
+                             _mflt["step"] or 0.00000001), _mflt["min_qty"])
+            _mres = t.sell(sym, _mqty, f"{MOD_ADI}: {_mwhy}", partial=True)
+            if _mres.get("ok"):
+                _cur = t._load()
+                _np, _nl = _active_position(_cur)
+                if _np:
+                    _np["micro_tp_stage"] = int(_np.get("micro_tp_stage", 0)) + 1
+                    _np["grid_layers"] = max(1, int(_np.get("grid_layers", 1)) - 1)
+                    _np["grid_anchor"] = ind["price"]
+                    _save_active_position(_np, _nl)
+                sm.day_record(float(_mres.get("net", 0) or 0))
+                logs.append(f"{_mwhy} · {_mqty} adet satıldı")
+            else:
+                logs.append(f"MİKRO TP emri reddedildi: {str(_mres.get('reason'))[:80]}")
+            return logs
+        if _mact == "SKIP":
+            logs.append(f"MİKRO TP atlandı: {_mwhy}")
+
         action, ratio, why, locked = sell_decision(pos, ind, atr["stop"])
         if locked > float(pos.get("locked_sl", 0) or 0):
             pos["locked_sl"] = locked
@@ -485,7 +510,7 @@ def cycle() -> list[str]:
             logs.append(f"SAT {sym} {'OK' if res.get('ok') else 'HATA'} — {why}")
             return logs
         # SÜREKLİ GRID — katman 2/3: fiyat referanstan %1 / %1.5 düştüğünde ek alım
-        gdec, gnote = grid_decision(pos, ind["price"])
+        gdec, gnote = _me.micro_grid_decision(pos, ind["price"])
         logs.append(f"GRID: {sym} — {gnote}")
         if gdec == "ADD":
             _wr_ok, _wr_msg = safety_guards.win_rate_allowed()
@@ -634,6 +659,17 @@ def cycle() -> list[str]:
                 f"spread %{ofi['spread_pct']:.2f}" + (f" · {ofi['reason']}" if ofi["reason"] else ""))
     if not ofi["ok"]:
         return logs + ["OFI: Toxic flow, alım atlandı"]
+    # İKİ MOTOR — fırsat koşulları tutarsa Motor 2, yoksa Motor 1 (mikro)
+    _bp = float(ofi.get("bid_pct", 50.0) or 50.0)
+    _obi_ratio = round(_bp / max(1.0, 100.0 - _bp), 2)
+    _obi = {"ok": _obi_ratio >= 2.0, "ratio": _obi_ratio,
+            "reason": f"OBI {_obi_ratio}:1"}
+    _cvdd = _me.fetch_cvd(sym)
+    _opp_ok, _opp_why = _me.opportunity_entry(best, _obi, _cvdd, best["score"])
+    _motor = "FIRSAT" if _opp_ok else "MIKRO"
+    _split = _me.capital_split(bal if "bal" in dir() else t.available_try())
+    logs.append(f"MOTOR {_motor}: {_opp_why} | sermaye mikro ₺{_split['micro']:.2f} "
+                f"/ fırsat ₺{_split['opportunity']:.2f} · CVD {_cvdd.get('delta', 0)}")
     brake = t.brakes_block(sym)
     # Ayıda Nakitte Kalma SADECE EMA50 modunda geçerli — Sürekli Küçük Kar
     # modunda AYI'da %5 + RSI<25 ile alım yapılır (diğer frenler aynen çalışır).
@@ -677,7 +713,8 @@ def cycle() -> list[str]:
         "order_id": body.get("orderId") or body.get("id"),
         "cost": round(best["price"] * qty, 4), "strategy": MOD_ADI,
         "rescues": 0, "ladders": 0, "last_buy": best["price"],
-        "grid_anchor": anchor, "grid_layers": 1,
+        "grid_anchor": anchor, "grid_layers": 1, "micro_layers": 0,
+        "micro_tp_stage": 0, "motor": _motor,
         "atr_stop": market_regime.atr_stop(best["price"], sym)["stop"],
     })
     t._save({**_cur, "positions": _poss, "mode": MOD_ADI})

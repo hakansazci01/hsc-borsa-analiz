@@ -22,6 +22,7 @@ from ui import auth, autonomous_ops
 WS_MARKET = "wss://stream-cloud.binance.tr/ws/!miniTicker@arr"
 WS_KLINE = "wss://stream-cloud.binance.tr/ws/{sym}@kline_{tf}"
 WS_USER = "wss://ws-api.binance.tr:443/ws-api/v3"
+WS_DEPTH = "wss://stream-cloud.binance.tr/ws/{sym}@depth5@100ms"  # OBI için L2
 RECONNECT_SEC = 5
 MAX_RETRIES = 3
 STATE = auth.USERS_DIR / "ws_state.json"
@@ -301,6 +302,58 @@ def _user_stream_loop() -> None:
             _stop.wait(30)
 
 
+def _depth_loop() -> None:
+    """depth5@100ms — OBI (alis/satis hacmi) icin anlik L2. REST yedek kalir."""
+    import websocket
+
+    from ui import micro_engine as me
+
+    symbols = ["BTC_TRY", "XLM_TRY", "SHIB_TRY"]
+    while not _stop.is_set():
+        for sym in symbols:
+            if _stop.is_set():
+                break
+            ws = None
+            try:
+                plain = sym.replace("_", "").lower()
+                ws = websocket.create_connection(WS_DEPTH.format(sym=plain), timeout=10)
+                ws.settimeout(20)
+                last_write = 0.0
+                while not _stop.is_set():
+                    try:
+                        raw = ws.recv()
+                    except websocket.WebSocketTimeoutException:
+                        continue
+                    try:
+                        d = json.loads(raw)
+                    except (ValueError, json.JSONDecodeError):
+                        continue
+                    if not isinstance(d, dict):
+                        continue
+                    if time.time() - last_write < 1.0:
+                        continue
+                    obi = me.obi_ratio(d.get("bids") or [], d.get("asks") or [])
+                    st = _load()
+                    depth = st.get("depth_obi", {}) if isinstance(st.get("depth_obi"), dict) else {}
+                    depth[sym] = {"ratio": obi["ratio"], "ok": obi["ok"],
+                                  "at": time.strftime("%Y-%m-%d %H:%M:%S")}
+                    st["depth_obi"] = depth
+                    _save(st)
+                    last_write = time.time()
+                try:
+                    ws.close()
+                except Exception:
+                    pass
+            except Exception:
+                try:
+                    if ws:
+                        ws.close()
+                except Exception:
+                    pass
+                _stop.wait(RECONNECT_SEC)
+        _stop.wait(RECONNECT_SEC)
+
+
 def start() -> None:
     global _thread
     if _thread and _thread.is_alive():
@@ -310,6 +363,7 @@ def start() -> None:
     _thread = threading.Thread(target=_mini_ticker_loop, name="hsc-ws-market", daemon=True)
     _thread.start()
     threading.Thread(target=_user_stream_loop, name="hsc-ws-user", daemon=True).start()
+    threading.Thread(target=_depth_loop, name="hsc-ws-depth", daemon=True).start()
 
 
 def health_check() -> bool:
