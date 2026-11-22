@@ -310,7 +310,9 @@ def _log_gate(gate: dict[str, Any]) -> None:
 
 # ------------------------------------------------------------------- emir
 def _order(symbol: str, side: int, qty: float) -> dict[str, Any]:
-    payload = {"symbol": symbol, "side": side, "type": 2, "quantity": str(qty)}
+    # API bilimsel notasyonu (1e-05) reddediyor — sabit noktalı gönder.
+    qty_str = f"{float(qty):.8f}".rstrip("0").rstrip(".")
+    payload = {"symbol": symbol, "side": side, "type": 2, "quantity": qty_str}
     ok, data = _request("/open/v1/orders", payload, signed=True, method="POST")
     if not ok:
         res = {"ok": False, "reason": str(data)[:200]}
@@ -437,7 +439,9 @@ def sell(symbol: str, qty: float, reason: str, partial: bool = False) -> dict[st
     actual = asset_balance(symbol.split("_")[0]) or qty
     qty = min(qty, actual)
     px = price(symbol) or 0
-    payload = {"symbol": symbol, "side": 1, "type": 2, "quoteOrderQty": str(round(px * qty * 0.9995, 4))}
+    # Binance TR quoteOrderQty desteklemiyor — alımda çalışan quantity formatını kullan.
+    qty_str = f"{float(qty):.8f}".rstrip("0").rstrip(".")
+    payload = {"symbol": symbol, "side": 1, "type": 2, "quantity": qty_str}
     ok, data = _request("/open/v1/orders", payload, signed=True, method="POST")
     success = bool(ok and isinstance(data, dict) and data.get("code") in (0, None))
     if not success:
