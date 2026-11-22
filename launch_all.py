@@ -71,6 +71,13 @@ def main() -> None:
         # watchdog_once() motor + scheduler + watchdog'u kontrol edip başlatır.
         states = ops.watchdog_once()
 
+        # WebSocket hibrit canlı veri — REST polling yedek kalır
+        try:
+            from ui import ws_feed
+            ws_feed.start()
+        except Exception as exc:
+            _autolog(f"WS başlatılamadı (REST yedekte): {type(exc).__name__}")
+
         from launch_app import main as launch_app_main
 
         launch_app_main()

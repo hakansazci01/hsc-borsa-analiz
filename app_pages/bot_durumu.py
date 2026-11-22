@@ -622,6 +622,14 @@ def _panel():
     # WEBSOCKET + ORDER BOOK
     st.divider()
     st.subheader("Canlı veri akışı — WebSocket + Order Book", divider="gray")
+    from ui import ws_feed as _ws
+
+    _wsst = _ws.status()
+    st.caption(f"**Canlı Veri:** {_wsst['source']} "
+               + (f"(gecikme: {_wsst['latency_ms']} ms) " if _wsst["connected"] else "")
+               + f"· son olay: {_wsst['last_event']} · {_wsst['at']}"
+               + (f" · ExecutionReport: {_wsst.get('last_user_event','—')}"
+                  if _wsst.get("last_user_event") else ""))
     from ui import live_feed
 
     fs = live_feed.status()
