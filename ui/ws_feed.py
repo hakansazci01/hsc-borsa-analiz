@@ -28,6 +28,7 @@ STATE = auth.USERS_DIR / "ws_state.json"
 
 _thread: threading.Thread | None = None
 _stop = threading.Event()
+_market_stop = threading.Event()  # market WS yeniden başlatma — user stream'i etkilemez
 
 
 def _load() -> dict[str, Any]:
@@ -63,6 +64,10 @@ def status() -> dict[str, Any]:
     }
 
 
+def _market_halted() -> bool:
+    return _stop.is_set() or _market_stop.is_set()
+
+
 def _mini_ticker_loop() -> None:
     """Anlık fiyatları WS'ten al, REST polling'i yedekte bırak."""
     import websocket
@@ -70,7 +75,7 @@ def _mini_ticker_loop() -> None:
     from ui import tr_scalper as t
 
     retries = 0
-    while not _stop.is_set():
+    while not _market_halted():
         try:
             ws = websocket.create_connection(WS_MARKET, timeout=10)
             ws.settimeout(15)
@@ -79,7 +84,7 @@ def _mini_ticker_loop() -> None:
             else:
                 log("WS BAĞLANDI — canlı fiyat WebSocket'ten geliyor (REST yedek)")
             retries = 0
-            while not _stop.is_set():
+            while not _market_halted():
                 raw = ws.recv()
                 started = time.time()
                 rows = json.loads(raw)
@@ -117,52 +122,183 @@ def _mini_ticker_loop() -> None:
 
 
 def handle_user_message(msg: dict[str, Any]) -> str | None:
-    """ExecutionReport eventini loglar — test edilebilir tek nokta."""
-    if not isinstance(msg, dict) or msg.get("e") != "executionReport":
+    """ExecutionReport eventini loglar — test edilebilir tek nokta.
+
+    Binance TR WS API user data event'leri sarılmış gelir:
+        {"subscriptionId": 0, "event": {"e": "executionReport", ...}}
+    Eski/çıplak format da desteklenir: {"e": "executionReport", ...}
+    """
+    if not isinstance(msg, dict):
         return None
-    status = str(msg.get("X") or "")
+    ev = msg.get("event") if isinstance(msg.get("event"), dict) else msg
+    if not isinstance(ev, dict) or ev.get("e") != "executionReport":
+        return None
+    status = str(ev.get("X") or "")
     st = _load()
     st.update(last_user_event=status, user_at=time.time(),
               at=time.strftime("%Y-%m-%d %H:%M:%S"))
     _save(st)
-    log(f"WS ExecutionReport: {status} · orderId={msg.get('i')} "
-        f"· filled={msg.get('z')}/{msg.get('q')}")
+    log(f"WS ExecutionReport: {status} · orderId={ev.get('i')} "
+        f"· filled={ev.get('z')}/{ev.get('q')}")
     return status
 
 
-def _user_stream_loop() -> None:
-    """ExecutionReport push — NEW / PARTIAL / FILLED / CANCEL anında loglanır."""
-    import websocket
-
+def _get_user_token() -> tuple[str | None, float]:
+    """POST /open/v1/user-listen-token → (token, expirationTime ms)."""
     from ui import tr_scalper as t
 
-    while not _stop.is_set():
+    ok, data = t._request("/open/v1/user-listen-token", signed=True, method="POST")
+    body = ((data or {}).get("data") or {}) if isinstance(data, dict) else {}
+    token = body.get("token") or body.get("listenToken")  # TR API 'token' döndürür
+    expires = float(body.get("expirationTime", 0) or 0)
+    return (token if ok else None), expires
+
+
+def _subscribe_message(token: str) -> dict[str, Any]:
+    """Binance TR docs: userDataStream.subscribe.listenToken + params.listenToken."""
+    import uuid
+
+    return {
+        "id": uuid.uuid4().hex,
+        "method": "userDataStream.subscribe.listenToken",
+        "params": {"listenToken": token},
+    }
+
+
+def _subscribe_response_ok(resp: dict[str, Any]) -> tuple[bool, float]:
+    """Subscribe yanıtını doğrula → (ok, subscription expiration ms).
+
+    Kabul edilen iki docs formatı:
+      {"subscriptionId": 1, "expirationTime": 1749094553955907}
+      {"id":"...", "status": 200, "result": {"subscriptionId": 0}}
+    """
+    if not isinstance(resp, dict):
+        return False, 0.0
+    result = resp.get("result") if isinstance(resp.get("result"), dict) else {}
+    sub_id = resp.get("subscriptionId", result.get("subscriptionId"))
+    exp = float(resp.get("expirationTime") or result.get("expirationTime") or 0)
+    error = resp.get("error")
+    code = resp.get("code")
+    status = resp.get("status")
+    if isinstance(error, dict) or (code is not None and code not in (0, 200)):
+        return False, 0.0
+    if status is not None and status != 200:
+        return False, 0.0
+    if status == 200 or sub_id is not None:
+        return True, exp
+    return False, 0.0
+
+
+def _subscribe_user(ws: Any, token: str) -> tuple[bool, float]:
+    """Docs formatında subscribe gönder, yanıtını oku ve doğrula."""
+    from websocket import WebSocketTimeoutException
+
+    req = _subscribe_message(token)
+    ws.send(json.dumps(req))
+    end = time.time() + 10
+    while time.time() < end:
         try:
-            ok, data = t._request("/open/v1/user-listen-token", signed=True, method="POST")
-            body = ((data or {}).get("data") or {}) if isinstance(data, dict) else {}
-            token = body.get("token") or body.get("listenToken")  # TR API 'token' döndürür
-            expires = float(body.get("expirationTime", 0) or 0)
-            if not ok or not token:
-                _stop.wait(30)
-                continue
-            ws = websocket.create_connection(WS_USER, timeout=10)
-            ws.settimeout(20)
-            ws.send(json.dumps({"method": "SUBSCRIBE", "params": [token], "id": 1}))
-            log("WS user data BAĞLANDI — ExecutionReport push aktif")
-            while not _stop.is_set():
-                # Token süresi dolmak üzereyse yenile (30 dk)
-                if expires and time.time() * 1000 > expires - 30 * 60 * 1000:
-                    log("WS token yenileniyor (30 dk)")
-                    break
+            raw = ws.recv()
+        except WebSocketTimeoutException:
+            continue
+        try:
+            resp = json.loads(raw)
+        except (ValueError, json.JSONDecodeError):
+            continue
+        if not isinstance(resp, dict):
+            continue
+        # Subscribe cevabından önce gelebilen eventleri kaçırma
+        if "e" in resp or "event" in resp:
+            handle_user_message(resp)
+            continue
+        # Başka bir isteğe ait cevapsa atla
+        if resp.get("id") and str(resp["id"]) != str(req["id"]):
+            continue
+        ok, exp = _subscribe_response_ok(resp)
+        if ok:
+            return True, exp
+        log(f"WS user subscribe reddedildi: {str(resp)[:180]}")
+        return False, 0.0
+    return False, 0.0
+
+
+def _user_heartbeat(stop_evt: threading.Event) -> None:
+    """Bağlantı açıkken her 60 sn kanıt logu — recv bloklansa bile çalışır."""
+    while not stop_evt.wait(60):
+        log("WS user data BAĞLI, 60 sn")
+
+
+def _user_stream_loop() -> None:
+    """ExecutionReport push — docs: userDataStream.subscribe.listenToken."""
+    import websocket
+    from websocket import WebSocketTimeoutException
+
+    while not _stop.is_set():
+        token, expires = _get_user_token()
+        if not token:
+            _stop.wait(30)
+            continue
+        for _attempt in range(1, MAX_RETRIES + 1):
+            if _stop.is_set():
+                break
+            ws = None
+            beat = None
+            try:
+                ws = websocket.create_connection(WS_USER, timeout=10)
+                ws.settimeout(20)
+                ok, sub_exp = _subscribe_user(ws, token)
+                if not ok:
+                    raise RuntimeError("subscribe yanıtı doğrulanamadı")
+                if sub_exp:
+                    expires = sub_exp
+                log("WS user data BAĞLANDI — ExecutionReport push aktif")
+                beat = threading.Event()
+                threading.Thread(target=_user_heartbeat, args=(beat,), daemon=True,
+                                 name="hsc-ws-user-beat").start()
+                while not _stop.is_set():
+                    # Token 24 sn, otomatik yenilenmez — 30 dk kala yeni token + subscribe
+                    if expires and time.time() * 1000 > expires - 30 * 60 * 1000:
+                        new_token, new_exp = _get_user_token()
+                        if new_token:
+                            renewed, _ = _subscribe_user(ws, new_token)
+                            if renewed:
+                                token, expires = new_token, new_exp or expires
+                                log("WS user stream yeni token ile yeniden abone oldu")
+                        continue
+                    try:
+                        raw = ws.recv()
+                    except WebSocketTimeoutException:
+                        # docs: ~20 sn ping/pong — sessizlikte ping gönder, koparma
+                        try:
+                            ws.ping()
+                        except Exception:
+                            raise
+                        raw = None
+                    if raw is not None:
+                        try:
+                            msg = json.loads(raw)
+                        except (ValueError, json.JSONDecodeError):
+                            msg = None
+                        if msg is not None:
+                            handle_user_message(msg)
+                break
+            except Exception as exc:
+                log(f"WS user stream koptu, yeniden bağlanılıyor "
+                    f"({type(exc).__name__}) — clientId + REST sorgu yedekte")
+                _stop.wait(RECONNECT_SEC)  # 5 sn bekle, 3 kez dene
+            finally:
+                if beat is not None:
+                    beat.set()
                 try:
-                    msg = json.loads(ws.recv())
-                except (ValueError, json.JSONDecodeError):
-                    continue  # subscribe/heartbeat yanıtı JSON değil — bağlantıyı koparma
-                handle_user_message(msg)
-            ws.close()
-        except Exception as exc:
-            log(f"WS user stream koptu ({type(exc).__name__}) — clientId + REST sorgu yedekte")
-            _stop.wait(RECONNECT_SEC * MAX_RETRIES)
+                    if ws:
+                        ws.close()
+                except Exception:
+                    pass
+        else:
+            log("WS user stream 3 denemede bağlanamadı — clientId + REST yedekte, "
+                "bot çalışmaya devam ediyor")
+        if not _stop.is_set():
+            _stop.wait(30)
 
 
 def start() -> None:
@@ -170,6 +306,7 @@ def start() -> None:
     if _thread and _thread.is_alive():
         return
     _stop.clear()
+    _market_stop.clear()
     _thread = threading.Thread(target=_mini_ticker_loop, name="hsc-ws-market", daemon=True)
     _thread.start()
     threading.Thread(target=_user_stream_loop, name="hsc-ws-user", daemon=True).start()
@@ -189,10 +326,11 @@ def health_check() -> bool:
     age = s.get("age")
     if age is not None and age < 120:
         return False
+    # Sadece market döngüsünü yeniden başlat — user stream'i koparma
     log(f"WS sessiz ({age} sn) — yeniden bağlanılıyor")
-    _stop.set()
+    _market_stop.set()
     time.sleep(1)
-    _stop.clear()
+    _market_stop.clear()
     _thread = threading.Thread(target=_mini_ticker_loop, name="hsc-ws-market", daemon=True)
     _thread.start()
     return True
