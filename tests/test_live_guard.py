@@ -1560,6 +1560,34 @@ def test_quick_profit_scoring_volatility() -> None:
                                     "bb_puan", "atr_pct", "pozisyon_pct"))
 
 
+def test_quick_profit_smart_exit() -> None:
+    """Kademeli satış (%0.8 yarı / %1.5 tam) + trailing + zaman stopu."""
+    import time as _t
+
+    from ui import quick_profit as q
+
+    now = _t.time()
+    base = {"entry": 100.0, "qty": 1.0, "entry_ts": now, "locked_sl": 0.0}
+
+    a = q.sell_decision(base, {"price": 100.5, "rsi": 50}, None, now)
+    assert a[0] == "HOLD"
+    a = q.sell_decision(base, {"price": 100.8, "rsi": 50}, None, now)
+    assert a[0] == "PARTIAL" and a[1] == 0.5 and a[3] >= 100.0   # breakeven
+    done = {**base, "first_take_done": True, "locked_sl": 100.0}
+    a = q.sell_decision(done, {"price": 101.0, "rsi": 50}, None, now)
+    assert a[0] == "HOLD"                                        # yarı tekrar satılmaz
+    a = q.sell_decision(done, {"price": 101.2, "rsi": 50}, None, now)
+    assert a[3] >= 100.5                                         # %0.5 kâr kilidi
+    a = q.sell_decision(done, {"price": 101.5, "rsi": 50}, None, now)
+    assert a[0] == "FULL" and "2/2" in a[2]
+    a = q.sell_decision({**base, "locked_sl": 100.5, "first_take_done": True},
+                        {"price": 100.4, "rsi": 50}, None, now)
+    assert a[0] == "FULL" and "trailing" in a[2]
+    a = q.sell_decision({**base, "entry_ts": now - 5 * 3600},
+                        {"price": 100.0, "rsi": 50}, None, now)
+    assert a[0] == "FULL" and "zaman" in a[2]
+
+
 def test_quick_profit_backtest() -> None:
     """30 gün 1s mum — slippage %0.5 + çift yön komisyon dahil."""
     from ui import quick_profit as q

@@ -129,6 +129,7 @@ def buy_signal(ind: dict[str, Any]) -> tuple[bool, str]:
 
 
 def sell_signal(ind: dict[str, Any], entry: float, atr_stop: float | None = None) -> str | None:
+    """Geriye uyumlu basit kontrol (backtest/eskiler). Canlıda sell_decision kullanılır."""
     gain = (ind["price"] - entry) / entry if entry else 0.0
     if gain >= TAKE_PCT:
         return f"hedef kâr %{gain*100:.2f} ≥ %{TAKE_PCT*100:.1f}"
@@ -137,6 +138,55 @@ def sell_signal(ind: dict[str, Any], entry: float, atr_stop: float | None = None
     if atr_stop and ind["price"] <= atr_stop:
         return f"ATR stop {atr_stop:.2f} değdi"
     return None
+
+
+# --- AKILLI SATIŞ: kademeli + trailing + zaman stopu ---
+FIRST_TAKE_PCT = 0.008       # %0.8 → yarısı
+FIRST_TAKE_RATIO = 0.5
+TRAIL_BE_GAIN = 0.008        # %0.8 → stop girişe (breakeven)
+TRAIL_LOCK_GAIN = 0.012      # %1.2 → stop %0.5 kara
+TRAIL_LOCK_PCT = 0.005
+TIME_STOP_H = 4.0            # 4 saatte kâr yoksa kapat
+TIME_EXT_H = 6.0             # 4 saatte %0.5+ varsa 2 saat daha
+TIME_MIN_GAIN = 0.005
+
+
+def sell_decision(pos: dict[str, Any], ind: dict[str, Any],
+                  atr_stop: float | None = None,
+                  now_ts: float | None = None) -> tuple[str, float, str, float]:
+    """(aksiyon, oran, neden, yeni_locked_sl) — kademeli/trailing/zaman stopu."""
+    import time as _t
+
+    entry = float(pos.get("entry", 0) or 0)
+    price = float(ind["price"])
+    gain = (price - entry) / entry if entry else 0.0
+    now = now_ts if now_ts is not None else _t.time()
+    hours = (now - float(pos.get("entry_ts", now))) / 3600.0
+    locked = float(pos.get("locked_sl", 0) or 0)
+
+    eps = 1e-9  # 100.8/100 gibi tam eşiklerde floating point kaybını önle
+    if gain >= TRAIL_LOCK_GAIN - eps:
+        locked = max(locked, round(entry * (1 + TRAIL_LOCK_PCT), 8))
+    elif gain >= TRAIL_BE_GAIN - eps:
+        locked = max(locked, entry)
+
+    if gain >= TAKE_PCT - eps:  # %1.5 → kalan %50
+        return "FULL", 1.0, f"kademeli 2/2: kâr %{gain*100:.2f} ≥ %1.5 — tam kapanış", locked
+    if gain >= FIRST_TAKE_PCT - eps and not pos.get("first_take_done"):
+        return "PARTIAL", FIRST_TAKE_RATIO, \
+            f"kademeli 1/2: kâr %{gain*100:.2f} ≥ %0.8 — yarısat", locked
+    if locked and price <= locked:
+        return "FULL", 1.0, f"trailing stop {locked:.4f} değdi (kâr %{gain*100:.2f})", locked
+    if ind["rsi"] > RSI_SELL:
+        return "FULL", 1.0, f"RSI {ind['rsi']:.1f} > 70", locked
+    if atr_stop and price <= atr_stop:
+        return "FULL", 1.0, f"ATR stop {atr_stop:.4f} değdi", locked
+    if hours >= TIME_STOP_H and gain <= 0:
+        return "FULL", 1.0, f"zaman stopu: {hours:.1f}s açık, kâr yok — sermaye boşa bağlı", locked
+    if hours >= TIME_EXT_H and 0 < gain < TIME_MIN_GAIN:
+        return "FULL", 1.0, \
+            f"zaman stopu (uzatma): {hours:.1f}s, kâr %{gain*100:.2f} <%0.5", locked
+    return "HOLD", 0.0, "", locked
 
 
 def _qty(cap_try: float, px: float, step: float) -> float:
@@ -164,8 +214,26 @@ def cycle() -> list[str]:
             return [f"{sym}: 1s veri yok — pozisyon korunuyor"]
         entry = float(pos.get("entry", 0))
         atr = market_regime.atr_stop(ind["price"], sym)
-        why = sell_signal(ind, entry, atr["stop"])
-        if why:
+        action, ratio, why, locked = sell_decision(pos, ind, atr["stop"])
+        if locked > float(pos.get("locked_sl", 0) or 0):
+            pos["locked_sl"] = locked
+            logs.append(f"TRAILING STOP YÜKSELTİLDİ: {locked:.4f} "
+                        f"(giriş {entry:.4f}) — zarar yok, kâr korunuyor")
+        if action == "PARTIAL":
+            flt = t._filters(sym)
+            half = max(_qty(float(pos["qty"]) * ratio, ind["price"],
+                            flt["step"] or 0.00000001), flt["min_qty"])
+            res = t.sell(sym, half, f"{MOD_ADI}: {why}", partial=True)
+            if res.get("ok"):
+                np = t._load().get("position") or pos
+                np["first_take_done"] = True
+                if locked:
+                    np["locked_sl"] = locked
+                t._save({**t._load(), "position": np})
+            logs.append(f"KDEMELİ SATIŞ 1/2 {sym} {'OK' if res.get('ok') else 'HATA'} "
+                        f"· {half} adet · {why}")
+            return logs
+        if action == "FULL":
             res = t.sell(sym, float(pos["qty"]), f"{MOD_ADI}: {why}")
             logs.append(f"SAT {sym} {'OK' if res.get('ok') else 'HATA'} — {why}")
             return logs
