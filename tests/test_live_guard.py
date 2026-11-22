@@ -1539,6 +1539,27 @@ def test_quick_profit_module(tmp_path, monkeypatch) -> None:
     assert rows and rows[0]["score"] >= rows[-1]["score"]   # en fırsatlı ilk sırada
 
 
+def test_quick_profit_scoring_volatility() -> None:
+    """0-100 skor bileşenleri + ATR% volatilite filtresi."""
+    from ui import quick_profit as q
+    from ui import tr_scalper as t
+
+    assert q.rsi_points(20) == 30 and abs(q.rsi_points(35) - 10) < 0.01
+    assert q.rsi_points(50) == 0 and q.rsi_points(70) == 0
+    assert q.drop_points(3) == 30 and abs(q.drop_points(1) - 10) < 0.01
+    assert q.drop_points(0) == 0
+    assert q.volatility_position(0.4)[0] == 0.0      # hareketsiz — alma
+    assert q.volatility_position(1.0)[0] == 0.10     # normal
+    assert q.volatility_position(3.0)[0] == 0.07     # riskli — küçült
+    assert q.volatility_position(5.0)[0] == 0.0      # çok oynak — alma
+    rows = q.scan(list(t.SYMBOLS))
+    assert rows and rows[0]["score"] >= rows[-1]["score"]
+    for r in rows:
+        assert 0 <= r["score"] <= 100
+        assert all(k in r for k in ("rsi_puan", "dusur_puan", "hacim_puan",
+                                    "bb_puan", "atr_pct", "pozisyon_pct"))
+
+
 def test_quick_profit_backtest() -> None:
     """30 gün 1s mum — slippage %0.5 + çift yön komisyon dahil."""
     from ui import quick_profit as q

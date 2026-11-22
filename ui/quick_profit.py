@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 import pandas as pd
+import streamlit as st
 
 MOD_ADI = "SÜREKLİ KÜÇÜK KAR"
 RSI_BUY = 35.0
@@ -33,35 +34,88 @@ def indicators(symbol: str, tf: str = "1h", limit: int = 120) -> dict[str, Any] 
     df = quant_lab.fetch(symbol, tf, limit)
     if df is None or len(df) < BB_PERIOD + 10:
         return None
-    c = df["Close"]
+    c, h, l, v = df["Close"], df["High"], df["Low"], df["Volume"]
     rsi = quant_lab.rsi(c, 14)
     mid = c.rolling(BB_PERIOD).mean()
     sd = c.rolling(BB_PERIOD).std()
     lower = mid - BB_STD * sd
+    # ATR(14) — volatilite filtresi için (yüzde)
+    tr = pd.concat([h - l, (h - c.shift(1)).abs(), (l - c.shift(1)).abs()], axis=1).max(axis=1)
+    atr = float(tr.rolling(14).mean().iloc[-1])
+    price = float(c.iloc[-1])
+    ref = float(c.iloc[-25]) if len(c) > 25 else float(c.iloc[0])
     return {
         "df": df,
-        "price": float(c.iloc[-1]),
+        "price": price,
         "rsi": float(rsi.iloc[-1]),
         "lower": float(lower.iloc[-1]),
-        "low1h": float(df["Low"].tail(24).min()),
+        "low1h": float(l.tail(24).min()),
+        "atr": atr,
+        "atr_pct": round(atr / price * 100, 3) if price else 0.0,
+        "drop_pct": round(max(0.0, (ref - price) / ref * 100), 3) if ref else 0.0,
+        "vol_ratio": round(float(v.iloc[-1]) / float(v.tail(20).mean()), 2)
+                     if float(v.tail(20).mean()) else 0.0,
     }
 
 
+def rsi_points(rsi: float) -> float:
+    """RSI 20→30, 35→10, 50→0 puan (lineer)."""
+    if rsi <= 20:
+        return 30.0
+    if rsi <= 35:
+        return 30.0 - (rsi - 20) * (20.0 / 15.0)
+    if rsi <= 50:
+        return 10.0 - (rsi - 35) * (10.0 / 15.0)
+    return 0.0
+
+
+def drop_points(drop_pct: float) -> float:
+    """Son 1s %3 düşüş→30, %1 düşüş→10 puan (lineer)."""
+    if drop_pct <= 0:
+        return 0.0
+    if drop_pct <= 1:
+        return drop_pct * 10.0
+    if drop_pct <= 3:
+        return 10.0 + (drop_pct - 1) * 10.0
+    return 30.0
+
+
+def volatility_position(atr_pct: float) -> tuple[float, str]:
+    """ATR% filtresi — hareketsiz/çok oynak alma, orta riskte pozisyon küçült."""
+    if atr_pct < 0.5:
+        return 0.0, f"ATR %{atr_pct:.2f} < %0.5 — HAREKETSİZ, ALMA"
+    if atr_pct <= 2.0:
+        return 0.10, f"ATR %{atr_pct:.2f} — NORMAL %10"
+    if atr_pct <= 4.0:
+        return 0.07, f"ATR %{atr_pct:.2f} — YÜKSEK RİSK, %7'ye küçült"
+    return 0.0, f"ATR %{atr_pct:.2f} > %4 — ÇOK OYNAK, ALMA"
+
+
+@st.cache_data(ttl=60, show_spinner=False)
 def scan(symbols: list[str] | tuple[str, ...]) -> list[dict[str, Any]]:
-    """8 coin'i tara — en fırsatlı (en çok düşmüş / RSI en düşük / BB altı) ilk sırada."""
+    """8 coin'e 0-100 puan — en yüksek seçilir, en düşük asla alınmaz (60 sn cache)."""
     rows: list[dict[str, Any]] = []
     for s in symbols:
         ind = indicators(s)
         if not ind:
             continue
-        bb_gap = (ind["price"] - ind["lower"]) / ind["price"]
-        score = 100.0 - ind["rsi"] - bb_gap * 500.0
+        rp = rsi_points(ind["rsi"])
+        dp = drop_points(ind["drop_pct"])
+        vp = 20.0 if ind["vol_ratio"] > 1.0 else 0.0
+        bp = 20.0 if ind["price"] <= ind["lower"] * 1.001 else 0.0
+        score = round(rp + dp + vp + bp, 1)
+        pos_pct, vol_reason = volatility_position(ind["atr_pct"])
         rows.append({
-            "symbol": s, "score": round(score, 1),
-            "price": ind["price"], "rsi": round(ind["rsi"], 1),
-            "lower": round(ind["lower"], 2), "low1h": ind["low1h"],
+            "symbol": s, "score": score,
+            "rsi_puan": round(rp, 1), "dusur_puan": round(dp, 1),
+            "hacim_puan": vp, "bb_puan": bp,
+            "rsi": round(ind["rsi"], 1), "dus_pct": ind["drop_pct"],
+            "vol_oran": ind["vol_ratio"], "atr_pct": ind["atr_pct"],
+            "pozisyon_pct": pos_pct, "vol_not": vol_reason,
+            "price": ind["price"], "lower": round(ind["lower"], 2),
+            "low1h": ind["low1h"],
         })
-    rows.sort(key=lambda r: r["score"], reverse=True)
+    rows.sort(key=lambda r: (r["score"], r["vol_oran"]), reverse=True)
     return rows
 
 
@@ -119,7 +173,12 @@ def cycle() -> list[str]:
         last = float(pos.get("last_buy", entry) or entry)
         ladder = int(pos.get("ladders", 0) or 0)
         if ladder < MAX_LADDERS and ind["price"] <= last * (1 - DCA_DROP):
-            cap = t.position_size_try(t.available_try(), sym)
+            _vpct, _vnot = volatility_position(ind["atr_pct"])
+            _bal = t.available_try()
+            cap = min(t.position_size_try(_bal, sym), _bal * _vpct) if _vpct > 0 else 0
+            if cap <= 0:
+                return logs + [f"DCA ALINMADI: {_vnot}"]
+            logs.append(f"VOLATİLİTE FİLTRESİ (DCA): {sym} — {_vnot}")
             flt = t._filters(sym)
             qty = _qty(cap, ind["price"], flt["step"] or 0.00000001)
             qty = max(qty, flt["min_qty"])
@@ -139,12 +198,22 @@ def cycle() -> list[str]:
                         f"RSI {ind['rsi']:.1f} · kademe {ladder}/{MAX_LADDERS} — bekleniyor")
         return logs
 
+    # KORELASYON: aynı anda en fazla 1 pozisyon — 1. kapanmadan 2. açılmaz
+    extra = t._load().get("positions", [])
+    if extra:
+        return logs + [f"KORELASYON: {len(extra)} açık pozisyon var — "
+                       "1. pozisyon kapanmadan yeni coin açılmaz"]
     rows = scan(list(t.SYMBOLS))
     if not rows:
         return ["1s veri yok — fırsat taraması yapılamadı"]
-    logs.append("TARAMA (en fırsatlı →): " + " | ".join(
-        f"{r['symbol']} skor {r['score']} RSI {r['rsi']}" for r in rows[:8]))
+    logs.append("SKOR TABLOSU (0-100): " + " | ".join(
+        f"{r['symbol']} {r['score']} (RSI {r['rsi_puan']}+düşüş {r['dusur_puan']}"
+        f"+hacim {r['hacim_puan']}+BB {r['bb_puan']}) ATR%{r['atr_pct']}"
+        for r in rows[:8]))
     best = rows[0]
+    logs.append(f"VOLATİLİTE FİLTRESİ: {best['symbol']} — {best['vol_not']}")
+    if best["pozisyon_pct"] <= 0:
+        return logs + [f"ALIM YOK: {best['vol_not']}"]
     ok, why = buy_signal(best)
     if not ok:
         return logs + [f"ALIM KOŞULU YOK: {best['symbol']} — {why}"]
@@ -152,7 +221,10 @@ def cycle() -> list[str]:
     brake = t.brakes_block(sym)
     if brake:
         return logs + [f"FREN ({sym}): {brake}"]
-    cap = t.position_size_try(t.available_try(), sym)   # dinamik %10 — limit değişmedi
+    bal = t.available_try()
+    cap = min(t.position_size_try(bal, sym), bal * best["pozisyon_pct"])
+    logs.append(f"POZİSYON: {best['pozisyon_pct']*100:.0f}% · ₺{cap:.2f} "
+                f"(bakiye ₺{bal:.2f})")
     if cap <= 0:
         return logs + ["bakiye yetersiz"]
     flt = t._filters(sym)
@@ -195,19 +267,23 @@ def backtest(days: int = 30, symbols: list[str] | tuple[str, ...] | None = None)
         df = quant_lab.fetch(sym, "1h", days * 24 + 40)
         if df is None or len(df) < BB_PERIOD + 10:
             continue
-        c = df["Close"]
+        c, h, l = df["Close"], df["High"], df["Low"]
         rsi = quant_lab.rsi(c, 14)
         mid = c.rolling(BB_PERIOD).mean()
         sd = c.rolling(BB_PERIOD).std()
         lower = mid - BB_STD * sd
+        tr = pd.concat([h - l, (h - c.shift(1)).abs(), (l - c.shift(1)).abs()], axis=1).max(axis=1)
+        atr_pct_series = tr.rolling(14).mean() / c * 100
         pos: dict[str, Any] | None = None
         for i in range(BB_PERIOD + 5, len(c) - 1):
             px = float(c.iloc[i])
             r = float(rsi.iloc[i])
             lo = float(lower.iloc[i])
             low24 = float(df["Low"].iloc[max(0, i - 23):i + 1].min())
+            ap = float(atr_pct_series.iloc[i]) if atr_pct_series.iloc[i] == atr_pct_series.iloc[i] else 0.0
             if pos is None:
-                if px <= low24 * 1.005 and r < RSI_BUY and px <= lo * 1.01:
+                # VOLATİLİTE FİLTRESİ backtest'te de aktif: %0.5 altı / %4 üstü alınmaz
+                if 0.5 <= ap <= 4.0 and px <= low24 * 1.005 and r < RSI_BUY and px <= lo * 1.01:
                     pos = {"entry": px * (1 + SLIPPAGE), "units": 1,
                            "ladders": 0, "last": px}
                 continue

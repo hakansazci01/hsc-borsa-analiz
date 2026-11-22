@@ -230,6 +230,16 @@ def _panel():
                       f"{_bt['islem']} işlem · {_bt['karli']} kârlı · {_bt['toplam_kar_pct']:+.2f}%",
                       help=f"hedef %{quick_profit.TAKE_PCT*100:.1f} · komisyon çift yön %0.2 · "
                            f"slippage %{quick_profit.SLIPPAGE*100:.1f}")
+            _skor = quick_profit.scan(list(tr_scalper.SYMBOLS))
+            if _skor:
+                st.subheader("8 coin skor tablosu (0-100)", divider="gray")
+                st.dataframe(pd.DataFrame([{
+                    "Coin": r["symbol"], "SKOR": r["score"],
+                    "RSI": r["rsi_puan"], "Düşüş": r["dusur_puan"],
+                    "Hacim": r["hacim_puan"], "BB": r["bb_puan"],
+                    "ATR%": r["atr_pct"], "Pozisyon": f"%{r['pozisyon_pct']*100:.0f}",
+                    "Karar": r["vol_not"],
+                } for r in _skor]), use_container_width=True, hide_index=True)
         except Exception as _be:
             st.caption(f"backtest verisi alınamadı: {type(_be).__name__}")
     g = tr_scalper._load().get("grid", {})
