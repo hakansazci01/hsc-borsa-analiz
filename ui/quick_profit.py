@@ -389,11 +389,14 @@ def backtest(days: int = 30, symbols: list[str] | tuple[str, ...] | None = None)
                 pos["last"] = px
     wins = [x for x in trades if x["ret"] > 0]
     total = round(sum(x["ret"] for x in trades), 2)
+    worst = round(min([x["ret"] for x in trades] or [0]), 2)
     return {
         "gun": days, "islem": len(trades), "karli": len(wins),
         "zararli": len(trades) - len(wins),
         "kazanma_pct": round(len(wins) / len(trades) * 100, 1) if trades else 0.0,
         "toplam_kar_pct": total,
+        "en_buyuk_zarar_pct": worst,
+        "komisyon_toplam_pct": round(len(trades) * 2 * FEE * 100, 2),
         "hedef": f"%{TAKE_PCT*100:.1f}", "komisyon": "çift yön %0.2",
         "slippage": f"%{SLIPPAGE*100:.1f}",
     }

@@ -117,6 +117,8 @@ def _panel():
                  help=f"aralık {interval} sn")
 
     # --- BAKİYE / POZİSYON / İŞLEM (canlı API + gerçek kayıt) ---
+    from ui import strategy_mode as strategy_mode
+
     bal = tr_scalper.available_try()
     pos = tr_monitor.live_metrics()["position"]
     summary = tr_monitor.summary()
@@ -133,6 +135,14 @@ def _panel():
     l.metric("BUGÜN İŞLEM / NET K/Z",
              f"{len([x for x in hist if str(x.get('exit_time', '')).startswith(time.strftime('%Y-%m-%d'))])} / "
              f"{summary['net_pnl']:+.2f} ₺")
+    _gun = strategy_mode._state()
+    _gun_islem = int(_gun.get("day_trades", 0))
+    _gun_zarar = int(_gun.get("day_losses", 0))
+    st.caption(
+        f"**Bugün:** {_gun_islem} işlem, {_gun_islem - _gun_zarar} kârlı, "
+        f"{_gun_zarar} zararlı, Net Kar: {summary['net_pnl']:+.2f} TL "
+        f"(günlük fren: {_gun_islem}/10 işlem, {_gun_zarar}/3 zararlı)"
+    )
 
     # SON İŞLEM — trades.csv'den gerçek kayıt (sadece gösterge)
     st.divider()
