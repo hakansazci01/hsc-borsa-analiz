@@ -1,0 +1,27 @@
+{
+  "cycle_count": 1,
+  "positions": [],
+  "history": [
+    {
+      "symbol": "XLM_TRY",
+      "qty": 41.0,
+      "entry": 6.476,
+      "exit": 6.473,
+      "gross_pnl": -0.123,
+      "fee": 0.5309,
+      "net_pnl": -0.6539,
+      "exit_time": "2026-11-22 21:06:16",
+      "duration_sec": 2.0,
+      "reason": "GO-NOGO TEST - TP tetiklenmedi, pozisyon kapatildi",
+      "strategy": "günlük EMA50 pullback (quant_lab)"
+    }
+  ],
+  "realized_pnl": -0.6539,
+  "loss_streak": 1,
+  "dust": {
+    "asset": "XLM",
+    "qty": 0.916,
+    "try": 5.93,
+    "at": "2026-11-22 21:06:16"
+  }
+}

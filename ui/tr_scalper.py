@@ -354,9 +354,8 @@ def _order(symbol: str, side: int, qty: float) -> dict[str, Any]:
     qty_str = f"{float(qty):.8f}".rstrip("0").rstrip(".")
     # clientId = idempotency anahtarı: timeout/5xx sonrası aynı emri tekrar
     # göndermek yerine bu ID ile sorgulanır — çift dolum riski önlenir.
-    client_id = f"HSC-{symbol.replace('_','')}-{side}-{int(time.time()*1000)}"
-    payload = {"symbol": symbol, "side": side, "type": 2,
-               "quantity": qty_str, "clientId": client_id}
+    # Binance TR özel "HSC-" clientId'yi reddediyor (3703) — API kendi clientId'sini üretir.
+    payload = {"symbol": symbol, "side": side, "type": 2, "quantity": qty_str}
     ok, data = _request("/open/v1/orders", payload, signed=True, method="POST")
     if not ok and "BELİRSİZ" in str(data):
         # 5xx/timeout: emir GİTMİŞ OLABİLİR — clientId ile sorgula, tekrar gönderme.
@@ -505,9 +504,7 @@ def sell(symbol: str, qty: float, reason: str, partial: bool = False) -> dict[st
     px = price(symbol) or 0
     # Binance TR quoteOrderQty desteklemiyor — alımda çalışan quantity formatını kullan.
     qty_str = f"{float(qty):.8f}".rstrip("0").rstrip(".")
-    client_id = f"HSC-{symbol.replace('_','')}-1-{int(time.time()*1000)}"
-    payload = {"symbol": symbol, "side": 1, "type": 2,
-               "quantity": qty_str, "clientId": client_id}
+    payload = {"symbol": symbol, "side": 1, "type": 2, "quantity": qty_str}
     ok, data = _request("/open/v1/orders", payload, signed=True, method="POST")
     success = bool(ok and isinstance(data, dict) and data.get("code") in (0, None))
     if not success:
