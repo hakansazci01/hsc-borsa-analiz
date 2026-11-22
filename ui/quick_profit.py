@@ -17,6 +17,24 @@ import pandas as pd
 import streamlit as st
 
 MOD_ADI = "SÜREKLİ KÜÇÜK KAR"
+# 30 coin — 3 kademe (ZEC_TRY Binance TR'de listeli değil -> XLM_TRY)
+TIERS: dict[str, tuple[tuple[str, ...], float]] = {
+    "Güvenli": (("BTC_TRY", "ETH_TRY", "BNB_TRY", "SOL_TRY", "ADA_TRY",
+                 "XRP_TRY", "DOGE_TRY", "LINK_TRY"), 0.10),
+    "Hacimli": (("AVAX_TRY", "DOT_TRY", "LTC_TRY", "ATOM_TRY", "NEAR_TRY",
+                 "ARB_TRY", "OP_TRY", "TRX_TRY", "TON_TRY", "SUI_TRY",
+                 "APT_TRY", "INJ_TRY"), 0.10),
+    "Fırsatçı": (("AAVE_TRY", "HYPE_TRY", "PEPE_TRY", "SHIB_TRY", "XLM_TRY",
+                  "DASH_TRY", "APE_TRY", "MANA_TRY", "SAND_TRY", "GALA_TRY"), 0.05),
+}
+SYMBOLS: tuple[str, ...] = tuple(s for coins, _ in TIERS.values() for s in coins)
+
+
+def tier_of(symbol: str) -> tuple[str, float]:
+    for name, (coins, pct) in TIERS.items():
+        if symbol in coins:
+            return name, pct
+    return "Güvenli", 0.10
 RSI_BUY = 35.0
 RSI_SELL = 70.0
 TAKE_PCT = 0.015        # %1.5 — komisyonun 7.5 katı
@@ -105,8 +123,9 @@ def scan(symbols: list[str] | tuple[str, ...]) -> list[dict[str, Any]]:
         bp = 20.0 if ind["price"] <= ind["lower"] * 1.001 else 0.0
         score = round(rp + dp + vp + bp, 1)
         pos_pct, vol_reason = volatility_position(ind["atr_pct"])
+        tier, tier_pct = tier_of(s)
         rows.append({
-            "symbol": s, "score": score,
+            "symbol": s, "score": score, "kademe": tier, "tier_pct": tier_pct,
             "rsi_puan": round(rp, 1), "dusur_puan": round(dp, 1),
             "hacim_puan": vp, "bb_puan": bp,
             "rsi": round(ind["rsi"], 1), "dus_pct": ind["drop_pct"],
@@ -326,11 +345,24 @@ def cycle() -> list[str]:
     if not ok:
         return logs + [f"ALIM KOŞULU YOK: {best['symbol']} — {why}"]
     sym = best["symbol"]
+    _tier, _tier_pct = tier_of(sym)
+    logs.append(f"KADEME: {sym} → {_tier} (%{_tier_pct*100:.0f} pozisyon)")
     brake = t.brakes_block(sym)
     if brake:
         return logs + [f"FREN ({sym}): {brake}"]
+    if _tier == "Fırsatçı":
+        if float(best.get("dus_pct", 0) or 0) >= 3.0:
+            return logs + ["KADEME 3: son 1s %3+ düşüş — 60 dk bekleme, alım yok"]
+        try:
+            from ui import order_guard
+            sp_ok, sp_msg = order_guard.check_slippage(
+                best["price"], t.price(sym) or best["price"])
+            if not sp_ok:
+                return logs + [f"KADEME 3 spread %0.5 filtresi: {sp_msg}"]
+        except Exception:
+            pass
     bal = t.available_try()
-    cap = min(t.position_size_try(bal, sym), bal * best["pozisyon_pct"])
+    cap = min(t.position_size_try(bal, sym), bal * best["pozisyon_pct"], bal * _tier_pct)
     if _bear_cap:
         cap = min(cap, bal * _bear_cap)
     logs.append(f"POZİSYON: {cap / bal * 100:.0f}% · ₺{cap:.2f} "

@@ -16,7 +16,11 @@ import numpy as np
 import pandas as pd
 
 FEE = 0.001  # her yon, Binance TR spot VIP0
-SYMBOLS = ("BTC_TRY", "ETH_TRY", "XRP_TRY", "DOGE_TRY", "ADA_TRY", "LTC_TRY", "LINK_TRY")
+SYMBOLS = ("BTC_TRY", "ETH_TRY", "BNB_TRY", "SOL_TRY", "ADA_TRY", "XRP_TRY",
+           "DOGE_TRY", "LINK_TRY", "AVAX_TRY", "DOT_TRY", "LTC_TRY", "ATOM_TRY",
+           "NEAR_TRY", "ARB_TRY", "OP_TRY", "TRX_TRY", "TON_TRY", "SUI_TRY",
+           "APT_TRY", "INJ_TRY", "AAVE_TRY", "HYPE_TRY", "PEPE_TRY", "SHIB_TRY",
+           "XLM_TRY", "DASH_TRY", "APE_TRY", "MANA_TRY", "SAND_TRY", "GALA_TRY")
 TIMEFRAMES = ("15m", "1h", "4h", "1d")
 
 

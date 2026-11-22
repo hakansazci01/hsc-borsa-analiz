@@ -269,14 +269,16 @@ def _panel():
                       f"{_bt['islem']} işlem · {_bt['karli']} kârlı · {_bt['toplam_kar_pct']:+.2f}%",
                       help=f"hedef %{quick_profit.TAKE_PCT*100:.1f} · komisyon çift yön %0.2 · "
                            f"slippage %{quick_profit.SLIPPAGE*100:.1f}")
+            st.caption("**Akıllı Sepet — 30 coin taranıyor "
+                       "(8 Güvenli + 12 Hacimli + 10 Fırsatçı)**")
             _skor = quick_profit.scan(list(tr_scalper.SYMBOLS))
             if _skor:
-                st.subheader("8 coin skor tablosu (0-100)", divider="gray")
+                st.subheader("30 coin skor tablosu (0-100)", divider="gray")
                 st.dataframe(pd.DataFrame([{
-                    "Coin": r["symbol"], "SKOR": r["score"],
+                    "Coin": r["symbol"], "Kademe": r["kademe"], "SKOR": r["score"],
                     "RSI": r["rsi_puan"], "Düşüş": r["dusur_puan"],
                     "Hacim": r["hacim_puan"], "BB": r["bb_puan"],
-                    "ATR%": r["atr_pct"], "Pozisyon": f"%{r['pozisyon_pct']*100:.0f}",
+                    "ATR%": r["atr_pct"], "Pozisyon": f"%{r['tier_pct']*100:.0f}",
                     "Karar": r["vol_not"],
                 } for r in _skor]), use_container_width=True, hide_index=True)
                 _max_skor = max(float(r["score"]) for r in _skor)

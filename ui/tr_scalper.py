@@ -32,8 +32,15 @@ STATE = ROOT / "users" / "tr_daily_state.json"
 STOP_FILE = ROOT / "users" / "TR_SCALPER_STOP"
 TRADES_CSV = ROOT / "trades.csv"
 STRATEGY_NAME = "günlük EMA50 pullback (quant_lab)"
-SYMBOLS = ("BTC_TRY", "ETH_TRY", "XRP_TRY", "DOGE_TRY",
-           "ADA_TRY", "LINK_TRY", "BNB_TRY", "SOL_TRY")
+# 30 coin — 3 kademe (kademe tanımları ui.quick_profit.TIERS tek kaynak)
+SYMBOLS = (
+    "BTC_TRY", "ETH_TRY", "BNB_TRY", "SOL_TRY", "ADA_TRY", "XRP_TRY",
+    "DOGE_TRY", "LINK_TRY",                                    # Kademe 1 (8)
+    "AVAX_TRY", "DOT_TRY", "LTC_TRY", "ATOM_TRY", "NEAR_TRY", "ARB_TRY",
+    "OP_TRY", "TRX_TRY", "TON_TRY", "SUI_TRY", "APT_TRY", "INJ_TRY",  # Kademe 2 (12)
+    "AAVE_TRY", "HYPE_TRY", "PEPE_TRY", "SHIB_TRY", "XLM_TRY",  # ZEC_TRY listeli değil -> XLM_TRY
+    "DASH_TRY", "APE_TRY", "MANA_TRY", "SAND_TRY", "GALA_TRY",  # Kademe 3 (10)
+)
 MAX_HOLD_DAYS = 90
 # Sabit %3 stop KALDIRILDI — stop mesafesi = 1.5 * ATR(14) (market_regime.atr_stop)
 COMMISSION = 0.001            # Binance TR spot VIP0, her yön

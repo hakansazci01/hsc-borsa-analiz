@@ -111,8 +111,7 @@ def test_tr_scalper_bounds() -> None:
     assert t.MAX_HOLD_DAYS == 90
     assert t.COMMISSION == 0.001
     assert "quant_lab.signals" in str(t.signal.__doc__ or "")
-    assert set(t.SYMBOLS).issubset({"BTC_TRY", "ETH_TRY", "XRP_TRY", "DOGE_TRY",
-                                     "ADA_TRY", "LINK_TRY", "BNB_TRY", "SOL_TRY"})
+    assert len(t.SYMBOLS) == 30 and all(s.endswith("_TRY") for s in t.SYMBOLS)
 
 
 def test_quant_lab_verdict_logic() -> None:
@@ -907,7 +906,7 @@ def test_smart_basket() -> None:
 
     # 2) 8 coin skor tablosu
     rows = sb.rank()
-    assert len(rows) == 8
+    assert len(rows) == 30   # 30 coin — 3 kademe (8 + 12 + 10)
     for r in rows:
         assert "symbol" in r and "score" in r and "regime" in r
         assert -100 <= r["score"] <= 100
