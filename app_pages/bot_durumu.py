@@ -160,9 +160,10 @@ def _panel():
     j, k, l = st.columns(3)
     j.metric("BİNANCE TR BAKİYE (CANLI)", f"₺{bal:,.2f}",
              help="Her panel yenilemesinde Binance TR API'den (imzalı /open/v1/account/spot) çekilir.")
+    from ui import quick_profit as _qp
     _br = risk_brakes.status()
     st.caption(
-        f"POZİSYON: %10 · ₺{tr_scalper.position_size_try(bal):.2f} · "
+        f"POZİSYON: %{_qp.POS_PCT*100:.0f} · ₺{bal*_qp.POS_PCT:.2f} · "
         f"günlük zarar limiti ₺{float(_br.get('daily_limit_try', 0)):.2f} (%10) · "
         f"Trailing DD ₺{float(_br.get('day_peak_balance', 0)) * 0.15:.2f} (%15) · "
         f"Kâr Kilidi ₺{tr_scalper.PROFIT_LOCK_TRY:.2f}"
@@ -275,8 +276,8 @@ def _panel():
     sm_st = sm._state()
     st.caption(
         f"Otomatik mod (kullanıcı seçmez) · rejim durumu: **{rejim_modu}** · "
-        f"günlük işlem {sm_st.get('day_trades', 0)}/10 · zararlı "
-        f"{sm_st.get('day_losses', 0)}/3 · son geçiş {sm_st.get('changed_at', '—')}"
+        f"işlem/zararlı işlem sınırı **YOK** · portföy freni **%10** · "
+        f"son geçiş {sm_st.get('changed_at', '—')}"
     )
     if _auto_mode == sm.QUICK:
         try:

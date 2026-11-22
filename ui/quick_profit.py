@@ -436,6 +436,7 @@ def cycle() -> list[str]:
     return logs
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def backtest(days: int = 30, symbols: list[str] | tuple[str, ...] | None = None) -> dict[str, Any]:
     """Geçmiş 30 gün, 1s mumlar — slippage %0.5 + çift yön komisyon %0.2 dahil."""
     from ui import quant_lab, tr_scalper as t
