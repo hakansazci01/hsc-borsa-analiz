@@ -1446,7 +1446,10 @@ def test_bear_cash_strategy(monkeypatch) -> None:
     """
     from ui import strategy_mode as sm
 
+    # Bu test ESKİ EMA50 akışını doğrular — otomatik modu sabitle
     monkeypatch.setattr(sm, "get", lambda: sm.EMA50)
+    monkeypatch.setattr(sm, "current_auto", lambda *a, **k: (sm.EMA50, "AYI"))
+    monkeypatch.setattr(sm, "day_guard", lambda: None)
     from pathlib import Path
 
     from ui import market_regime as mr, tr_scalper as t
@@ -1537,6 +1540,36 @@ def test_quick_profit_module(tmp_path, monkeypatch) -> None:
     assert q.sell_signal({**ind, "price": ind["price"]}, ind["price"] / 1.02) is not None
     rows = q.scan(list(t.SYMBOLS))
     assert rows and rows[0]["score"] >= rows[-1]["score"]   # en fırsatlı ilk sırada
+
+
+def test_auto_regime_mode(tmp_path, monkeypatch) -> None:
+    """BOĞA→EMA50, YATAY/AYI→KÜÇÜK KÂR; AYI %7 + RSI<25; günlük 10/3 freni."""
+    from ui import strategy_mode as sm
+
+    monkeypatch.setattr(sm, "STATE", tmp_path / "auto_mode_state.json")
+    assert sm.auto_mode("BOĞA") == sm.EMA50
+    assert sm.auto_mode("YATAY") == sm.QUICK
+    assert sm.auto_mode("AYI") == sm.QUICK
+    cap, rsi = sm.bear_params("AYI")
+    assert cap == 0.07 and rsi == 25.0
+    cap, rsi = sm.bear_params("YATAY")
+    assert cap is None and rsi == 35.0
+
+    assert sm.current_auto("AYI")[0] == sm.QUICK
+    assert sm._state()["regime"] == "AYI"
+    assert sm.current_auto("BOĞA")[0] == sm.EMA50
+    assert sm._state()["previous"] == sm.QUICK
+
+    for _ in range(10):
+        sm.day_record(1.0)
+    assert "10" in (sm.day_guard() or "")
+    st = sm._state()
+    st["day"] = "2000-01-01"       # yeni gün simülasyonu
+    sm._save(st)
+    assert sm.day_guard() is None
+    for _ in range(3):
+        sm.day_record(-1.0)
+    assert "3" in (sm.day_guard() or "")
 
 
 def test_quick_profit_scoring_volatility() -> None:

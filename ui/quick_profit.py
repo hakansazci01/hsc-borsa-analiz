@@ -198,12 +198,22 @@ def cycle() -> list[str]:
     """Tek tarama turu — mevcut emir/fren modüllerini kullanır, EMA50'ye dokunmaz."""
     from ui import market_regime, tr_scalper as t
 
+    from ui import strategy_mode as sm
+
     logs: list[str] = []
     t._beat(int(t._load().get("cycle_count", 0)) + 1)
     _st = t._load()
     t._save({**_st, "cycle_count": int(_st.get("cycle_count", 0)) + 1})
     if t.kill_switch():
         return ["KILL SWITCH: yeni işlem yok"]
+    _guard = sm.day_guard()
+    if _guard:
+        return [_guard]
+    _mode, _reg = sm.current_auto()
+    _bear_cap, _rsi_max = sm.bear_params(_reg)
+    logs.append(f"REJİM: {_reg} — MOD: {sm.LABELS[_mode]}"
+                + (f" (AYI: %{_bear_cap*100:.0f} pozisyon, RSI<{_rsi_max:.0f})"
+                   if _bear_cap else ""))
 
     st = t._load()
     pos = st.get("position")
@@ -230,11 +240,14 @@ def cycle() -> list[str]:
                 if locked:
                     np["locked_sl"] = locked
                 t._save({**t._load(), "position": np})
+                sm.day_record(float(res.get("net", 0) or 0))
             logs.append(f"KDEMELİ SATIŞ 1/2 {sym} {'OK' if res.get('ok') else 'HATA'} "
                         f"· {half} adet · {why}")
             return logs
         if action == "FULL":
             res = t.sell(sym, float(pos["qty"]), f"{MOD_ADI}: {why}")
+            if res.get("ok"):
+                sm.day_record(float(res.get("net", 0) or 0))
             logs.append(f"SAT {sym} {'OK' if res.get('ok') else 'HATA'} — {why}")
             return logs
         # DCA: %1 düşüşte bir %10 kademe daha (en fazla 3)
@@ -283,6 +296,10 @@ def cycle() -> list[str]:
     if best["pozisyon_pct"] <= 0:
         return logs + [f"ALIM YOK: {best['vol_not']}"]
     ok, why = buy_signal(best)
+    if _bear_cap and best["rsi"] >= _rsi_max:
+        ok = False
+        why += (f" · AYI rejiminde RSI<{_rsi_max:.0f} gerekli "
+                f"(şu an {best['rsi']:.1f}) — az işlem")
     if not ok:
         return logs + [f"ALIM KOŞULU YOK: {best['symbol']} — {why}"]
     sym = best["symbol"]
@@ -291,8 +308,10 @@ def cycle() -> list[str]:
         return logs + [f"FREN ({sym}): {brake}"]
     bal = t.available_try()
     cap = min(t.position_size_try(bal, sym), bal * best["pozisyon_pct"])
-    logs.append(f"POZİSYON: {best['pozisyon_pct']*100:.0f}% · ₺{cap:.2f} "
-                f"(bakiye ₺{bal:.2f})")
+    if _bear_cap:
+        cap = min(cap, bal * _bear_cap)
+    logs.append(f"POZİSYON: {cap / bal * 100:.0f}% · ₺{cap:.2f} "
+                f"(bakiye ₺{bal:.2f}{', AYI %7 üst sınır' if _bear_cap else ''})")
     if cap <= 0:
         return logs + ["bakiye yetersiz"]
     flt = t._filters(sym)

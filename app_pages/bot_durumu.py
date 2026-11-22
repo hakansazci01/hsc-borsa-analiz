@@ -200,28 +200,26 @@ def _panel():
     )
     st.caption(f"ADX {reg['adx']:.1f} · fiyat {reg['price']:.2f} / EMA50 {reg['ema50']:.2f} — "
                f"{reg['reason']}")
-    # STRATEJİ MODU — kullanıcı panelden seçer (EMA50 korunur, yeni mod yanında)
+    # REJİME GÖRE OTOMATİK MOD — kullanıcı seçmez (BOĞA=EMA50, YATAY/AYI=KÜÇÜK KÂR)
     from ui import strategy_mode as sm
 
-    _sec = st.selectbox(
-        "STRATEJİ MODU", list(sm.VALID), index=list(sm.VALID).index(sm.get()),
-        format_func=lambda x: sm.LABELS[x], key="strategy_mode_select",
-    )
-    if _sec != sm.get():
-        sm.set(_sec)
-        st.rerun()
-    strat_label = sm.label()
-    # Rejim durumu ayrı gösterilir (NAKİTTE BEKLEME / GRID / NORMAL)
+    _auto_mode, _auto_reg = sm.current_auto(reg["name"])
+    strat_label = sm.LABELS[_auto_mode]
     rejim_modu = "GRID" if reg["range"] else ("NAKİTTE BEKLEME" if reg["bear"] else "NORMAL")
-    _mc = "#eab308" if sm.get() == sm.QUICK else "#22c55e"
+    _mc = "#eab308" if _auto_mode == sm.QUICK else "#22c55e"
     st.markdown(
         f'<div style="text-align:center;padding:6px 0 10px 0;">'
         f'<span style="font-size:22px;font-weight:800;color:{_mc};letter-spacing:2px;">'
-        f'MOD: {strat_label}</span></div>',
+        f'REJİM: {_auto_reg} - MOD: {strat_label}</span></div>',
         unsafe_allow_html=True,
     )
-    st.caption(f"Rejim durumu: **{rejim_modu}** · strateji modu: **{strat_label}**")
-    if sm.get() == sm.QUICK:
+    sm_st = sm._state()
+    st.caption(
+        f"Otomatik mod (kullanıcı seçmez) · rejim durumu: **{rejim_modu}** · "
+        f"günlük işlem {sm_st.get('day_trades', 0)}/10 · zararlı "
+        f"{sm_st.get('day_losses', 0)}/3 · son geçiş {sm_st.get('changed_at', '—')}"
+    )
+    if _auto_mode == sm.QUICK:
         try:
             from ui import quick_profit
 
