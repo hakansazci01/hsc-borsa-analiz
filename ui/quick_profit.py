@@ -380,7 +380,9 @@ def cycle() -> list[str]:
         f"+hacim {r['hacim_puan']}+BB {r['bb_puan']}) ATR%{r['atr_pct']}"
         for r in rows[:8]))
     best = rows[0]
-    logs.append(f"VOLATİLİTE FİLTRESİ: {best['symbol']} — {best['vol_not']}")
+    logs.append(f"VOLATİLİTE FİLTRESİ: {best['symbol']} — ATR %{best['atr_pct']:.2f} "
+                f"· POZİSYON %{POS_PCT*100:.0f} (₺{t.available_try()*POS_PCT:.2f}) "
+                f"— kademe: {best['vol_not']}")
     if best["pozisyon_pct"] <= 0:
         return logs + [f"ALIM YOK: {best['vol_not']}"]
     ok, why = buy_signal(best)
