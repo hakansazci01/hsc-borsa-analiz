@@ -720,7 +720,7 @@ def cycle() -> list[str]:
                     _np["grid_anchor"] = ind["price"]
                     _save_active_position(_np, _nl)
             else:
-                _target = float(pos.get("entry", ind["price"])) * (1 + 0.006)
+                _target = float(pos.get("entry", ind["price"])) * (1 + _me.MICRO_TP[0][0])
                 _mres = t.sell(sym, _mqty, f"{MOD_ADI}: {_mwhy}",
                                partial=True, price_limit=_target)
                 if _mres.get("pending"):
@@ -736,6 +736,13 @@ def cycle() -> list[str]:
                                 f"@ {_target:.8f} · komisyon %0.10 — dolum bekleniyor")
                     return logs
             if _mres.get("ok"):
+                # Mikro TP %1.5, TP2 ile aynı seviye — tp_stage=2 yapıp
+                # TP2'nin aynı pozisyonu ikinci kez satmasını engelle.
+                _cur = t._load()
+                _np, _nl = _active_position(_cur)
+                if _np:
+                    _np["tp_stage"] = 2
+                    _save_active_position(_np, _nl)
                 sm.day_record(float(_mres.get("net", 0) or 0))
                 from ui import tp_proof as _tpproof
                 _n = _tpproof.record_real_tp(sym, _mwhy, float(_mres.get("net", 0) or 0))
@@ -747,6 +754,10 @@ def cycle() -> list[str]:
             logs.append(f"MİKRO TP atlandı: {_mwhy}")
 
         action, ratio, why, locked = sell_decision(pos, ind, atr["stop"])
+        # Mikro TP %1.5 iken TP1 %0.8 erken satış yapmasın — tek çıkış noktası.
+        if action == "PARTIAL" and _me.MICRO_TP[0][0] >= 0.015:
+            logs.append("TP1 %0.8 atlandı: mikro TP %1.5 tek çıkış noktası (çift satış yok)")
+            action, ratio, why = "HOLD", 0.0, ""
         if locked > float(pos.get("locked_sl", 0) or 0):
             pos["locked_sl"] = locked
             _gain = (ind["price"] - entry) / entry if entry else 0.0

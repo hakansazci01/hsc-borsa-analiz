@@ -22,9 +22,9 @@ MOTOR2_PCT = 0.30
 COMMISSION = 0.0015
 ROUND_TRIP_PCT = 0.30
 MIN_GRID_PCT = 0.009        # %0.90 — 3x %0.30
-MIN_TP_PCT = 0.006          # %0.60 — komisyonun 2 katı
+MIN_TP_PCT = 0.015          # %1.50 — R/R matematiği: %0.60'da yaşayabilir stop yok
 MICRO_LAYERS = (0.009, 0.018, 0.027)
-MICRO_TP = ((0.006, 0.50),)  # TP1 %0.8 değişmez; mikro TP onun altında %0.60
+MICRO_TP = ((0.015, 0.50),)  # kullanıcı onayı: %0.6 → %1.5 (TP2 ile aynı seviye, tek satış)
 
 # Motor 2 — fırsat
 OPP_RSI_MAX = 25.0

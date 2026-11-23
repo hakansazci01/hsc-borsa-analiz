@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-TP_PCT = 0.60
+TP_PCT = 1.50   # mikro TP %1.5 (kullanıcı onayı)
 FEE_PCT = 0.25
 MICRO_STOP_PCT = 1.00
 MIN_WIN_RATE = 0.60

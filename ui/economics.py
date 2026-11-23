@@ -19,7 +19,7 @@ ROUND_TRIP_TAKER = 0.30
 ROUND_TRIP_MAKER = 0.25
 ROUND_TRIP_BOTH_MAKER = 0.20
 MIN_NET_TRY = 0.15   # 50 TL @ maker çıkış → net 0.175 TL → geçer; 30 TL → 0.105 → atlanır
-MICRO_TP_PCT = 0.60
+MICRO_TP_PCT = 1.50   # kullanıcı onayı: %0.6 → %1.5 (R/R için gerekli)
 
 
 def net_try(cap_try: float, gross_pct: float,

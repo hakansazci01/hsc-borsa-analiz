@@ -246,7 +246,7 @@ def summarize(rows: tuple[dict[str, Any], ...], key: str) -> dict[str, Any]:
 # sonrası ayakta kalmıyor. Bu bölüm sadece ÖLÇER — emir/limit/state değiştirmez.
 MICRO_FEE_PCT = 0.25
 MICRO_SLIP_PCT = 0.05
-MICRO_TP_PCT = 0.60
+MICRO_TP_PCT = 1.50
 MICRO_STOP_PCT = 1.00
 
 
