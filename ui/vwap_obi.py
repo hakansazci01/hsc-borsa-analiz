@@ -65,8 +65,12 @@ def obi_formula(bids: list[list[Any]], asks: list[list[Any]]) -> dict[str, Any]:
 
 def reclaim_check(symbol: str, price: float, vwap: float, prev_price: float,
                   obi: dict[str, Any], signal_age_sec: float,
-                  above_sec: float) -> tuple[bool, str]:
-    """Tüm koşullar birlikte tutarsa LONG adayı."""
+                  above_sec: float, fresh_limit: float | None = None) -> tuple[bool, str]:
+    """Tüm koşullar birlikte tutarsa LONG adayı.
+
+    fresh_limit verilirse (mikro sistemde 2 sn) depth5 sunucu zamanı `T` ile
+    ölçülen sinyal yaşı bu sınırı aşarsa giriş reddedilir.
+    """
     checks = {
         "derin tahta": is_deep(symbol),
         "VWAP altındaydı": float(prev_price) <= float(vwap),
@@ -76,6 +80,8 @@ def reclaim_check(symbol: str, price: float, vwap: float, prev_price: float,
         "OBI ≥ 0 (spoofing yok)": float(obi.get("value", 0)) >= 0,
         "sinyal ≤ 15 sn": float(signal_age_sec) <= SIGNAL_TTL_SEC,
     }
+    if fresh_limit is not None:
+        checks[f"depth tazeliği ≤ {fresh_limit:g} sn"] = float(signal_age_sec) <= float(fresh_limit)
     bad = [k for k, ok in checks.items() if not ok]
     detail = " · ".join(f"{k} {'OK' if ok else 'X'}" for k, ok in checks.items())
     return (not bad), detail

@@ -406,6 +406,12 @@ def _scan_new() -> list[str]:
         f"+hacim {r['hacim_puan']}+BB {r['bb_puan']}) ATR%{r['atr_pct']}"
         for r in rows[:8]))
     best = rows[0]
+    # REJİM KAPISI — araştırma: grid trendde kaybettirir, yatay/ayıda çalışır
+    _reg = market_regime.regime("BTC_TRY")
+    _grid_off = bool(_reg.get("bull")) and float(_reg.get("adx", 0) or 0) >= 25
+    if _grid_off:
+        logs.append("REJİM KAPISI: BOĞA + ADX≥25 — mikro grid yeni alımı kapalı "
+                    "(fırsat/crash/OBI sinyalleri açık)")
 
     # SİNYALLER — karar modülleri skor tablosunu BOZMAZ
     _crash_ok, _last_close, _vo_ok, _cok = False, 0.0, False, False
@@ -431,14 +437,22 @@ def _scan_new() -> list[str]:
                 _obi_f = _vo.obi_formula(
                     [["b", float(ofi.get("bid_pct", 50)) / 100.0]],
                     [["a", (100.0 - float(ofi.get("bid_pct", 50))) / 100.0]])
+                from ui import ws_feed as _wsf
+                _depth = (_wsf._load().get("depth_obi") or {}).get(best["symbol"], {})
+                _age_ms = _depth.get("age_ms")
+                _sig_age = (_age_ms / 1000.0) if isinstance(_age_ms, (int, float)) else 99.0
                 _vo_ok, _vo_why = _vo.reclaim_check(
                     best["symbol"], best["price"], _vw["vwap"],
-                    _vw["vwap"] - 0.01, _obi_f, 5.0, 65.0)
-                logs.append(f"OBI+VWAP: {_vo_ok} | {_vo_why} (VWAP={_vw['vwap']:.4f})")
+                    _vw["vwap"] - 0.01, _obi_f, min(_sig_age, 15.0), 65.0,
+                    fresh_limit=2.0)
+                logs.append(f"OBI+VWAP: {_vo_ok} | {_vo_why} · depth yaşı "
+                            f"{_sig_age:.2f} sn (limit 2 sn), OBI={_depth.get('ratio', '—')}")
         except Exception as _ve:
             logs.append(f"OBI+VWAP kontrolü atlandı: {type(_ve).__name__}")
     try:
-        _cok, _cwhy = _cn.entry(t.klines(best["symbol"], "15m", 210)["Close"].tolist())
+        _c15 = t.klines(best["symbol"], "15m", 210)
+        _cd1 = t.klines(best["symbol"], "1d", 210)
+        _cok, _cwhy = _cn.entry(_c15["Close"].tolist(), _cd1["Close"].tolist())
         logs.append(f"CONNORS RSI(2): {'AL sinyali' if _cok else 'sinyal yok'} · {_cwhy}")
     except Exception:
         _cok = False
@@ -512,6 +526,13 @@ def _scan_new() -> list[str]:
               _tb.position_cap(bal, _day_dd, _conf))
     if cap <= 0:
         return logs + ["bakiye yetersiz"]
+    # EKONOMİ KAPISI — komisyonu yenmeyen işlem hiç gönderilmez
+    from ui import economics as _econ
+    _worth, _wmsg = _econ.worth_it(cap, _econ.MICRO_TP_PCT, _econ.ROUND_TRIP_MAKER)
+    logs.append(f"EKONOMİ: {_wmsg}")
+    if not _worth:
+        return logs + ["Net kâr eşiği altında — emir atılmadı"]
+
     _sigs = {"CRASH_BID": bool(_crash_ok), "OBI_VWAP": bool(_vo_ok),
              "MICRO_GRID": False, "FIRSAT": bool(_opp_ok or _cok)}
     _chosen = _eng.pick_motor(_sigs)
@@ -525,6 +546,8 @@ def _scan_new() -> list[str]:
     if _chosen == "OBI_VWAP":
         _er = _eng.obi_vwap_entry(sym, best["price"], cap, _day_dd)
         return logs + [f"OBI+VWAP: {'emir atıldı ID ' + str(_er.get('order_id')) if _er.get('ok') else _er.get('reason')}"]
+    if _grid_off:
+        return logs + ["REJİM KAPISI: trendde mikro grid alımı yapılmadı"]
     _flt = t._filters(sym)
     qty = max(_qty(cap, best["price"], _flt["step"] or 0.00000001), _flt["min_qty"])
     res = _eng.place_buy(sym, _chosen or _motor, cap, price_limit=None)
@@ -648,20 +671,53 @@ def cycle() -> list[str]:
             _mflt = t._filters(sym)
             _mqty = max(_qty(float(pos["qty"]) * _mratio, ind["price"],
                              _mflt["step"] or 0.00000001), _mflt["min_qty"])
-            _mres = t.sell(sym, _mqty, f"{MOD_ADI}: {_mwhy}", partial=True)
-            if _mres.get("ok"):
+            # MAKER ÇIKIŞ — limit satış, komisyon %0.15 → %0.10
+            _pend_id = pos.get("tp_limit_order_id")
+            if _pend_id and time.time() - float(pos.get("tp_limit_at", time.time())) > 3600:
+                t.cancel_order(_pend_id)
                 _cur = t._load()
                 _np, _nl = _active_position(_cur)
                 if _np:
+                    _np.pop("tp_limit_order_id", None)
+                    _save_active_position(_np, _nl)
+                logs.append(f"MİKRO TP maker limit 1 saatte dolmadı — ID {_pend_id} iptal edildi")
+                _pend_id = None
+            if _pend_id:
+                _cf = t.confirm_limit_fill(_pend_id, sym, float(pos.get("tp_limit_qty", _mqty)),
+                                           pos.get("tp_limit_reason", _mwhy), partial=True)
+                if _cf.get("pending"):
+                    logs.append(f"MİKRO TP maker limit bekliyor ID {_pend_id} — pozisyon korundu")
+                    return logs
+                _mres, _mqty = _cf, float(pos.get("tp_limit_qty", _mqty))
+                _cur = t._load()
+                _np, _nl = _active_position(_cur)
+                if _np:
+                    _np.pop("tp_limit_order_id", None)
                     _np["micro_tp_stage"] = int(_np.get("micro_tp_stage", 0)) + 1
                     _np["grid_layers"] = max(1, int(_np.get("grid_layers", 1)) - 1)
                     _np["grid_anchor"] = ind["price"]
                     _save_active_position(_np, _nl)
+            else:
+                _target = float(pos.get("entry", ind["price"])) * (1 + 0.006)
+                _mres = t.sell(sym, _mqty, f"{MOD_ADI}: {_mwhy}",
+                               partial=True, price_limit=_target)
+                if _mres.get("pending"):
+                    _cur = t._load()
+                    _np, _nl = _active_position(_cur)
+                    if _np:
+                        _np["tp_limit_order_id"] = _mres.get("order_id")
+                        _np["tp_limit_qty"] = _mqty
+                        _np["tp_limit_reason"] = _mwhy
+                        _np["tp_limit_at"] = time.time()
+                        _save_active_position(_np, _nl)
+                    logs.append(f"MİKRO TP maker limit emri atıldı ID {_mres.get('order_id')} "
+                                f"@ {_target:.8f} · komisyon %0.10 — dolum bekleniyor")
+                    return logs
+            if _mres.get("ok"):
                 sm.day_record(float(_mres.get("net", 0) or 0))
                 from ui import tp_proof as _tpproof
                 _n = _tpproof.record_real_tp(sym, _mwhy, float(_mres.get("net", 0) or 0))
-                logs.append(f"GERÇEK TP KANITI {_n}: {_mwhy} · {_mqty} adet satıldı")
-                logs.append(f"{_mwhy} · {_mqty} adet satıldı")
+                logs.append(f"GERÇEK TP KANITI {_n}: {_mwhy} · {_mqty} adet satıldı (MAKER)")
             else:
                 logs.append(f"MİKRO TP emri reddedildi: {str(_mres.get('reason'))[:80]}")
             return logs

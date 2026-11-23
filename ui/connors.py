@@ -35,16 +35,20 @@ def sma(closes: list[float], period: int) -> float:
     return float(s.rolling(period).mean().iloc[-1]) if len(s) >= period else 0.0
 
 
-def entry(closes: list[float]) -> tuple[bool, str]:
-    """Fiyat > SMA200 ve RSI(2) < 10 → LONG adayı."""
+def entry(closes: list[float], daily_closes: list[float] | None = None) -> tuple[bool, str]:
+    """Kaynak kural (Connors 2009): RSI(2) 15dk, trend filtresi GÜNLÜK SMA200.
+
+    daily_closes verilmezse eski davranış (15dk SMA200) korunur — geri uyumluluk.
+    """
     price = float(closes[-1]) if closes else 0.0
-    s200 = sma(closes, 200)
+    trend = daily_closes if daily_closes else closes
+    tf = "günlük" if daily_closes else "15dk"
+    s200 = sma(trend, 200)
     r2 = rsi2(closes)
     ok = s200 > 0 and price > s200 and r2 < ENTRY_RSI
-    # Düşük fiyatlı coin'lerde (SHIB/PEPE) 4 ondalık yeterli değil — gerçek
-    # değer 0.0001808 iken 0.0002 gösterilmesi koşulu yanlış okutuyordu.
-    return ok, (f"Connors RSI(2)={r2:.1f} < {ENTRY_RSI:.0f} · "
-                f"fiyat {price:.8f} {'>' if price > s200 else '<'} SMA200 {s200:.8f}")
+    return ok, (f"Connors RSI(2)(15dk)={r2:.1f} < {ENTRY_RSI:.0f} · "
+                f"fiyat {price:.8f} {'>' if price > s200 else '<'} "
+                f"SMA200({tf}) {s200:.8f}")
 
 
 def exit_signal(price: float, closes: list[float]) -> tuple[bool, str]:

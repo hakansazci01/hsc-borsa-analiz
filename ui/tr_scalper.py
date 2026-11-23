@@ -555,8 +555,13 @@ def buy(symbol: str, qty_override: float | None = None,
     return res
 
 
-def sell(symbol: str, qty: float, reason: str, partial: bool = False) -> dict[str, Any]:
-    """GERÇEK SATIŞ + trades.csv kaydı. partial=True ise pozisyonu kapatmaz."""
+def sell(symbol: str, qty: float, reason: str, partial: bool = False,
+         price_limit: float | None = None) -> dict[str, Any]:
+    """GERÇEK SATIŞ + trades.csv kaydı. partial=True ise pozisyonu kapatmaz.
+
+    price_limit verilirse MAKER limit satışı (type 1) — komisyon %0.15 yerine
+    %0.10 ödenir. Dolmazsa pending=True döner, pozisyon state'i değişmez.
+    """
     actual = asset_balance(symbol.split("_")[0]) or qty
     qty = min(qty, actual)
     # TOZ ENGELLİYİCİ: miktarı step'e AŞAĞI yuvarla (7.3 -> 7.2), kalanı kaydet.
@@ -569,12 +574,36 @@ def sell(symbol: str, qty: float, reason: str, partial: bool = False) -> dict[st
     px = price(symbol) or 0
     # Binance TR quoteOrderQty desteklemiyor — alımda çalışan quantity formatını kullan.
     qty_str = f"{float(qty):.8f}".rstrip("0").rstrip(".")
-    payload = {"symbol": symbol, "side": 1, "type": 2, "quantity": qty_str}
+    payload = {"symbol": symbol, "side": 1,
+               "type": 1 if price_limit is not None else 2, "quantity": qty_str}
+    if price_limit is not None:
+        tick = float(_flt.get("tick", 0) or 0)
+        lim = float(price_limit)
+        if tick > 0:
+            lim = round(int(lim / tick + 1e-12) * tick, 8)
+        payload["price"] = f"{lim:.8f}".rstrip("0").rstrip(".")
     ok, data = _request("/open/v1/orders", payload, signed=True, method="POST")
     success = bool(ok and isinstance(data, dict) and data.get("code") in (0, None))
     if not success:
         return {"ok": False, "reason": str(data)[:200]}
+    _body0 = ((data or {}).get("data") or {}) if isinstance(data, dict) else {}
+    _filled0 = float(_body0.get("executedQty") or 0)
+    if price_limit is not None and _filled0 <= 0:
+        return {"ok": True, "pending": True,
+                "order_id": _body0.get("orderId") or _body0.get("id"),
+                "price_limit": price_limit,
+                "reason": "MAKER limit satış emri bekliyor — pozisyon korundu"}
+    if price_limit is not None:
+        px = float(_body0.get("executedPrice") or price_limit)
 
+    return _record_sell(symbol, qty, px, reason, partial, _dust)
+
+
+
+
+def _record_sell(symbol: str, qty: float, px: float, reason: str,
+                 partial: bool, _dust: float) -> dict[str, Any]:
+    """Gerçekleşen satışın K/Z, state ve trades.csv kaydı (tek nokta)."""
     st = _load()
     # Aktif pozisyon tekil alanda YA DA positions listesinde olabilir.
     # İkisini de kontrol et — yoksa TP satışında K/Z sıfır kaydedilirdi.
@@ -596,6 +625,7 @@ def sell(symbol: str, qty: float, reason: str, partial: bool = False) -> dict[st
             "gross_pnl": round(gross, 4), "fee": round(fee, 4),
             "net_pnl": round(net, 4), "exit_time": time.strftime("%Y-%m-%d %H:%M:%S"),
             "duration_sec": duration_sec, "reason": reason, "strategy": STRATEGY_NAME,
+            "motor": pos.get("motor", "—"),
         }])[-50:]
         st["realized_pnl"] = round(sum(float(h.get("net_pnl", 0)) for h in st["history"]), 4)
         # KADEMELİ FREN — her gerçek satışta seri sayacını güncelle
@@ -656,7 +686,26 @@ def sell(symbol: str, qty: float, reason: str, partial: bool = False) -> dict[st
             "net_kar_zarar": round(net, 4), "işlem_süresi": f"{duration_sec:.0f} sn",
             "strateji_adı": STRATEGY_NAME,
         })
-    return {"ok": True, "data": data}
+    return {"ok": True, "net": round(float(net), 4),
+            "entry": round(float(entry), 8), "exit": round(float(px), 8)}
+
+
+def confirm_limit_fill(order_id: int | str, symbol: str, qty: float,
+                       reason: str, partial: bool = True) -> dict[str, Any]:
+    """Bekleyen MAKER limit satışının dolup dolmadığını kontrol et.
+    Dolmuşsa K/Z kaydını yapar; hâlâ açıksa pending döner, çift kayıt olmaz.
+    """
+    q = order_status(order_id)
+    if not q.get("ok"):
+        return {"ok": False, "pending": True, "reason": str(q.get("reason"))[:120]}
+    body = q.get("data") or {}
+    filled = float(body.get("executedQty") or 0)
+    if filled <= 0:
+        return {"ok": True, "pending": True, "order_id": order_id}
+    px = float(body.get("executedPrice") or 0) or (price(symbol) or 0)
+    actual = asset_balance(symbol.split("_")[0]) or qty
+    dust = max(0.0, actual - float(filled))
+    return _record_sell(symbol, float(filled), px, reason, partial, dust)
 
 
 def _write_trade_csv(row: dict[str, Any]) -> None:

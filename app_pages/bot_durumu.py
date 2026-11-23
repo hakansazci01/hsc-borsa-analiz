@@ -518,6 +518,7 @@ def _panel():
         f"Son 7 gün net: **{_dr['week_net']:+.2f} TL** · "
         f"Açık pozisyon: **{_dr['open_position']}** · "
         f"Gerçek TP kanıtı: **{_dr['tp_proof']}** · "
+        f"Motor defteri: **{_dr['motor_ledger']}** · "
         f"Rapor saati: {_dr['at']} — vaat değil, trades.csv'den gerçek rakam"
     )
 

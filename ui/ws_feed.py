@@ -335,7 +335,13 @@ def _depth_loop() -> None:
                     obi = me.obi_ratio(d.get("bids") or [], d.get("asks") or [])
                     st = _load()
                     depth = st.get("depth_obi", {}) if isinstance(st.get("depth_obi"), dict) else {}
+                    # Binance partial depth5@100ms sunucu zamanı 'T' taşır —
+                    # sinyal yaşını ölçüp 2 sn üzeri OBI'ları reddediyoruz.
+                    srv_ms = d.get("T")
+                    age_ms = (int(time.time() * 1000 - float(srv_ms))
+                              if srv_ms else None)
                     depth[sym] = {"ratio": obi["ratio"], "ok": obi["ok"],
+                                  "age_ms": age_ms,
                                   "at": time.strftime("%Y-%m-%d %H:%M:%S")}
                     st["depth_obi"] = depth
                     _save(st)

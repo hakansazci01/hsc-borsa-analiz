@@ -163,7 +163,7 @@ def daily_report_data() -> dict[str, Any]:
     """23:00 net rakam — vaat değil, gerçek kayıtlar."""
     import csv
     from datetime import datetime
-    from ui import risk_brakes, trade_stats, tp_proof
+    from ui import motor_ledger, risk_brakes, trade_stats, tp_proof
 
     today = time.strftime("%Y-%m-%d")
     rows: list[dict[str, Any]] = []
@@ -191,6 +191,7 @@ def daily_report_data() -> dict[str, Any]:
         "week_net": stt["week_net"],
         "balance": br["balance"], "open_position": pos_txt,
         "tp_proof": tp_proof.count(),
+        "motor_ledger": motor_ledger.summary_text(),
         "bot": "AÇIK" if not tr_scalper.STOP_FILE.exists() else "KAPALI (STOP)",
     }
 
@@ -206,6 +207,7 @@ def daily_summary(notify: bool = True) -> str:
         f"Güncel kasa / Bakiye: ₺{d['balance']:,.2f}\n"
         f"Açık pozisyon: {d['open_position']}\n"
         f"Gerçek TP kanıtı: {d['tp_proof']}\n"
+        f"Motor defteri: {d['motor_ledger']}\n"
         f"Bot: {d['bot']}"
     )
     try:
