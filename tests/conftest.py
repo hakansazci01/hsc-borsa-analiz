@@ -110,6 +110,11 @@ def isolate_live_state(tmp_path, monkeypatch):
     }
     sandbox = tmp_path / "isolated"
     sandbox.mkdir(exist_ok=True)
+    # Yedek testlerinin her zaman 3 dosya bulmasını sağla — test sırasına bağlı kalmasın.
+    for name in ("trades.csv", "tr_daily_state.json", "config.yaml"):
+        f = sandbox / name
+        if not f.exists():
+            f.write_text("tarih,sembol\n" if name.endswith(".csv") else "{}", encoding="utf-8")
     for mod_name, attrs in targets.items():
         try:
             mod = importlib.import_module(mod_name)
