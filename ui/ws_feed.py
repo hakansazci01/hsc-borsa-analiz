@@ -308,7 +308,7 @@ def _depth_loop() -> None:
 
     from ui import micro_engine as me
 
-    symbols = ["BTC_TRY", "XLM_TRY", "SHIB_TRY"]
+    symbols = ["BTC_TRY", "ETH_TRY", "XLM_TRY", "SHIB_TRY"]
     while not _stop.is_set():
         for sym in symbols:
             if _stop.is_set():

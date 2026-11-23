@@ -102,6 +102,8 @@ def preflight(symbol: str, cap_try: float) -> tuple[bool, str]:
         return False, "SMA200 verisi yok"
     # OBI ≤2 sn tazelik
     d = depth(symbol)
+    if not d:
+        return False, "depth verisi yok"
     age = d.get("age_ms")
     if not isinstance(age, (int, float)) or float(age) > 2000:
         return False, "OBI depth verisi bayat (>2 sn)"
@@ -168,8 +170,10 @@ def step() -> list[str]:
             ask = float(d.get("best_ask") or 0) or px
             spread = ((ask - bid) / ((ask + bid) / 2) * 100) if ask > bid else 99
             ratio = float(d.get("ratio") or 0)
-            if px <= 0 or spread > SPREAD_MAX_PCT or not (0.3 <= ratio <= 3.0):
-                logs.append(f"FAST_MAKER {sym}: spread %{spread:.3f} / OBI {ratio:.2f} — uygun değil")
+            obi_value = (ratio - 1) / (ratio + 1) if ratio > 0 else 0.0  # -1..+1
+            if px <= 0 or spread > SPREAD_MAX_PCT or abs(obi_value) > 0.5:
+                logs.append(f"FAST_MAKER {sym}: spread %{spread:.3f} / OBI {obi_value:+.2f} "
+                            f"(bid/ask {ratio:.2f}) — uygun değil")
                 continue
             cap = min(t.available_try() * 0.05, 250.0)
             ok, why = preflight(sym, cap)
