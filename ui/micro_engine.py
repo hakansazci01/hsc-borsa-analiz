@@ -181,5 +181,5 @@ def opportunity_exit(pos: dict[str, Any], price: float, now_ts: float,
     if gain > OPP_TARGET_MAX:
         return ("SELL", f"FIRSAT hedef aşıldı %{gain*100:.2f} — kârı al")
     if held >= OPP_MAX_HOLD_SEC and gain <= 0:
-        return ("LOCK_BE", f"1 saat doldu, kâr yok — stop girişe ({entry:.4f}) çekildi")
+        return ("LOCK_BE", f"1 saat doldu, kâr yok — stop girişe ({entry:.8f}) çekildi")
     return "HOLD", ""

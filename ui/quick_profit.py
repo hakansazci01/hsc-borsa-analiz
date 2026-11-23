@@ -77,7 +77,7 @@ def grid_decision(pos: dict[str, Any], price: float) -> tuple[str, str]:
     drop = (anchor - float(price)) / anchor
     if drop >= threshold:
         return ("ADD", f"KATMAN {layers+1}: fiyat {float(price):.4f} / referans "
-                       f"{anchor:.4f} · düşüş %{drop*100:.2f} ≥ %{threshold*100:.1f}")
+                       f"{anchor:.8f} · düşüş %{drop*100:.2f} ≥ %{threshold*100:.1f}")
     return ("HOLD", f"KATMAN {layers+1} için %{threshold*100:.1f} düşüş gerekli "
                     f"(şu an %{drop*100:.2f})")
 
@@ -460,7 +460,7 @@ def _scan_new() -> list[str]:
     _drop = (anchor - best["price"]) / anchor if anchor else 0.0
     if _drop < GRID_STEPS[0]:
         return logs + [f"GRID KATMAN 1: %{_drop*100:.2f} pullback < %{GRID_STEPS[0]*100:.1f} "
-                       f"— referans {anchor:.4f}, alım bekleniyor"]
+                       f"— referans {anchor:.8f}, alım bekleniyor"]
     _tier, _tier_pct = tier_of(sym)
     logs.append(f"KADEME: {sym} → {_tier} · POZİSYON: "
                 f"%{confidence_pct(best['score'])*100:.0f} (skora göre)")
@@ -681,7 +681,7 @@ def cycle() -> list[str]:
                 _save_active_position(np, np_in_list)
                 sm.day_record(float(res.get("net", 0) or 0))
                 logs.append(f"GRID: TP satışı sonrası katman {int(pos.get('grid_layers',1))}→{_freed}, "
-                            f"yeni referans {ind['price']:.4f}")
+                            f"yeni referans {ind['price']:.8f}")
             logs.append(f"KDEMELİ SATIŞ {'TP1' if action == 'PARTIAL' else 'TP2'} {sym} "
                         f"{'OK' if res.get('ok') else 'HATA'} · {sell_qty} adet · {why}")
             return logs
@@ -694,7 +694,7 @@ def cycle() -> list[str]:
             if locked:
                 np["locked_sl"] = locked
             _save_active_position(np, np_in_list)
-            logs.append(f"TP3 TRAILING AKTİF {sym} · zirve {ind['price']:.4f} "
+            logs.append(f"TP3 TRAILING AKTİF {sym} · zirve {ind['price']:.8f} "
                         f"· kalan %{100*(1-TP1_RATIO-TP2_RATIO):.0f} · {why}")
             return logs
         if action == "FULL":
@@ -734,7 +734,7 @@ def cycle() -> list[str]:
                 _cap_note = (" · coin %7 üst limiti nedeniyle hedef %5'ten küçültüldü"
                              if spend < target - 0.01 else "")
                 logs.append(f"GRID ALIM KATMAN {_layers+1}/{GRID_LAYERS} {sym} OK · "
-                            f"{gqty} adet @ {ind['price']:.4f} · ₺{spend:.2f} "
+                            f"{gqty} adet @ {ind['price']:.8f} · ₺{spend:.2f} "
                             f"(hedef ₺{target:.2f}){_cap_note} · yeni ort. {pos['avg_entry']:.4f}")
             else:
                 logs.append(f"GRID KATMAN {_layers+1} emri reddedildi: "

@@ -41,12 +41,14 @@ def entry(closes: list[float]) -> tuple[bool, str]:
     s200 = sma(closes, 200)
     r2 = rsi2(closes)
     ok = s200 > 0 and price > s200 and r2 < ENTRY_RSI
+    # Düşük fiyatlı coin'lerde (SHIB/PEPE) 4 ondalık yeterli değil — gerçek
+    # değer 0.0001808 iken 0.0002 gösterilmesi koşulu yanlış okutuyordu.
     return ok, (f"Connors RSI(2)={r2:.1f} < {ENTRY_RSI:.0f} · "
-                f"fiyat {price:.4f} {'>' if price > s200 else '<'} SMA200 {s200:.4f}")
+                f"fiyat {price:.8f} {'>' if price > s200 else '<'} SMA200 {s200:.8f}")
 
 
 def exit_signal(price: float, closes: list[float]) -> tuple[bool, str]:
     """Fiyat SMA5 üstüne çıkınca sat."""
     s5 = sma(closes, 5)
     ok = s5 > 0 and float(price) > s5
-    return ok, f"Connors çıkış: fiyat {float(price):.4f} {'>' if ok else '<'} SMA5 {s5:.4f}"
+    return ok, f"Connors çıkış: fiyat {float(price):.8f} {'>' if ok else '<'} SMA5 {s5:.8f}"
