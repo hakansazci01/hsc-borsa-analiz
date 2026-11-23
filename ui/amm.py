@@ -234,7 +234,11 @@ def step() -> list[str]:
                     t.cancel_order(existing.get("order_id"))
                     quotes.pop(f"{sym}:{side}", None)
             else:
-                qty = round(max((cap / px) * 0.02, (flt.get("min_qty") or stepq)), 8)
+                # Hedef 50-80 TL = cap/px (önceden 0.02 çarpanı ETH'de ₺0.87 emir üretiyordu)
+                raw_qty = cap / px
+                min_notional = float(flt.get("min_notional") or 10)
+                qty = round(max(raw_qty, min_notional / px,
+                                float(flt.get("min_qty") or stepq)), 8)
                 if side == "SELL" and not (st.get("inventory") or {}).get("qty"):
                     continue   # satacak coin yok
                 if side == "SELL":
