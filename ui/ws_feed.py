@@ -340,7 +340,12 @@ def _depth_loop() -> None:
                     srv_ms = d.get("T")
                     age_ms = (int(time.time() * 1000 - float(srv_ms))
                               if srv_ms else None)
+                    bids = d.get("bids") or []
+                    asks = d.get("asks") or []
+                    best_bid = float(bids[0][0]) if bids else 0.0
+                    best_ask = float(asks[0][0]) if asks else 0.0
                     depth[sym] = {"ratio": obi["ratio"], "ok": obi["ok"],
+                                  "best_bid": best_bid, "best_ask": best_ask,
                                   "age_ms": age_ms,
                                   "at": time.strftime("%Y-%m-%d %H:%M:%S")}
                     st["depth_obi"] = depth

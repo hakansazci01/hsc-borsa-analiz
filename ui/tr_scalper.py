@@ -349,7 +349,8 @@ def _log_gate(gate: dict[str, Any]) -> None:
 
 # ------------------------------------------------------------------- emir
 def _order(symbol: str, side: int, qty: float,
-           price_limit: float | None = None) -> dict[str, Any]:
+           price_limit: float | None = None,
+           post_only: bool = False) -> dict[str, Any]:
     try:
         from ui import order_guard
         _ok, _msg = order_guard.allow_order()
@@ -364,7 +365,8 @@ def _order(symbol: str, side: int, qty: float,
     # Binance TR özel "HSC-" clientId'yi reddediyor (3703) — API kendi clientId'sini üretir.
     # price_limit verilirse LIMIT (type 1), yoksa MARKET (type 2).
     payload = {"symbol": symbol, "side": side,
-               "type": 1 if price_limit is not None else 2, "quantity": qty_str}
+               "type": (7 if post_only else 1) if price_limit is not None else 2,
+               "quantity": qty_str}
     if price_limit is not None:
         tick = float(_filters(symbol).get("tick", 0) or 0)
         px = float(price_limit)
@@ -556,7 +558,8 @@ def buy(symbol: str, qty_override: float | None = None,
 
 
 def sell(symbol: str, qty: float, reason: str, partial: bool = False,
-         price_limit: float | None = None) -> dict[str, Any]:
+         price_limit: float | None = None,
+         post_only: bool = False) -> dict[str, Any]:
     """GERÇEK SATIŞ + trades.csv kaydı. partial=True ise pozisyonu kapatmaz.
 
     price_limit verilirse MAKER limit satışı (type 1) — komisyon %0.15 yerine
@@ -575,7 +578,8 @@ def sell(symbol: str, qty: float, reason: str, partial: bool = False,
     # Binance TR quoteOrderQty desteklemiyor — alımda çalışan quantity formatını kullan.
     qty_str = f"{float(qty):.8f}".rstrip("0").rstrip(".")
     payload = {"symbol": symbol, "side": 1,
-               "type": 1 if price_limit is not None else 2, "quantity": qty_str}
+               "type": (7 if post_only else 1) if price_limit is not None else 2,
+               "quantity": qty_str}
     if price_limit is not None:
         tick = float(_flt.get("tick", 0) or 0)
         lim = float(price_limit)
