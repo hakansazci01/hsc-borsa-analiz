@@ -378,27 +378,6 @@ def watchdog_once() -> dict[str, Any]:
     }
 
 
-def _enforce_single_copy() -> None:
-    """Kalıcı süreçleri TEK kopyaya indir — sadece gerçek watchdog döngüsünde çağrılır."""
-    import os
-    import psutil
-
-    me = os.getpid()
-    targets = ("ui.watchdog_runner", "ui.tr_runner", "ui.autonomous_scheduler")
-    for p in psutil.process_iter(["pid", "cmdline", "exe"]):
-        if p.info["pid"] == me:
-            continue
-        cmd = " ".join(p.info.get("cmdline") or [])
-        exe = (p.info.get("exe") or "").lower()
-        if "python" not in exe:
-            continue
-        if any(t in cmd for t in targets):
-            try:
-                p.kill()
-            except Exception:
-                pass
-
-
 def watchdog(interval: int = 60, claim_fn=None) -> None:
     """60 saniyede bir motoru ve scheduler'ı gerçekten başlatır/izler.
 
@@ -406,7 +385,6 @@ def watchdog(interval: int = 60, claim_fn=None) -> None:
     aldıysa bu örnek hemen çıkar (çift watchdog birbirini başlatmasın).
     """
     _log(f"WATCHDOG BAŞLADI — {interval} sn ctrl, MOTOR + SCHEDULER")
-    _enforce_single_copy()
     while True:
         if claim_fn is not None and not claim_fn():
             _log("BAŞKA WATCHDOG VAR — tek-instance kilidi bu örneği durdurdu")

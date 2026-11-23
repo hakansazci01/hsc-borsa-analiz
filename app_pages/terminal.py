@@ -36,7 +36,8 @@ def _terminal() -> None:
         st.caption(f"İstanbul saati: **{now().strftime('%H:%M:%S')}** · 15 sn'de bir yenilenir")
         st.badge(
             session["label"],
-            color={"open": "green", "pre_market": "orange", "after_hours": "gray", "closed": "gray"}[session["key"]],
+            color={"open": "green", "pre_market": "orange", "lunch": "gray",
+                   "after_hours": "gray", "closed": "gray"}.get(session["key"], "gray"),
             help=session["detail"],
         )
 

@@ -44,7 +44,9 @@ def test_trailing_stop_simulation() -> None:
         )
         assert position["peak_price"] == 100.0
 
-        with patch("ui.paper.live_quote", return_value={"price": 120.0, "source": "test"}):
+        with patch("ui.paper.live_quote", return_value={"price": 120.0, "source": "test"}), \
+             patch("ui.paper.get_live_snapshot", side_effect=Exception("izole test")), \
+             patch("ui.paper.build_decision", side_effect=Exception("izole test")):
             rows = paper.evaluate(USER, settings)
         assert rows[0]["peak_price"] == 120.0
         assert rows[0]["trailing_stop"] == 116.4

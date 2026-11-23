@@ -36,6 +36,8 @@ class _Monkeypatch:
 
 def _call(fn):
     """pytest fixture'larını (tmp_path, monkeypatch) bağımsız runner'da da sağla."""
+    # Her test öncesi izolasyonu yenile — önceki test modül state'lerini bozmuş olabilir.
+    _isolate_live_state()
     params = inspect.signature(fn).parameters
     kwargs = {}
     if "tmp_path" in params:
@@ -61,15 +63,17 @@ def _isolate_live_state() -> None:
         if not f.exists():
             f.write_text("tarih,sembol\n" if n.endswith(".csv") else "{}", encoding="utf-8")
     targets = {
-        "ui.tr_scalper": ["STATE"], "ui.safety_guards": ["STATE"],
+        "ui.tr_scalper": ["STATE", "STOP_FILE"], "ui.safety_guards": ["STATE"],
         "ui.order_guard": ["STATE"], "ui.risk_brakes": ["STATE"],
         "ui.strategy_mode": ["STATE"], "ui.ws_feed": ["STATE"],
         "ui.engine": ["STATE"], "ui.crash_bid": ["STATE"],
         "ui.tiered_brakes": ["STATE"], "ui.tp_proof": ["STATE"],
         "ui.live_feed": ["STATE"], "ui.autonomous": ["STATE"],
         "ui.health_report": ["STATE"], "ui.disaster_recovery": ["STATE"],
+        "ui.paper": ["STATE", "TRADES_CSV"],
         "ui.amm": ["STATE"], "ui.motor_guard": ["STATE"],
         "ui.autonomous_ops": ["DAILY_REPORT"],
+        "ui.tr_scalper": ["STATE", "STOP_FILE"],
     }
     for name, attrs in targets.items():
         try:

@@ -104,6 +104,7 @@ def isolate_live_state(tmp_path, monkeypatch):
         "ui.health_report": ["STATE"],
         "ui.monthly_backtest": ["STATE"],
         "ui.performance_export": ["STATE"],
+        "ui.paper": ["STATE", "TRADES_CSV"],
         "ui.disaster_recovery": ["STATE", "BACKUPS", "RECOVERY", "SOURCES"],
         "ui.check_gate": [],
         "ui.autonomous_ops": ["DAILY_REPORT"],

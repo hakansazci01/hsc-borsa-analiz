@@ -789,6 +789,12 @@ def test_check_gate(monkeypatch) -> None:
             "mr_mtf": mr.mtf_confirm, "cg": cg.guard_entry,
             "wg": wg.check, "dr": dr.block_on_corrupt,
         }
+        import ui.order_flow as of
+        from ui import safety_guards as sg
+
+        of.check = lambda s: {"ok": True, "state": "Temiz", "bid_pct": 55,
+                              "spread_pct": 0.02, "reason": ""}
+        sg.stale_check = lambda sell=False: (True, "Taze (2 sn)")
         wg.check = lambda s: {"blocked": False, "move_pct": 0.5, "reason": ""}
         dr.block_on_corrupt = lambda: False
         rb.update_from_history = lambda h: {}
