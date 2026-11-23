@@ -69,6 +69,13 @@ def main() -> None:
 
         disaster_recovery.recover()
         # watchdog_once() motor + scheduler + watchdog'u kontrol edip başlatır.
+        # Watchdog kendi kopyalarını kurduktan sonra tek kopya güvenliğini sağla:
+        # global/.venv karışık başlatmalarda çift watchdog/scheduler kalmasın.
+        try:
+            from ui import watchdog_runner
+            watchdog_runner._kill_other_runners()
+        except Exception:
+            pass
         states = ops.watchdog_once()
 
         # WS market + user data stream'i kalıcı motor (ui.tr_runner) başlatır.
