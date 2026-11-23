@@ -40,6 +40,28 @@ TARGET_INV = 0.50               # %50 coin / %50 nakit
 INV_BUY_CAP = 0.70              # %70 üstü → alış yok
 INV_SELL_FLOOR = 0.30           # %30 altı → satış yok
 TICK_START = time.time()
+_FILTER_CACHE: dict[str, tuple[float, dict[str, float]]] = {}
+_SIGMA_CACHE: dict[str, tuple[float, float]] = {}
+
+
+def cached_filters(symbol: str) -> dict[str, float]:
+    now = time.time()
+    hit = _FILTER_CACHE.get(symbol)
+    if hit and now - hit[0] < 300:
+        return hit[1]
+    f = t._filters(symbol)
+    _FILTER_CACHE[symbol] = (now, f)
+    return f
+
+
+def cached_sigma(symbol: str) -> float:
+    now = time.time()
+    hit = _SIGMA_CACHE.get(symbol)
+    if hit and now - hit[0] < 30:
+        return hit[1]
+    s = sigma(symbol)
+    _SIGMA_CACHE[symbol] = (now, s)
+    return s
 
 
 def _log(msg: str) -> None:
@@ -260,7 +282,7 @@ def step() -> list[str]:
     for sym in SYMBOLS:
         ok, why = preflight(sym)
         mid, bid, ask = mid_and_spread(sym)
-        sig = sigma(sym)
+        sig = cached_sigma(sym)
         q = inventory_ratio(sym, st) * 2 - 1     # -1..+1
         r = reservation_price(mid, q, sig) if mid > 0 else 0.0
         sp = dynamic_spread(sig) if mid > 0 else 0.0
@@ -279,7 +301,7 @@ def step() -> list[str]:
             sides.append("BUY")
         if invr >= INV_SELL_FLOOR:
             sides.append("SELL")
-        flt = t._filters(sym)
+        flt = cached_filters(sym)
         stepq = flt.get("step") or 0.00000001
         cap = min(BUDGET_TRY - st_budget_used(), TRADE_MAX_TRY)
         if cap < TRADE_MIN_TRY:
