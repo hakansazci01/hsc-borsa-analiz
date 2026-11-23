@@ -18,6 +18,11 @@ FULL_LAYERS = 3
 
 
 def stop_pct(pos: dict[str, Any]) -> float:
+    # Yeni pozisyonlarda R/R kapısıyla belirlenen mikro stop (%1) kullanılır.
+    # Eski pozisyonlarda (alan yok) felaket stop %5/%7 aynen korunur — dokunulmaz.
+    micro = pos.get("micro_stop_pct")
+    if micro:
+        return float(micro)
     layers = int(pos.get("grid_layers", pos.get("micro_layers", 0)) or 0)
     return STOP_PCT_FULL if layers >= FULL_LAYERS else STOP_PCT_EARLY
 

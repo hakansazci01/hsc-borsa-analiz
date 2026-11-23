@@ -449,11 +449,18 @@ def _scan_new() -> list[str]:
                             f"{_sig_age:.2f} sn (limit 2 sn), OBI={_depth.get('ratio', '—')}")
         except Exception as _ve:
             logs.append(f"OBI+VWAP kontrolü atlandı: {type(_ve).__name__}")
+    _trend_ok = True
+    _s200 = 0.0
     try:
         _c15 = t.klines(best["symbol"], "15m", 210)
         _cd1 = t.klines(best["symbol"], "1d", 210)
         _cok, _cwhy = _cn.entry(_c15["Close"].tolist(), _cd1["Close"].tolist())
+        _s200 = float(_cd1["Close"].rolling(200).mean().iloc[-1])
+        _trend_ok = float(best["price"]) > _s200
         logs.append(f"CONNORS RSI(2): {'AL sinyali' if _cok else 'sinyal yok'} · {_cwhy}")
+        logs.append(f"TREND FİLTRESİ (günlük SMA200): fiyat {best['price']:.8f} "
+                    f"{'>' if _trend_ok else '<'} {_s200:.8f} → "
+                    f"{'uzun girişe izin' if _trend_ok else 'YENİ ALIM YOK (düşüş trendi)'}")
     except Exception:
         _cok = False
     logs.append(f"VOLATİLİTE FİLTRESİ: {best['symbol']} — ATR %{best['atr_pct']:.2f} "
@@ -526,6 +533,8 @@ def _scan_new() -> list[str]:
               _tb.position_cap(bal, _day_dd, _conf))
     if cap <= 0:
         return logs + ["bakiye yetersiz"]
+    if not _trend_ok:
+        return logs + ["TREND KAPISI: fiyat günlük SMA200 altında — yeni uzun pozisyon açılmadı"]
     # EKONOMİ KAPISI — komisyonu yenmeyen işlem hiç gönderilmez
     from ui import economics as _econ
     _worth, _wmsg = _econ.worth_it(cap, _econ.MICRO_TP_PCT, _econ.ROUND_TRIP_MAKER)
@@ -567,7 +576,7 @@ def _scan_new() -> list[str]:
         "cost": round(best["price"] * qty, 4), "strategy": MOD_ADI,
         "rescues": 0, "ladders": 0, "last_buy": best["price"],
         "grid_anchor": anchor, "grid_layers": 1, "micro_layers": 0,
-        "micro_tp_stage": 0, "motor": _motor,
+        "micro_tp_stage": 0, "motor": _motor, "micro_stop_pct": 1.0,
         "atr_stop": market_regime.atr_stop(best["price"], sym)["stop"],
     })
     t._save({**_cur, "positions": _poss, "mode": MOD_ADI})
@@ -653,6 +662,8 @@ def cycle() -> list[str]:
         logs.append(f"HARD STOP hedefi: {sym} {hard_stop.stop_price(pos):.8f} "
                     f"(%{hard_stop.stop_pct(pos)*100:.0f}, katman "
                     f"{int(pos.get('grid_layers', 0) or 0)}/3) — şu an {ind['price']:.8f}")
+        from ui import risk_reward as _rr
+        logs.append("R/R KAPISI: " + _rr.check(hard_stop.stop_pct(pos))["msg"])
         if _hs:
             _hsres = t.sell(sym, float(pos["qty"]), f"{MOD_ADI}: {_hs_msg}")
             logs.append(f"HARD STOP {'OK' if _hsres.get('ok') else 'HATA'} · {_hs_msg}")
