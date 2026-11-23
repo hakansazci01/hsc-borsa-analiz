@@ -411,18 +411,18 @@ def test_watchdog_restarts_dead_processes() -> None:
 
     from ui import autonomous_ops as ops
 
-    # process_state gerçek psutil kullanır
-    ok, pid, start = ops.process_state("ui.tr_runner")
-    assert isinstance(ok, bool)
-    # watchdog_once tek tur: duran süreçleri BAŞLATIR (zaten ayakta olması gerekmez)
-    result = ops.watchdog_once()
-    for key in ("motor_alive", "sched_alive", "watch_alive", "motor_pid",
-                "sched_pid", "actions", "at"):
-        assert key in result
-    _time.sleep(8)  # yeni süreçlerin process listesine girmesi için
-    after = ops.watchdog_once()
-    # tur sonunda üçü de ayakta olmalı (watchdog başlattı)
-    assert after["motor_alive"] and after["sched_alive"] and after["watch_alive"]
+    # Test gerçek süreç doğurmasın — process_state'i izole et.
+    orig_ps = ops.process_state
+    try:
+        ops.process_state = lambda p: (True, 12345, "12:00:00")
+        result = ops.watchdog_once()
+        for key in ("motor_alive", "sched_alive", "watch_alive", "motor_pid",
+                    "sched_pid", "actions", "at"):
+            assert key in result
+        assert result["motor_alive"] and result["sched_alive"] and result["watch_alive"]
+        assert result["actions"] == []   # hepsi ayakta → aksiyon yok, döngü yok
+    finally:
+        ops.process_state = orig_ps
 
     # Panel ışığı: süreçler durmuşsa config temiz olsa bile AÇIK olmamalı
     panel = (Path(__file__).resolve().parent.parent / "app_pages" / "bot_durumu.py").read_text(encoding="utf-8")
