@@ -1,0 +1,26 @@
+{
+  "cycle_count": 74,
+  "positions": [
+    {
+      "symbol": "XLM_TRY",
+      "qty": 122.7663,
+      "entry": 6.43990698,
+      "avg_entry": 6.44012195,
+      "entry_ts": 1795388241.938,
+      "time": "2026-11-23 01:57:21",
+      "order_id": 1389965346,
+      "cost": 790.6299,
+      "strategy": "SÜREKLİ KÜÇÜK KAR",
+      "rescues": 0,
+      "ladders": 0,
+      "last_buy": 6.44679488,
+      "grid_anchor": 6.43990698,
+      "grid_layers": 3,
+      "tp_stage": 0,
+      "peak_tp": 6.44012195,
+      "locked_sl": 0.0,
+      "atr_stop": 5.808515
+    }
+  ],
+  "mode": "SÜREKLİ KÜÇÜK KAR"
+}

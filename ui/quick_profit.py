@@ -373,6 +373,185 @@ def _qty(cap_try: float, px: float, step: float) -> float:
     return round(int(raw / step + 0.999999) * step, 8) if step else round(raw, 8)
 
 
+def _scan_new() -> list[str]:
+    """YENİ TARAMA — açık pozisyonlardan BAĞIMSIZ, her turda çalışır.
+
+    Açık coin'ler aday listesinden çıkarılır; aynı coine çift emir atılmaz.
+    Crash Bid / OBI+VWAP / Mikro / Fırsat sinyalleri burada üretilir.
+    """
+    from ui import (connors as _cn, crash_bid as _cb, engine as _eng,
+                    micro_engine as _me, risk_brakes as _rb,
+                    safety_guards, tiered_brakes as _tb, tr_scalper as t,
+                    vwap_obi as _vo)
+    from ui import order_flow
+
+    logs: list[str] = ["YENİ TARAMA: başlatıldı"]
+    _open = t._load().get("positions") or []
+    open_syms = {str(p.get("symbol")) for p in _open if isinstance(p, dict)}
+    watch = dynamic_watchlist()
+    logs.append(f"DİNAMİK TOP-10 (saatlik): {', '.join(watch)}")
+    rows = [r for r in scan(list(watch)) if r["symbol"] not in open_syms]
+    if open_syms:
+        logs.append(f"YENİ TARAMA: açık coin'ler dışlandı ({', '.join(sorted(open_syms))})")
+    if not rows:
+        return logs + ["YENİ TARAMA: uygun aday yok (1s veri yok veya hepsi açık)"]
+    logs.append("SKOR TABLOSU (0-100): " + " | ".join(
+        f"{r['symbol']} {r['score']} (RSI {r['rsi_puan']}+düşüş {r['dusur_puan']}"
+        f"+hacim {r['hacim_puan']}+BB {r['bb_puan']}) ATR%{r['atr_pct']}"
+        for r in rows[:8]))
+    best = rows[0]
+
+    # SİNYALLER — karar modülleri skor tablosunu BOZMAZ
+    _crash_ok, _last_close, _vo_ok, _cok = False, 0.0, False, False
+    try:
+        _k = t.klines(best["symbol"], "1m", 3)
+        if _k is not None and len(_k) >= 2:
+            _prev, _cur = float(_k["Close"].iloc[-2]), float(_k["Close"].iloc[-1])
+            _last_close = _cur
+            _cr = _cb.detect_drop(_prev, _cur)
+            _crash_ok = bool(_cr["ok"])
+            if _crash_ok:
+                _pl = _cb.plan(_cur)
+                logs.append(f"CRASH BID SİNYALİ: {_cr['reason']} · limit alış {_pl['bid_px']:.4f} "
+                            f"· hedef +%2 · 4 sa · %5-7 tek seferlik (skor bypass)")
+    except Exception:
+        pass
+    ofi = order_flow.check(best["symbol"])
+    if _vo.is_deep(best["symbol"]):
+        try:
+            _kd = t.klines(best["symbol"], "1m", 1440)
+            _vw = _vo.session_vwap(_kd.tail(1440).values.tolist()) if _kd is not None else {}
+            if _vw.get("ok"):
+                _obi_f = _vo.obi_formula(
+                    [["b", float(ofi.get("bid_pct", 50)) / 100.0]],
+                    [["a", (100.0 - float(ofi.get("bid_pct", 50))) / 100.0]])
+                _vo_ok, _vo_why = _vo.reclaim_check(
+                    best["symbol"], best["price"], _vw["vwap"],
+                    _vw["vwap"] - 0.01, _obi_f, 5.0, 65.0)
+                logs.append(f"OBI+VWAP: {_vo_ok} | {_vo_why} (VWAP={_vw['vwap']:.4f})")
+        except Exception as _ve:
+            logs.append(f"OBI+VWAP kontrolü atlandı: {type(_ve).__name__}")
+    try:
+        _cok, _cwhy = _cn.entry(t.klines(best["symbol"], "15m", 210)["Close"].tolist())
+        logs.append(f"CONNORS RSI(2): {'AL sinyali' if _cok else 'sinyal yok'} · {_cwhy}")
+    except Exception:
+        _cok = False
+    logs.append(f"VOLATİLİTE FİLTRESİ: {best['symbol']} — ATR %{best['atr_pct']:.2f} "
+                f"— kademe: {best['vol_not']}")
+    if best["pozisyon_pct"] <= 0:
+        return logs + [f"ALIM YOK: {best['vol_not']}"]
+    fresh_ok, fresh_msg = safety_guards.stale_check()
+    if not fresh_ok:
+        return logs + [fresh_msg]
+    buy_ok, buy_halt_msg = safety_guards.buy_allowed()
+    if not buy_ok:
+        return logs + [buy_halt_msg]
+    wr_ok, wr_msg = safety_guards.win_rate_allowed()
+    if not wr_ok:
+        return logs + [wr_msg]
+    logs.append(f"FİYAT TAZELİĞİ: {fresh_msg}")
+    ok, why = should_buy(best)
+    if not ok:
+        return logs + [f"ALIM YOK: {best['symbol']} — {why}"]
+    sym = best["symbol"]
+    _cur = t._load()
+    _cur, anchor = grid_anchor_update(_cur, sym, best["price"])
+    t._save(_cur)
+    _drop = (anchor - best["price"]) / anchor if anchor else 0.0
+    if _drop < GRID_STEPS[0]:
+        return logs + [f"GRID KATMAN 1: %{_drop*100:.2f} pullback < %{GRID_STEPS[0]*100:.1f} "
+                       f"— referans {anchor:.4f}, alım bekleniyor"]
+    _tier, _tier_pct = tier_of(sym)
+    logs.append(f"KADEME: {sym} → {_tier} · POZİSYON: "
+                f"%{confidence_pct(best['score'])*100:.0f} (skora göre)")
+    logs.append(f"OFI: {ofi['state']} · bid %{ofi['bid_pct']} · "
+                f"spread %{ofi['spread_pct']:.2f}" + (f" · {ofi['reason']}" if ofi["reason"] else ""))
+    if not ofi["ok"]:
+        return logs + ["OFI: Toxic flow, alım atlandı"]
+    _bp = float(ofi.get("bid_pct", 50.0) or 50.0)
+    _obi = {"ok": (_bp / max(1.0, 100.0 - _bp)) >= 2.0,
+            "ratio": round(_bp / max(1.0, 100.0 - _bp), 2),
+            "reason": f"OBI {_bp / max(1.0, 100.0 - _bp):.2f}:1"}
+    _cvdd = _me.fetch_cvd(sym)
+    _opp_ok, _opp_why = _me.opportunity_entry(best, _obi, _cvdd, best["score"])
+    _motor = "FIRSAT" if _opp_ok else "MIKRO"
+    _split = _me.capital_split(t.available_try())
+    logs.append(f"MOTOR {_motor}: {_opp_why} | sermaye mikro ₺{_split['micro']:.2f} "
+                f"/ fırsat ₺{_split['opportunity']:.2f} · CVD {_cvdd.get('delta', 0)}")
+    brake = t.brakes_block(sym)
+    if brake and "AYI REJİMİ - NAKİTTE KALMA" not in brake:
+        return logs + [f"FREN ({sym}): {brake}"]
+    if _tier == "Fırsatçı":
+        if float(best.get("dus_pct", 0) or 0) >= 3.0:
+            return logs + ["KADEME 3: son 1s %3+ düşüş — 60 dk bekleme, alım yok"]
+        try:
+            from ui import order_guard
+            sp_ok, sp_msg = order_guard.check_slippage(
+                best["price"], t.price(sym) or best["price"])
+            if not sp_ok:
+                return logs + [f"KADEME 3 spread %0.5 filtresi: {sp_msg}"]
+        except Exception:
+            pass
+    bal = t.available_try()
+    _conf = confidence_pct(best["score"])
+    _brs = _rb.status()
+    _open_bal = float(_brs.get("day_open_balance", 0) or 0)
+    _day_dd = (abs(float(_brs.get("day_realized_pnl", 0) or 0)) / _open_bal * 100
+               if _open_bal > 0 else 0.0)
+    _tbs = _tb.status(_day_dd)
+    logs.append(f"KADEMELİ FREN: {_tbs['msg']} (çarpan {_tbs['size_multiplier']:.2f})")
+    if not _tbs["trade_allowed"]:
+        return logs + [_tbs["msg"]]
+    cap = min(t.position_size_try(bal, sym), bal * _conf,
+              _tb.position_cap(bal, _day_dd, _conf))
+    if cap <= 0:
+        return logs + ["bakiye yetersiz"]
+    _sigs = {"CRASH_BID": bool(_crash_ok), "OBI_VWAP": bool(_vo_ok),
+             "MICRO_GRID": False, "FIRSAT": bool(_opp_ok or _cok)}
+    _chosen = _eng.pick_motor(_sigs)
+    logs.append(f"KARAR MOTORU: sinyaller={_sigs} → seçilen={_chosen or 'standart alım'}")
+    _pf_ok, _pf_why = _eng.preflight(sym, 0.9, _day_dd)
+    if not _pf_ok:
+        return logs + [_pf_why]
+    if _chosen == "CRASH_BID":
+        _er = _eng.crash_bid_entry(sym, _last_close, cap, _day_dd)
+        return logs + [f"CRASH BID: {'emir atıldı ID ' + str(_er.get('order_id')) if _er.get('ok') else _er.get('reason')}"]
+    if _chosen == "OBI_VWAP":
+        _er = _eng.obi_vwap_entry(sym, best["price"], cap, _day_dd)
+        return logs + [f"OBI+VWAP: {'emir atıldı ID ' + str(_er.get('order_id')) if _er.get('ok') else _er.get('reason')}"]
+    _flt = t._filters(sym)
+    qty = max(_qty(cap, best["price"], _flt["step"] or 0.00000001), _flt["min_qty"])
+    res = _eng.place_buy(sym, _chosen or _motor, cap, price_limit=None)
+    qty = float(res.get("qty") or qty)
+    if not res.get("ok"):
+        return logs + [f"ALIM HATA ({sym}): {str(res.get('reason'))[:120]}"]
+    body = ((res.get("data") or {}).get("data") or {})
+    _cur = t._load()
+    _poss = _cur.get("positions", [])
+    if len(_poss) >= MAX_POSITIONS:
+        return logs + [f"PORTFÖY DOLU: {len(_poss)}/{MAX_POSITIONS} — yeni pozisyon açılmadı"]
+    _poss.append({
+        "symbol": sym, "qty": qty, "entry": best["price"], "avg_entry": best["price"],
+        "entry_ts": __import__("time").time(),
+        "time": __import__("time").strftime("%Y-%m-%d %H:%M:%S"),
+        "order_id": body.get("orderId") or body.get("id"),
+        "cost": round(best["price"] * qty, 4), "strategy": MOD_ADI,
+        "rescues": 0, "ladders": 0, "last_buy": best["price"],
+        "grid_anchor": anchor, "grid_layers": 1, "micro_layers": 0,
+        "micro_tp_stage": 0, "motor": _motor,
+        "atr_stop": market_regime.atr_stop(best["price"], sym)["stop"],
+    })
+    t._save({**_cur, "positions": _poss, "mode": MOD_ADI})
+    logs.append(f"PORTFÖY: {len(_poss)}/{MAX_POSITIONS} açık pozisyon")
+    try:
+        from ui import disaster_recovery
+        disaster_recovery.backup("hızlı kâr alımı")
+    except Exception:
+        pass
+    logs.append(f"ALIM {sym} OK · {qty} adet @ {best['price']:.2f} · {why}")
+    return logs
+
+
 def cycle() -> list[str]:
     """Tek tarama turu — mevcut emir/fren modüllerini kullanır, EMA50'ye dokunmaz."""
     from ui import market_regime, tr_scalper as t
@@ -404,6 +583,8 @@ def cycle() -> list[str]:
     logs.append(f"REJİM: {_reg} — MOD: {sm.LABELS[_mode]}"
                 + (f" (AYI: %{POS_PCT*100:.0f} pozisyon, RSI<{_rsi_max:.0f})"
                    if _bear_cap else ""))
+    # 1) YENİ TARAMA — açık pozisyondan BAĞIMSIZ her turda çalışır
+    logs += _scan_new()
 
     st = t._load()
     # RECONCILIATION: state'deki pozisyonlar ile gerçek API bakiyesini doğrula.
@@ -423,6 +604,9 @@ def cycle() -> list[str]:
             st = t._load()
     # 5 eşzamanlı pozisyon: listeden yönetilecek olanı seç (eskiler tekil alanla uyumlu)
     pos, _in_list = _active_position(st)
+    logs.append(f"POZİSYON YÖNETİMİ: "
+                f"{pos['symbol'] + ' · ' + str(pos.get('qty')) + ' adet' if pos else 'açık pozisyon yok'}"
+                f" — TP/DCA/breakeven kontrol edildi")
     if pos:
         # STALE >120 sn: TP dahil hiçbir satış yapma, sadece izle
         from ui import safety_guards
@@ -610,206 +794,6 @@ def cycle() -> list[str]:
                         f"RSI {ind['rsi']:.1f} · kademe {_kademe}/{GRID_LAYERS} — bekleniyor")
         return logs
 
-    # KORELASYON: aynı anda en fazla 1 pozisyon — 1. kapanmadan 2. açılmaz
-    extra = t._load().get("positions", [])
-    if extra:
-        return logs + [f"KORELASYON: {len(extra)} açık pozisyon var — "
-                       "1. pozisyon kapanmadan yeni coin açılmaz"]
-    watch = dynamic_watchlist()
-    logs.append(f"DİNAMİK TOP-10 (saatlik): {', '.join(watch)}")
-    rows = scan(list(watch))
-    if not rows:
-        return ["1s veri yok — fırsat taraması yapılamadı"]
-    logs.append("SKOR TABLOSU (0-100): " + " | ".join(
-        f"{r['symbol']} {r['score']} (RSI {r['rsi_puan']}+düşüş {r['dusur_puan']}"
-        f"+hacim {r['hacim_puan']}+BB {r['bb_puan']}) ATR%{r['atr_pct']}"
-        for r in rows[:8]))
-    best = rows[0]
-    # YENİ TAKTİKLER — karar modülleri sinyal üretir, skor tablosunu BOZMAZ
-    from ui import connors as _cn, crash_bid as _cb, vwap_obi as _vo
-    _crash_ok, _last_close = False, 0.0
-    _vo_ok = False
-    try:
-        _k = t.klines(best["symbol"], "1m", 3)
-        if _k is not None and len(_k) >= 2:
-            _prev, _cur = float(_k["Close"].iloc[-2]), float(_k["Close"].iloc[-1])
-            _last_close = _cur
-            _cr = _cb.detect_drop(_prev, _cur)
-            _crash_ok = bool(_cr["ok"])
-            if _crash_ok:
-                _pl = _cb.plan(_cur)
-                logs.append(f"CRASH BID SİNYALİ: {_cr['reason']} · limit alış {_pl['bid_px']:.4f} "
-                            f"· hedef +%2 · 4 sa · %5-7 tek seferlik (skor bypass)")
-    except Exception:
-        pass
-    if _vo.is_deep(best["symbol"]):
-        try:
-            _kd = t.klines(best["symbol"], "1m", 1440)
-            _vw = _vo.session_vwap(_kd["Close"].tolist() if hasattr(_kd, "Close") else []) \
-                if _kd is not None else {"ok": False}
-            if not _vw.get("ok"):
-                # mum listesi (list of lists) — OHLCV ile hesapla
-                _vw = _vo.session_vwap(_kd.tail(1440).values.tolist() if _kd is not None else [])
-            if _vw.get("ok"):
-                _obi_f = _vo.obi_formula(
-                    [["b", float(ofi.get("bid_pct", 50)) / 100.0]],
-                    [["a", (100.0 - float(ofi.get("bid_pct", 50))) / 100.0]])
-                _vo_ok, _vo_why = _vo.reclaim_check(
-                    best["symbol"], best["price"], _vw["vwap"],
-                    float(best.get("vwap_dist", 0)) * 0 + _vw["vwap"] - 0.01,
-                    _obi_f, 5.0, 65.0)
-                logs.append(f"OBI+VWAP: {_vo_ok} | {_vo_why} (VWAP={_vw['vwap']:.4f})")
-        except Exception as _ve:
-            logs.append(f"OBI+VWAP kontrolü atlandı: {type(_ve).__name__}")
-    try:
-        _cok, _cwhy = _cn.entry(t.klines(best["symbol"], "15m", 210)["Close"].tolist())
-        logs.append(f"CONNORS RSI(2): {'AL sinyali' if _cok else 'sinyal yok'} · {_cwhy}")
-    except Exception:
-        _cok = False
-    logs.append(f"VOLATİLİTE FİLTRESİ: {best['symbol']} — ATR %{best['atr_pct']:.2f} "
-                f"— kademe: {best['vol_not']}")
-    if best["pozisyon_pct"] <= 0:
-        return logs + [f"ALIM YOK: {best['vol_not']}"]
-    from ui import safety_guards
-    fresh_ok, fresh_msg = safety_guards.stale_check()
-    if not fresh_ok:
-        return logs + [fresh_msg]
-    buy_ok, buy_halt_msg = safety_guards.buy_allowed()
-    if not buy_ok:
-        from ui import autonomous_ops as _ao
-        _ao._log(buy_halt_msg)
-        return logs + [buy_halt_msg]
-    wr_ok, wr_msg = safety_guards.win_rate_allowed()
-    if not wr_ok:
-        from ui import autonomous_ops as _ao
-        _ao._log(wr_msg)
-        return logs + [wr_msg]
-    logs.append(f"FİYAT TAZELİĞİ: {fresh_msg}")
-    ok, why = should_buy(best)
-    if not ok:
-        return logs + [f"ALIM YOK: {best['symbol']} — {why}"]
-    logs.append(f"ALIM KARARI: {why}")
-    sym = best["symbol"]
-    # GRID KATMAN 1: referans zirveden %0.5 pullback olmadan ilk giriş yok
-    _cur = t._load()
-    _cur, anchor = grid_anchor_update(_cur, sym, best["price"])
-    t._save(_cur)
-    _drop = (anchor - best["price"]) / anchor if anchor else 0.0
-    if _drop < GRID_STEPS[0]:
-        return logs + [f"GRID KATMAN 1: %{_drop*100:.2f} pullback < %{GRID_STEPS[0]*100:.1f} "
-                       f"— referans {anchor:.4f}, alım bekleniyor"]
-    logs.append(f"GRID KATMAN 1 tetik: referans {anchor:.4f} → fiyat {best['price']:.4f} "
-                f"(%{_drop*100:.2f} düşüş)")
-    _tier, _tier_pct = tier_of(sym)
-    logs.append(f"KADEME: {sym} → {_tier} · POZİSYON: "
-                f"%{confidence_pct(best['score'])*100:.0f} (skora göre)")
-    # OFI / L2 DEPTH — sadece alım freni, alımı zorlamaz
-    from ui import order_flow
-    ofi = order_flow.check(sym)
-    logs.append(f"OFI: {ofi['state']} · bid %{ofi['bid_pct']} · "
-                f"spread %{ofi['spread_pct']:.2f}" + (f" · {ofi['reason']}" if ofi["reason"] else ""))
-    if not ofi["ok"]:
-        return logs + ["OFI: Toxic flow, alım atlandı"]
-    # İKİ MOTOR — fırsat koşulları tutarsa Motor 2, yoksa Motor 1 (mikro)
-    _bp = float(ofi.get("bid_pct", 50.0) or 50.0)
-    _obi_ratio = round(_bp / max(1.0, 100.0 - _bp), 2)
-    _obi = {"ok": _obi_ratio >= 2.0, "ratio": _obi_ratio,
-            "reason": f"OBI {_obi_ratio}:1"}
-    _cvdd = _me.fetch_cvd(sym)
-    _opp_ok, _opp_why = _me.opportunity_entry(best, _obi, _cvdd, best["score"])
-    _motor = "FIRSAT" if _opp_ok else "MIKRO"
-    _split = _me.capital_split(bal if "bal" in dir() else t.available_try())
-    logs.append(f"MOTOR {_motor}: {_opp_why} | sermaye mikro ₺{_split['micro']:.2f} "
-                f"/ fırsat ₺{_split['opportunity']:.2f} · CVD {_cvdd.get('delta', 0)}")
-    brake = t.brakes_block(sym)
-    # Ayıda Nakitte Kalma SADECE EMA50 modunda geçerli — Sürekli Küçük Kar
-    # modunda AYI'da %5 + RSI<25 ile alım yapılır (diğer frenler aynen çalışır).
-    if brake and "AYI REJİMİ - NAKİTTE KALMA" not in brake:
-        return logs + [f"FREN ({sym}): {brake}"]
-    if brake:
-        logs.append(f"FREN ATLANDI ({sym}): Ayıda Nakitte Kalma sadece EMA50 modunda geçerli")
-    if _tier == "Fırsatçı":
-        if float(best.get("dus_pct", 0) or 0) >= 3.0:
-            return logs + ["KADEME 3: son 1s %3+ düşüş — 60 dk bekleme, alım yok"]
-        try:
-            from ui import order_guard
-            sp_ok, sp_msg = order_guard.check_slippage(
-                best["price"], t.price(sym) or best["price"])
-            if not sp_ok:
-                return logs + [f"KADEME 3 spread %0.5 filtresi: {sp_msg}"]
-        except Exception:
-            pass
-    bal = t.available_try()
-    _conf = confidence_pct(best["score"])
-    # KADEMELİ FREN — %3/%6 drawdown veya 3 ardışık zararda erken yavaşla
-    from ui import risk_brakes as _rb, tiered_brakes as _tb
-    _brs = _rb.status()
-    _open_bal = float(_brs.get("day_open_balance", 0) or 0)
-    _day_dd = (abs(float(_brs.get("day_realized_pnl", 0) or 0)) / _open_bal * 100
-               if _open_bal > 0 else 0.0)
-    _tbs = _tb.status(_day_dd)
-    logs.append(f"KADEMELİ FREN: {_tbs['msg']} (çarpan {_tbs['size_multiplier']:.2f})")
-    if not _tbs["trade_allowed"]:
-        return logs + [_tbs["msg"]]
-    cap = min(t.position_size_try(bal, sym), bal * _conf,
-              _tb.position_cap(bal, _day_dd, _conf))   # üst sınır %7, işlem riski %0.5
-    logs.append(f"POZİSYON: %{_conf*100:.0f} · ₺{cap:.2f} "
-                f"(skor {best['score']:.1f}, üst limit %7)")
-    if cap <= 0:
-        return logs + ["bakiye yetersiz"]
-
-    # TEK KARAR MOTORU — fren → komisyon → 5 pozisyon → sinyal sırası → emir
-    from ui import engine as _eng
-    _sigs = {"CRASH_BID": bool(_crash_ok), "OBI_VWAP": bool(_vo_ok),
-             "MICRO_GRID": False, "FIRSAT": bool(_opp_ok or _cok)}
-    _chosen = _eng.pick_motor(_sigs)
-    logs.append(f"KARAR MOTORU: sinyaller={_sigs} → seçilen={_chosen or 'standart alım'}")
-    _pf_ok, _pf_why = _eng.preflight(sym, 0.9, _day_dd)
-    if not _pf_ok:
-        return logs + [_pf_why]
-    if _chosen == "CRASH_BID":
-        _er = _eng.crash_bid_entry(sym, _last_close, cap, _day_dd)
-        return logs + [f"CRASH BID: {'emir atıldı ID ' + str(_er.get('order_id')) if _er.get('ok') else _er.get('reason')}"]
-    if _chosen == "OBI_VWAP":
-        _er = _eng.obi_vwap_entry(sym, best["price"], cap, _day_dd)
-        return logs + [f"OBI+VWAP: {'emir atıldı ID ' + str(_er.get('order_id')) if _er.get('ok') else _er.get('reason')}"]
-
-    flt = t._filters(sym)
-    qty = _qty(cap, best["price"], flt["step"] or 0.00000001)
-    qty = max(qty, flt["min_qty"])
-    res = _eng.place_buy(sym, _chosen or _motor, cap, price_limit=None)
-    qty = float(res.get("qty") or qty)
-    if not res.get("ok"):
-        return logs + [f"ALIM HATA ({sym}): {str(res.get('reason'))[:120]}"]
-    body = ((res.get("data") or {}).get("data") or {})
-    _cur = t._load()
-    _poss = _cur.get("positions", [])
-    if len(_poss) >= MAX_POSITIONS:
-        return logs + [f"PORTFÖY DOLU: {len(_poss)}/{MAX_POSITIONS} — yeni pozisyon açılmadı"]
-    _poss.append({
-        "symbol": sym, "qty": qty, "entry": best["price"], "avg_entry": best["price"],
-        "entry_ts": __import__("time").time(),
-        "time": __import__("time").strftime("%Y-%m-%d %H:%M:%S"),
-        "order_id": body.get("orderId") or body.get("id"),
-        "cost": round(best["price"] * qty, 4), "strategy": MOD_ADI,
-        "rescues": 0, "ladders": 0, "last_buy": best["price"],
-        "grid_anchor": anchor, "grid_layers": 1, "micro_layers": 0,
-        "micro_tp_stage": 0, "motor": _motor,
-        "atr_stop": market_regime.atr_stop(best["price"], sym)["stop"],
-    })
-    t._save({**_cur, "positions": _poss, "mode": MOD_ADI})
-    logs.append(f"PORTFÖY: {len(_poss)}/{MAX_POSITIONS} açık pozisyon")
-    try:
-        from ui import disaster_recovery
-        disaster_recovery.backup("hızlı kâr alımı")
-    except Exception:
-        pass
-    try:
-        from ui.autonomous_ops import _send
-        _send("HSC ALIM YAPILDI", f"{MOD_ADI} ALIM — {sym}\nFiyat: {best['price']}\nAdet: {qty}")
-    except Exception:
-        pass
-    logs.append(f"ALIM {sym} OK · {qty} adet @ {best['price']:.2f} · {why}")
     return logs
 
 
