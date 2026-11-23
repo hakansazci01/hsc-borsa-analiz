@@ -109,12 +109,13 @@ def dynamic_spread(sig: float) -> float:
 
 def inventory_ratio(symbol: str, st: dict[str, Any]) -> float:
     """0 = tam nakit, 1 = tam coin. Hedef 0.50."""
-    inv = st.get("inventory") or {}
-    if inv.get("symbol") != symbol or float(inv.get("qty") or 0) <= 0:
+    inv = (st.get("inventories") or {}).get(symbol) or {}
+    if float(inv.get("qty") or 0) <= 0:
         return 0.0
     mid, _, _ = mid_and_spread(symbol)
     coin_value = float(inv["qty"]) * (mid or float(inv.get("entry") or 0))
-    budget = float(st.get("budget_try", 500.0) or 500.0)
+    # Sembol başına kasa: ₺3000 / 2 coin = ₺1500; hedef %50 → ₺750.
+    budget = BUDGET_TRY / len(SYMBOLS)
     return round(min(1.0, max(0.0, coin_value / max(budget, 1.0))), 4)
 
 
@@ -139,6 +140,13 @@ def preflight(symbol: str) -> tuple[bool, str]:
     conflict = motor_guard.conflict(symbol, "AMM")
     if conflict:
         return False, f"çakışma engeli: {conflict}"
+    # ORTAK max 5 pozisyon (yönlü + AMM)
+    _core = t._load()
+    total = len(_core.get("positions") or []) + (1 if _core.get("position") else 0)
+    total += sum(1 for v in (_load().get("inventories") or {}).values()
+                 if float((v or {}).get("qty") or 0) > 0)
+    if total >= 5:
+        return False, f"ortak max 5 pozisyon dolu ({total}/5)"
     # Ayrı kasa bütçesi
     used = float(st_budget_used())
     if used >= BUDGET_TRY:
@@ -146,10 +154,27 @@ def preflight(symbol: str) -> tuple[bool, str]:
     return True, "OK"
 
 
+def _record_trade(symbol: str, side: str, qty: float, px: float,
+                  entry: float) -> None:
+    """AMM gerçek dolumunu trades.csv'ye yazar (motor bazlı defter)."""
+    import time as _t
+
+    fee = qty * px * 0.00075
+    net = ((px - entry) * qty - fee) if side == "SELL" else -fee
+    t._write_trade_csv({
+        "tarih": _t.strftime("%Y-%m-%d %H:%M:%S"), "sembol": symbol,
+        "alış_fiyatı": round(entry if side == "SELL" else px, 8),
+        "satış_fiyatı": round(px if side == "SELL" else 0, 8),
+        "adet": qty, "komisyon": round(fee, 6), "komisyon_oranı": 0.00075,
+        "net_kar_zarar": round(net, 4), "işlem_süresi": "—",
+        "strateji_adı": "HSC-AMM (maker+BNB)",
+    })
+
+
 def st_budget_used() -> float:
     s = _load()
-    inv = s.get("inventory") or {}
-    return float(inv.get("notional", 0) or 0) + sum(
+    invs = s.get("inventories") or {}
+    return sum(float(v.get("notional", 0) or 0) for v in invs.values()) + sum(
         float(q.get("notional", 0) or 0) for q in (s.get("quotes") or {}).values())
 
 
@@ -158,20 +183,41 @@ def step() -> list[str]:
     t0 = time.time()
     st = _load()
     logs.append(fee_msg())
+    _old = st.pop("inventory", None)
+    if isinstance(_old, dict) and _old.get("symbol"):
+        _invs0 = st.get("inventories") if isinstance(st.get("inventories"), dict) else {}
+        _invs0.setdefault(_old["symbol"], _old)
+        st["inventories"] = _invs0
 
-    # 1) envanter süresi (15 dk)
-    inv = st.get("inventory")
-    if inv and inv.get("symbol") and float(inv.get("qty") or 0) > 0:
+    # 0) RECONCILE — defter ile gerçek bakiye uyuşmuyorsa gerçeği esas al.
+    invs = st.get("inventories", {}) if isinstance(st.get("inventories"), dict) else {}
+    for sym_i, inv_i in list(invs.items()):
+        actual = float(t.asset_balance(sym_i.split("_")[0]) or 0)
+        book = float((inv_i or {}).get("qty") or 0)
+        if actual <= 0:
+            invs.pop(sym_i, None)
+            from ui import motor_guard
+            motor_guard.release(sym_i, "AMM")
+        elif actual < book * 0.999:
+            invs[sym_i]["qty"] = actual
+            logs.append(f"RECONCILE {sym_i}: defter {book:.8f} → gerçek {actual:.8f}")
+    st["inventories"] = invs
+
+    # 1) envanter süresi (15 dk) — sembol başına ayrı
+    for sym_i, inv in list(invs.items()):
+        if not inv or float(inv.get("qty") or 0) <= 0:
+            invs.pop(sym_i, None); continue
         age = time.time() - float(inv.get("entry_ts", time.time()))
         if age >= INVENTORY_TTL:
-            r = t.sell(inv["symbol"], float(inv["qty"]), "HSC-AMM 15 dk envanter çıkışı")
+            r = t.sell(sym_i, float(inv["qty"]), "HSC-AMM 15 dk envanter çıkışı")
             ok = isinstance(r, dict) and bool(r.get("ok"))
-            msg = (f"HSC-AMM ENVANTER ÇIKIŞI · {inv['symbol']} · "
-                   f"{'OK' if ok else 'HATA'} · {'kârda' if float(inv.get('entry',0)) < float(t.price(inv['symbol']) or 0) else 'zararda'}")
+            msg = (f"ENVANTER ÇIKIŞI · {sym_i} · "
+                   f"{'OK' if ok else 'HATA'} · {'kârda' if float(inv.get('entry',0)) < float(t.price(sym_i) or 0) else 'zararda'}")
             _log(msg); logs.append(msg)
-            st["inventory"] = None
+            invs.pop(sym_i, None)
             from ui import motor_guard
-            motor_guard.release(inv["symbol"], "AMM")
+            motor_guard.release(sym_i, "AMM")
+    st["inventories"] = invs
 
     # 2) bekleyen emirleri kontrol et / 5 sn TTL
     quotes = st.get("quotes", {}) if isinstance(st.get("quotes"), dict) else {}
@@ -182,10 +228,24 @@ def step() -> list[str]:
         filled = float(body.get("executedQty") or 0)
         if filled > 0:
             px = float(body.get("executedPrice") or q.get("price") or 0)
-            inv = {"symbol": q["symbol"], "qty": filled, "entry": px,
-                   "entry_ts": time.time(), "notional": float(q.get("notional") or 0),
-                   "motor": "AMM"}
-            st["inventory"] = inv
+            _is = st.get("inventories") if isinstance(st.get("inventories"), dict) else {}
+            old = _is.get(q["symbol"]) or {}
+            old_qty = float(old.get("qty") or 0)
+            if q["side"] == "SELL":
+                _record_trade(q["symbol"], "SELL", float(filled), px,
+                              float(old.get("entry") or px))
+            new_qty = old_qty + (float(filled) if q["side"] == "BUY" else -float(filled))
+            if new_qty <= 0:
+                _is.pop(q["symbol"], None)
+                from ui import motor_guard
+                motor_guard.release(q["symbol"], "AMM")
+            else:
+                avg = ((float(old.get("entry") or px) * old_qty + px * float(filled)) / new_qty
+                       if q["side"] == "BUY" else float(old.get("entry") or px))
+                _is[q["symbol"]] = {"symbol": q["symbol"], "qty": new_qty,
+                                    "entry": round(avg, 8), "entry_ts": old.get("entry_ts", time.time()),
+                                    "notional": float(q.get("notional") or 0), "motor": "AMM"}
+            st["inventories"] = _is
             quotes.pop(key, None)
             msg = (f"HSC-AMM DOLUM ID {q.get('order_id')} · {q['symbol']} "
                    f"{filled} @ {px:.8f} ({q['side']})")
@@ -242,16 +302,28 @@ def step() -> list[str]:
                 qty = round(int(need / stepq + 1e-9) * stepq, 8)
                 if qty * px < min_notional:
                     qty = round((int(need / stepq) + 1) * stepq, 8)
-                if side == "SELL" and not (st.get("inventory") or {}).get("qty"):
+                _my_inv = (st.get("inventories") or {}).get(sym) or {}
+                if side == "SELL" and float(_my_inv.get("qty") or 0) <= 0:
                     continue   # satacak coin yok
                 if side == "SELL":
-                    qty = min(qty, float(st["inventory"]["qty"]))
+                    qty = min(qty, float(_my_inv["qty"]))
                 res = (t._order(sym, 0, qty, price_limit=px, post_only=True)
                        if side == "BUY" else
                        t.sell(sym, qty, "HSC-AMM maker satış", price_limit=px, post_only=True))
                 body2 = ((res.get("data") or {}).get("data") or {}) if isinstance(res.get("data"), dict) else {}
                 oid = body2.get("orderId") or body2.get("id")
-                if isinstance(res, dict) and res.get("ok"):
+                if side == "SELL" and isinstance(res, dict) and res.get("ok") and not oid:
+                    # Limit satış anında doldu —ID yok, envanteri hemen kapat, deftere yaz.
+                    if qty > 0:
+                        _record_trade(sym, "SELL", qty, px, float(_my_inv.get("entry") or px))
+                    _isx = st.get("inventories") if isinstance(st.get("inventories"), dict) else {}
+                    _isx.pop(sym, None)
+                    st["inventories"] = _isx
+                    from ui import motor_guard
+                    motor_guard.release(sym, "AMM")
+                    logs.append(f"HSC-AMM SATIŞ anında doldu · {sym} {qty} @ {px:.8f} — defter güncellendi")
+                    continue
+                if isinstance(res, dict) and res.get("ok") and oid:
                     quotes[f"{sym}:{side}"] = {"order_id": oid, "symbol": sym,
                                                 "side": side, "price": px,
                                                 "qty": qty, "at": time.time(),

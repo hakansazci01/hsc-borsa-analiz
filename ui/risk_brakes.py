@@ -47,6 +47,35 @@ def today() -> str:
     return time.strftime("%Y-%m-%d")
 
 
+def portfolio_balance() -> float:
+    """Toplam portföy = TRY + eldeki coin'lerin TRY karşılığı.
+
+    AMM alımları TRY'yi BTC/ETH'ye çevirdiği için sadece TRY'ye bakmak
+    trailing drawdown'u yanlış tetikliyordu (nakit azaldı ama varlık duruyor).
+    """
+    val = float(tr_scalper.available_try() or 0)
+    assets = {"BNB"}
+    st = tr_scalper._load()
+    for p in (st.get("positions") or []):
+        if isinstance(p, dict) and p.get("symbol"):
+            assets.add(str(p["symbol"]).split("_")[0])
+    try:
+        from ui import amm
+        for inv in (amm._load().get("inventories") or {}).values():
+            if isinstance(inv, dict) and inv.get("symbol"):
+                assets.add(str(inv["symbol"]).split("_")[0])
+    except Exception:
+        pass
+    for a in assets:
+        try:
+            q = float(tr_scalper.asset_balance(a) or 0)
+            px = float(tr_scalper.price(f"{a}_TRY") or 0)
+            val += q * px
+        except Exception:
+            pass
+    return round(val, 2)
+
+
 def reset_daily_if_needed(balance: float) -> dict[str, Any]:
     st = _load()
     if st.get("day") != today():
@@ -67,7 +96,7 @@ def reset_daily_if_needed(balance: float) -> dict[str, Any]:
 
 
 def update_from_history(history: list[dict[str, Any]]) -> dict[str, Any]:
-    bal = tr_scalper.available_try()
+    bal = portfolio_balance()
     st = reset_daily_if_needed(bal)
     day = today()
     realized = sum(
@@ -137,7 +166,7 @@ def crash_detected(symbol: str) -> tuple[bool, str]:
 
 
 def status() -> dict[str, Any]:
-    bal = tr_scalper.available_try()
+    bal = portfolio_balance()
     st = reset_daily_if_needed(bal)
     daily, dmsg = daily_loss_breached()
     dd, ddmsg = drawdown_breached(bal)

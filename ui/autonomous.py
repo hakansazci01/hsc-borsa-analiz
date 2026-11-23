@@ -139,7 +139,7 @@ def decide() -> dict[str, Any]:
         d, dmsg = risk_brakes.daily_loss_breached()
         if d:
             reasons.append(dmsg)
-        dd, ddmsg = risk_brakes.drawdown_breached(tr_scalper.available_try())
+        dd, ddmsg = risk_brakes.drawdown_breached(risk_brakes.portfolio_balance())
         if dd:
             reasons.append(ddmsg)
     except Exception:

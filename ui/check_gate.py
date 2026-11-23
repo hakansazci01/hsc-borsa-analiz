@@ -67,7 +67,7 @@ def run(symbol: str, price: float | None = None,
     d, dmsg = risk_brakes.daily_loss_breached()
     add(not d, dmsg or "günlük limit OK")
     # 5) trailing drawdown
-    dd, ddmsg = risk_brakes.drawdown_breached(t.available_try())
+    dd, ddmsg = risk_brakes.drawdown_breached(risk_brakes.portfolio_balance())
     add(not dd, ddmsg or "drawdown OK")
     # 6) ani çöküş
     cr, crmsg = risk_brakes.crash_detected(symbol)

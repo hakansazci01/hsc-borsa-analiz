@@ -737,7 +737,7 @@ def kill_switch() -> bool:
         risk_brakes.update_from_history(st.get("history", []))
         if risk_brakes.daily_loss_breached()[0]:
             return True
-        dd, _ = risk_brakes.drawdown_breached(available_try())
+        dd, _ = risk_brakes.drawdown_breached(risk_brakes.portfolio_balance())
         if dd:
             STOP_FILE.parent.mkdir(parents=True, exist_ok=True)
             STOP_FILE.write_text("drawdown kilidi: kasa %10 eridi", encoding="utf-8")
@@ -755,7 +755,7 @@ def brakes_block(symbol: str) -> str:
         daily, msg = risk_brakes.daily_loss_breached()
         if daily:
             return msg
-        dd, msg2 = risk_brakes.drawdown_breached(available_try())
+        dd, msg2 = risk_brakes.drawdown_breached(risk_brakes.portfolio_balance())
         if dd:
             return msg2
         crash, msg3 = risk_brakes.crash_detected(symbol)

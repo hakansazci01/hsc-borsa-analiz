@@ -51,7 +51,58 @@ def _call(fn):
             patch.undo()
 
 
+def _isolate_live_state() -> None:
+    """Canlı users/ state dosyalarını asla değiştirme — tüm modülleri sandbox'a yönlendir."""
+    import importlib
+
+    sandbox = Path(tempfile.mkdtemp(prefix="hsc_runall_"))
+    for n in ("trades.csv", "tr_daily_state.json", "config.yaml"):
+        f = sandbox / n
+        if not f.exists():
+            f.write_text("tarih,sembol\n" if n.endswith(".csv") else "{}", encoding="utf-8")
+    targets = {
+        "ui.tr_scalper": ["STATE"], "ui.safety_guards": ["STATE"],
+        "ui.order_guard": ["STATE"], "ui.risk_brakes": ["STATE"],
+        "ui.strategy_mode": ["STATE"], "ui.ws_feed": ["STATE"],
+        "ui.engine": ["STATE"], "ui.crash_bid": ["STATE"],
+        "ui.tiered_brakes": ["STATE"], "ui.tp_proof": ["STATE"],
+        "ui.live_feed": ["STATE"], "ui.autonomous": ["STATE"],
+        "ui.health_report": ["STATE"], "ui.disaster_recovery": ["STATE"],
+        "ui.amm": ["STATE"], "ui.motor_guard": ["STATE"],
+        "ui.autonomous_ops": ["DAILY_REPORT"],
+    }
+    for name, attrs in targets.items():
+        try:
+            mod = importlib.import_module(name)
+        except Exception:
+            continue
+        for attr in attrs:
+            if hasattr(mod, attr):
+                setattr(mod, attr, sandbox / f"{name.split('.')[-1]}_{attr}")
+    # Genel tarama: ui.* modüllerindeki tüm state/log/csv Path alanları sandbox'a.
+    for name, mod in list(sys.modules.items()):
+        if not name.startswith("ui."):
+            continue
+        for attr in list(vars(mod)):
+            if attr in ("STATE", "LOG", "CSV", "REPORT_FILE", "DAILY_REPORT",
+                        "BACKUPS", "RECOVERY", "SOURCES") or attr.endswith("_STATE"):
+                val = getattr(mod, attr)
+                if isinstance(val, Path):
+                    setattr(mod, attr, sandbox / f"{name.split('.')[-1]}_{attr}")
+    try:
+        import ui.disaster_recovery as dr
+        dr.BACKUPS = sandbox / "backups"
+        dr.RECOVERY = sandbox / "recovery.json"
+        dr.SOURCES = [sandbox / "trades.csv", sandbox / "tr_daily_state.json",
+                      sandbox / "config.yaml"]
+        import ui.check_gate as cg
+        cg.save = lambda *a, **k: None
+    except Exception:
+        pass
+
+
 def main() -> int:
+    _isolate_live_state()
     total = failed = 0
     for module in MODULES:
         for name in sorted(dir(module)):

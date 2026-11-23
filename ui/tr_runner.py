@@ -107,6 +107,12 @@ def run_forever() -> None:
                     return
                 # HSC-AMM — her 5 sn. Eski 30 coin taraması 12. turda bir (60 sn).
                 lines: list[str] = []
+                # Kalp her 5 sn turunda atılmalı — eski kod 60 sn'de bir atıyordu
+                # ve watchdog motoru "ölü" sanıp gereksiz restart ediyordu.
+                try:
+                    tr_scalper._beat(int(tr_scalper._load().get("cycle_count", 0)) + 1)
+                except Exception:
+                    pass
                 try:
                     from ui import amm
                     lines += amm.step()
