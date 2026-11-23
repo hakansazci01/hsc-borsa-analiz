@@ -60,6 +60,5 @@ if __name__ == "__main__":
     # SADECE proje .venv python'u watchdog olabilir — global kopyalar kilitleri
     # ezip çift süreç yaratıyordu; onlar hemen çıkar.
     if ".venv" in sys.executable.lower() and _claim():
-        _kill_other_runners()
         watchdog(claim_fn=_claim)
 
