@@ -237,8 +237,11 @@ def step() -> list[str]:
                 # Hedef 50-80 TL = cap/px (önceden 0.02 çarpanı ETH'de ₺0.87 emir üretiyordu)
                 raw_qty = cap / px
                 min_notional = float(flt.get("min_notional") or 10)
-                qty = round(max(raw_qty, min_notional / px,
-                                float(flt.get("min_qty") or stepq)), 8)
+                need = max(raw_qty, min_notional / px, float(flt.get("min_qty") or stepq))
+                # step katına YUKARI yuvarla — aşağı yuvarlarsak min notional altına düşer
+                qty = round(int(need / stepq + 1e-9) * stepq, 8)
+                if qty * px < min_notional:
+                    qty = round((int(need / stepq) + 1) * stepq, 8)
                 if side == "SELL" and not (st.get("inventory") or {}).get("qty"):
                     continue   # satacak coin yok
                 if side == "SELL":
