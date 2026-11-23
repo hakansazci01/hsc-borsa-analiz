@@ -151,6 +151,8 @@ def _filters(symbol: str) -> dict[str, float]:
                     if f.get("filterType") == "LOT_SIZE":
                         out["min_qty"] = float(f["minQty"])
                         out["step"] = float(f["stepSize"])
+                    if f.get("filterType") == "PRICE_FILTER":
+                        out["tick"] = float(f["tickSize"])
                     if f.get("filterType") == "NOTIONAL":
                         out["min_notional"] = float(f["minNotional"])
                 return out
@@ -346,7 +348,8 @@ def _log_gate(gate: dict[str, Any]) -> None:
 
 
 # ------------------------------------------------------------------- emir
-def _order(symbol: str, side: int, qty: float) -> dict[str, Any]:
+def _order(symbol: str, side: int, qty: float,
+           price_limit: float | None = None) -> dict[str, Any]:
     try:
         from ui import order_guard
         _ok, _msg = order_guard.allow_order()
@@ -359,7 +362,15 @@ def _order(symbol: str, side: int, qty: float) -> dict[str, Any]:
     # clientId = idempotency anahtarı: timeout/5xx sonrası aynı emri tekrar
     # göndermek yerine bu ID ile sorgulanır — çift dolum riski önlenir.
     # Binance TR özel "HSC-" clientId'yi reddediyor (3703) — API kendi clientId'sini üretir.
-    payload = {"symbol": symbol, "side": side, "type": 2, "quantity": qty_str}
+    # price_limit verilirse LIMIT (type 1), yoksa MARKET (type 2).
+    payload = {"symbol": symbol, "side": side,
+               "type": 1 if price_limit is not None else 2, "quantity": qty_str}
+    if price_limit is not None:
+        tick = float(_filters(symbol).get("tick", 0) or 0)
+        px = float(price_limit)
+        if tick > 0:
+            px = round(int(px / tick + 1e-12) * tick, 8)
+        payload["price"] = f"{px:.8f}".rstrip("0").rstrip(".")
     ok, data = _request("/open/v1/orders", payload, signed=True, method="POST")
     if not ok and "BELİRSİZ" in str(data):
         # 5xx/timeout: emir GİTMİŞ OLABİLİR — clientId ile sorgula, tekrar gönderme.
@@ -410,6 +421,38 @@ def _order(symbol: str, side: int, qty: float) -> dict[str, Any]:
     except Exception:
         pass
     return res
+
+
+def cancel_order(order_id: int | str | None = None,
+                 client_id: str | None = None) -> dict[str, Any]:
+    """Açık limit emri iptal et (kaydırma / 15 sn TTL için)."""
+    payload: dict[str, Any] = {}
+    if order_id:
+        payload["orderId"] = order_id
+    elif client_id:
+        payload["clientId"] = client_id
+    else:
+        return {"ok": False, "reason": "orderId veya clientId gerekli"}
+    ok, data = _request("/open/v1/orders/cancel", payload, signed=True, method="POST")
+    if ok and isinstance(data, dict) and data.get("code") in (0, None):
+        return {"ok": True, "data": data}
+    return {"ok": False, "reason": str(data)[:200]}
+
+
+def order_status(order_id: int | str | None = None,
+                 client_id: str | None = None) -> dict[str, Any]:
+    """Emir durumu / dolum miktarı — limit emri dolup dolmadığını kontrol eder."""
+    payload: dict[str, Any] = {}
+    if order_id:
+        payload["orderId"] = order_id
+    elif client_id:
+        payload["clientId"] = client_id
+    else:
+        return {"ok": False, "reason": "orderId veya clientId gerekli"}
+    ok, data = _request("/open/v1/orders/detail", payload, signed=True)
+    if ok and isinstance(data, dict) and data.get("code") in (0, None):
+        return {"ok": True, "data": ((data.get("data") or {}) if isinstance(data.get("data"), dict) else data)}
+    return {"ok": False, "reason": str(data)[:200]}
 
 
 def buy(symbol: str, qty_override: float | None = None,

@@ -384,6 +384,16 @@ def cycle() -> list[str]:
     t._beat(int(t._load().get("cycle_count", 0)) + 1)
     _st = t._load()
     t._save({**_st, "cycle_count": int(_st.get("cycle_count", 0)) + 1})
+    # Aktif limit emirlerini yönet: Crash Bid kaydır/dolum/+%2 sat, OBI 15 sn TTL
+    try:
+        from ui import engine as _eng, vwap_obi as _vo_mgr
+        _eng.crash_bid_manage()
+        _kb = t.klines("BTC_TRY", "1m", 1440)
+        _kv = _vo_mgr.session_vwap(_kb.tail(1440).values.tolist()) if _kb is not None else {}
+        if _kv.get("ok"):
+            _eng.obi_vwap_manage(_kv["vwap"])
+    except Exception as _mexc:
+        logs.append(f"Motor yönetimi hatası: {type(_mexc).__name__}")
     if t.kill_switch():
         return ["KILL SWITCH: yeni işlem yok"]
     _guard = sm.day_guard()
@@ -617,27 +627,45 @@ def cycle() -> list[str]:
     best = rows[0]
     # YENİ TAKTİKLER — karar modülleri sinyal üretir, skor tablosunu BOZMAZ
     from ui import connors as _cn, crash_bid as _cb, vwap_obi as _vo
+    _crash_ok, _last_close = False, 0.0
+    _vo_ok = False
     try:
         _k = t.klines(best["symbol"], "1m", 3)
         if _k is not None and len(_k) >= 2:
             _prev, _cur = float(_k["Close"].iloc[-2]), float(_k["Close"].iloc[-1])
+            _last_close = _cur
             _cr = _cb.detect_drop(_prev, _cur)
-            if _cr["ok"]:
+            _crash_ok = bool(_cr["ok"])
+            if _crash_ok:
                 _pl = _cb.plan(_cur)
                 logs.append(f"CRASH BID SİNYALİ: {_cr['reason']} · limit alış {_pl['bid_px']:.4f} "
                             f"· hedef +%2 · 4 sa · %5-7 tek seferlik (skor bypass)")
     except Exception:
         pass
     if _vo.is_deep(best["symbol"]):
-        _bpf = float(best.get("bb_puan", 0) or 0)
-        logs.append(f"OBI+VWAP: derin tahta {best['symbol']} · VWAP mesafesi "
-                    f"%{best.get('vwap_dist', 0):.2f} · skor BB bileşeni {_bpf:.0f} "
-                    "(reclaim kuralları vwap_obi modülünde)")
+        try:
+            _kd = t.klines(best["symbol"], "1m", 1440)
+            _vw = _vo.session_vwap(_kd["Close"].tolist() if hasattr(_kd, "Close") else []) \
+                if _kd is not None else {"ok": False}
+            if not _vw.get("ok"):
+                # mum listesi (list of lists) — OHLCV ile hesapla
+                _vw = _vo.session_vwap(_kd.tail(1440).values.tolist() if _kd is not None else [])
+            if _vw.get("ok"):
+                _obi_f = _vo.obi_formula(
+                    [["b", float(ofi.get("bid_pct", 50)) / 100.0]],
+                    [["a", (100.0 - float(ofi.get("bid_pct", 50))) / 100.0]])
+                _vo_ok, _vo_why = _vo.reclaim_check(
+                    best["symbol"], best["price"], _vw["vwap"],
+                    float(best.get("vwap_dist", 0)) * 0 + _vw["vwap"] - 0.01,
+                    _obi_f, 5.0, 65.0)
+                logs.append(f"OBI+VWAP: {_vo_ok} | {_vo_why} (VWAP={_vw['vwap']:.4f})")
+        except Exception as _ve:
+            logs.append(f"OBI+VWAP kontrolü atlandı: {type(_ve).__name__}")
     try:
         _cok, _cwhy = _cn.entry(t.klines(best["symbol"], "15m", 210)["Close"].tolist())
         logs.append(f"CONNORS RSI(2): {'AL sinyali' if _cok else 'sinyal yok'} · {_cwhy}")
     except Exception:
-        pass
+        _cok = False
     logs.append(f"VOLATİLİTE FİLTRESİ: {best['symbol']} — ATR %{best['atr_pct']:.2f} "
                 f"— kademe: {best['vol_not']}")
     if best["pozisyon_pct"] <= 0:
@@ -729,10 +757,28 @@ def cycle() -> list[str]:
                 f"(skor {best['score']:.1f}, üst limit %7)")
     if cap <= 0:
         return logs + ["bakiye yetersiz"]
+
+    # TEK KARAR MOTORU — fren → komisyon → 5 pozisyon → sinyal sırası → emir
+    from ui import engine as _eng
+    _sigs = {"CRASH_BID": bool(_crash_ok), "OBI_VWAP": bool(_vo_ok),
+             "MICRO_GRID": False, "FIRSAT": bool(_opp_ok or _cok)}
+    _chosen = _eng.pick_motor(_sigs)
+    logs.append(f"KARAR MOTORU: sinyaller={_sigs} → seçilen={_chosen or 'standart alım'}")
+    _pf_ok, _pf_why = _eng.preflight(sym, 0.9, _day_dd)
+    if not _pf_ok:
+        return logs + [_pf_why]
+    if _chosen == "CRASH_BID":
+        _er = _eng.crash_bid_entry(sym, _last_close, cap, _day_dd)
+        return logs + [f"CRASH BID: {'emir atıldı ID ' + str(_er.get('order_id')) if _er.get('ok') else _er.get('reason')}"]
+    if _chosen == "OBI_VWAP":
+        _er = _eng.obi_vwap_entry(sym, best["price"], cap, _day_dd)
+        return logs + [f"OBI+VWAP: {'emir atıldı ID ' + str(_er.get('order_id')) if _er.get('ok') else _er.get('reason')}"]
+
     flt = t._filters(sym)
     qty = _qty(cap, best["price"], flt["step"] or 0.00000001)
     qty = max(qty, flt["min_qty"])
-    res = t._order(sym, 0, qty)
+    res = _eng.place_buy(sym, _chosen or _motor, cap, price_limit=None)
+    qty = float(res.get("qty") or qty)
     if not res.get("ok"):
         return logs + [f"ALIM HATA ({sym}): {str(res.get('reason'))[:120]}"]
     body = ((res.get("data") or {}).get("data") or {})
