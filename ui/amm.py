@@ -116,10 +116,10 @@ def inventory_ratio(symbol: str, st: dict[str, Any]) -> float:
 
 def preflight(symbol: str) -> tuple[bool, str]:
     from ui import safety_guards as sg, risk_brakes as rb, tiered_brakes as tb, tp_proof
+    # TP kilidi ORİJİNAL anlamı: açık pozisyon varsa yeni emir yok.
+    # Pozisyon yoksa kilit yeni girişi engellemez (mevcut davranış aynen).
     if t._load().get("position") or (t._load().get("positions") or []):
-        return False, "aktif pozisyon var (XLM korunuyor)"
-    if not tp_proof.unlocked():
-        return False, "TP kilidi kapalı"
+        return False, "TP kilidi: aktif pozisyon var — yeni emir yok"
     if not sg.buy_allowed()[0]:
         return False, "CUSUM freni"
     if not sg.stale_check()[0]:
