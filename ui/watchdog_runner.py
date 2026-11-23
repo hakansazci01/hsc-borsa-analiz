@@ -57,8 +57,10 @@ def _kill_other_runners() -> None:
 
 
 if __name__ == "__main__":
-    # SADECE proje .venv python'u watchdog olabilir — global kopyalar kilitleri
-    # ezip çift süreç yaratıyordu; onlar hemen çıkar.
-    if ".venv" in sys.executable.lower() and _claim():
+    # SADECE proje .venv python'u watchdog olabilir. Global python kopyaları
+    # (start_module'un fallback'i) hemen çıkar — aksi halde zincirleme çoğalır.
+    if ".venv" not in sys.executable.lower():
+        sys.exit(0)
+    if _claim():
         watchdog(claim_fn=_claim)
 
