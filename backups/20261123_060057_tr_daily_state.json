@@ -1,0 +1,32 @@
+{
+  "cycle_count": 182,
+  "positions": [],
+  "mode": "SÜREKLİ KÜÇÜK KAR",
+  "grid_anchors": {
+    "SHIB_TRY": 0.0001814
+  },
+  "history": [
+    {
+      "symbol": "XLM_TRY",
+      "qty": 122.0,
+      "entry": 6.43990698,
+      "exit": 6.358,
+      "gross_pnl": -9.9927,
+      "fee": 1.5613,
+      "net_pnl": -11.554,
+      "exit_time": "2026-11-23 05:57:32",
+      "duration_sec": 14410.0,
+      "reason": "SÜREKLİ KÜÇÜK KAR: zaman stopu: 4.0s açık, kâr yok — sermaye boşa bağlı",
+      "strategy": "günlük EMA50 pullback (quant_lab)",
+      "motor": "—"
+    }
+  ],
+  "realized_pnl": -11.554,
+  "loss_streak": 1,
+  "dust": {
+    "asset": "XLM",
+    "qty": 0.7663,
+    "try": 4.87,
+    "at": "2026-11-23 05:57:32"
+  }
+}

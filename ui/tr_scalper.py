@@ -865,7 +865,11 @@ def cycle() -> list[str]:
 
             return quick_profit.cycle()
     except Exception as exc:
-        _log(f"otomatik mod hatası: {type(exc).__name__}: {exc}")
+        try:
+            from ui import autonomous_ops as _ao
+            _ao._log(f"otomatik mod hatası: {type(exc).__name__}: {exc}")
+        except Exception:
+            pass
     _beat(int(_load().get("cycle_count", 0)) + 1)
     _save({**_load(), "cycle_count": int(_load().get("cycle_count", 0)) + 1})
     logs: list[str] = []

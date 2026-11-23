@@ -380,7 +380,7 @@ def _scan_new() -> list[str]:
     Crash Bid / OBI+VWAP / Mikro / Fırsat sinyalleri burada üretilir.
     """
     from ui import (connors as _cn, crash_bid as _cb, engine as _eng,
-                    micro_engine as _me, risk_brakes as _rb,
+                    market_regime, micro_engine as _me, risk_brakes as _rb,
                     safety_guards, tiered_brakes as _tb, tr_scalper as t,
                     vwap_obi as _vo)
     from ui import order_flow

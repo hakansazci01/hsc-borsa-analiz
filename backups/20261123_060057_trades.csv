@@ -1,0 +1,6 @@
+﻿tarih,sembol,alış_fiyatı,satış_fiyatı,adet,komisyon,komisyon_oranı,net_kar_zarar,işlem_süresi,strateji_adı
+2026-11-20 04:23:28,FORM_TRY,8.1,8.05,0.6,0.0114,0.001,-0.0694,2300 sn," FORM_TRY pilot (1dk scalper, geçmiş)"
+2026-11-22 06:05:21,ADA_TRY,7.19,7.17,7.2,0.103392,0.001,-0.2474,40 sn,GERÇEK CANLI TEST - 52.49 TL
+2026-11-22 21:06:18,XLM_TRY,6.476,6.473,41.0,0.5309,0.001,-0.6539,2 sn,günlük EMA50 pullback (quant_lab)
+2026-11-22 21:06:18,XLM_TRY,6.476,6.47,42.0,0.0,0.001,0.0,60 sn,GO-NOGO TEST - %5 gerçek alım/satım
+2026-11-23 05:57:33,XLM_TRY,6.439907,6.358,122.0,1.5613,0.001,-11.554,14410 sn,günlük EMA50 pullback (quant_lab)
