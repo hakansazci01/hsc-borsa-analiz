@@ -48,32 +48,36 @@ def today() -> str:
 
 
 def portfolio_balance() -> float:
-    """Toplam portföy = TRY + eldeki coin'lerin TRY karşılığı.
+    """Toplam portföy = API hesabındaki TÜM pozitif bakiyelerin TRY karşılığı.
 
-    AMM alımları TRY'yi BTC/ETH'ye çevirdiği için sadece TRY'ye bakmak
-    trailing drawdown'u yanlış tetikliyordu (nakit azaldı ama varlık duruyor).
+    Artık state dosyalarına (position/AMM inventories) bakılmaz — çünkü AMM
+    state'i boşaldığında elde duran ETH/BTC hesaba katılmıyor ve trailing
+    drawdown %15 yanlış tetikleniyordu. Kaynak: GERÇEK /open/v1/account/spot.
     """
-    val = float(tr_scalper.available_try() or 0)
-    assets = {"BNB"}
-    st = tr_scalper._load()
-    for p in (st.get("positions") or []):
-        if isinstance(p, dict) and p.get("symbol"):
-            assets.add(str(p["symbol"]).split("_")[0])
     try:
-        from ui import amm
-        for inv in (amm._load().get("inventories") or {}).values():
-            if isinstance(inv, dict) and inv.get("symbol"):
-                assets.add(str(inv["symbol"]).split("_")[0])
+        ok, data = tr_scalper._request("/open/v1/account/spot", signed=True)
+        if ok and isinstance(data, dict) and data.get("code") in (0, None):
+            assets = (data.get("data") or {}).get("accountAssets") or []
+            total = 0.0
+            for a in assets:
+                if not isinstance(a, dict):
+                    continue
+                q = float(a.get("free", 0) or 0) + float(a.get("locked", 0) or 0)
+                if q <= 0:
+                    continue
+                sym = str(a.get("asset", ""))
+                if sym == "TRY":
+                    total += q
+                else:
+                    px = float(tr_scalper.price(f"{sym}_TRY") or 0)
+                    if px > 0:
+                        total += q * px
+            if total > 0:
+                return round(total, 2)
     except Exception:
         pass
-    for a in assets:
-        try:
-            q = float(tr_scalper.asset_balance(a) or 0)
-            px = float(tr_scalper.price(f"{a}_TRY") or 0)
-            val += q * px
-        except Exception:
-            pass
-    return round(val, 2)
+    # API erişilemezse güvenli fallback: sadece TRY
+    return round(float(tr_scalper.available_try() or 0), 2)
 
 
 def reset_daily_if_needed(balance: float) -> dict[str, Any]:
