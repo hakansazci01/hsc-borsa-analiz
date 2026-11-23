@@ -317,10 +317,15 @@ def process_state(pattern: str) -> tuple[bool, int | None, str]:
         cmd = " ".join(p.info.get("cmdline") or [])
         pexe = (p.info.get("exe") or "").lower()
         # .venv YA DA global python — ikisini de gör (kaçan süreç kalmasın)
-        if p.info["pid"] != me and pattern in cmd and "-m" in cmd and "python" in pexe:
-            args = p.info.get("cmdline") or []
-            module = args[args.index("-m") + 1] if "-m" in args else ""
-            if module in (pattern, pattern.split(".")[-1]) or any(a.endswith(pattern) for a in args):
+        args = p.info.get("cmdline") or []
+        # Sadece gerçek `-m <modul>` süreci say — sorgu/-c komutlarındaki
+        # modül metni sahte "canlı" sonucu vermesin.
+        if ("-m" not in args or args[args.index("-m") + 1] not in
+                (pattern, pattern.split(".")[-1])):
+            continue
+        if p.info["pid"] != me and pattern in cmd and "python" in pexe:
+            module = args[args.index("-m") + 1]
+            if True:
                 start = datetime.fromtimestamp(p.info["create_time"]).strftime("%H:%M:%S")
                 return True, p.info["pid"], start
     return False, None, "—"
