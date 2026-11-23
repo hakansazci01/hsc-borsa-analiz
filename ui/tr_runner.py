@@ -19,7 +19,7 @@ from ui import auth, tr_scalper
 LOG = auth.USERS_DIR / "tr_scalper.log"
 RUN_FLAG = auth.USERS_DIR / "TR_SCALPER_RUN"
 LOCK = auth.USERS_DIR / "TR_SCALPER_LOCK"
-INTERVAL = 8    # HIZLI MAKER modu: 8 sn tur (BTC/ETH, WS fiyat) — eski sistem 8. turda bir
+INTERVAL = 5    # HSC-AMM: 5 sn tur (BTC/ETH, WS fiyat) — eski sistem 12. turda bir (60 sn)
 
 # 1-dk scalper KAPALI: tüm döngü günlük EMA50 motorunu çağırır.
 CYCLE = tr_scalper.cycle   # günlük EMA50 (1dk scalper kaldırıldı)
@@ -105,16 +105,16 @@ def run_forever() -> None:
                     RUN_FLAG.unlink(missing_ok=True)
                     _log("Durdurma sinyali alındı — güvenle çıkılıyor")
                     return
-                # HIZLI MAKER — her 8 sn. Eski 30 coin taraması 8. turda bir.
+                # HSC-AMM — her 5 sn. Eski 30 coin taraması 12. turda bir (60 sn).
                 lines: list[str] = []
                 try:
-                    from ui import fast_maker
-                    lines += fast_maker.step()
+                    from ui import amm
+                    lines += amm.step()
                 except Exception as exc:
-                    lines.append(f"FAST_MAKER hata: {type(exc).__name__}: {exc}")
+                    lines.append(f"HSC-AMM hata: {type(exc).__name__}: {exc}")
                 _fast_tick = globals().get("_fast_tick", 0) + 1
                 globals()["_fast_tick"] = _fast_tick
-                if _fast_tick % 8 == 0:
+                if _fast_tick % 12 == 0:
                     lines += CYCLE()
                 for line in lines:
                     _log(line)
