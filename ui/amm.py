@@ -24,10 +24,13 @@ from ui import auth, tr_scalper as t
 
 STATE = auth.USERS_DIR / "amm_state.json"
 SYMBOLS = ("BTC_TRY", "ETH_TRY")
+BUDGET_TRY = 3000.0        # Motor 1 — ayrı kasa
+TRADE_MIN_TRY = 50.0
+TRADE_MAX_TRY = 80.0
 GAMMA = 0.5
 KAPPA = 1.5
 TAU = 15.0 / (24 * 60)          # 15 dakika, gün cinsinden
-SPREAD_MIN = 0.0010             # %0.10
+SPREAD_MIN = 0.0016             # %0.16 — komisyon %0.15'in üstünde olmalı
 SPREAD_MAX = 0.0030             # %0.30
 FEE_PCT = 0.15                  # maker + BNB (gidiş-dönüş)
 QUOTE_TTL = 5.0
@@ -42,7 +45,7 @@ TICK_START = time.time()
 def _log(msg: str) -> None:
     try:
         from ui import autonomous_ops
-        autonomous_ops._log(msg)
+        autonomous_ops._log("HSC-AMM: " + msg)
     except Exception:
         pass
 
@@ -98,8 +101,9 @@ def reservation_price(mid: float, q: float, sig: float) -> float:
 
 
 def dynamic_spread(sig: float) -> float:
-    # A-S + Hummingbot sadeformül: taban komisyon + volatilite primi
-    raw = GAMMA * (sig ** 2) * TAU + (2.0 / GAMMA) * math.log(1.0 + GAMMA / KAPPA)
+    # Komisyon tabanı + gerçek sigma primi. (2/gamma)*ln(...) terimi sabit
+    # ~%1.15 olduğu için her zaman tavana çıkıyordu — kaldırıldı.
+    raw = (FEE_PCT + GAMMA * (sig ** 2) * TAU * 100 + sig * 100) / 100.0
     return max(SPREAD_MIN, min(SPREAD_MAX, raw))
 
 
@@ -129,16 +133,24 @@ def preflight(symbol: str) -> tuple[bool, str]:
         return False, "portföy freni"
     if tb.status(0)["tier"] >= 2:
         return False, "kademeli fren"
-    # günlük SMA200
-    try:
-        k = t.klines(symbol, "1d", 210)
-        s200 = float(k["Close"].rolling(200).mean().iloc[-1])
-        mid, _, _ = mid_and_spread(symbol)
-        if mid <= 0 or mid <= s200:
-            return False, f"SMA200 altı ({mid:.2f} ≤ {s200:.2f})"
-    except Exception:
-        return False, "SMA200 verisi yok"
+    # HSC-AMM trend TAHMİNİ YAPMAZ → SMA200 kapası yok (kullanıcı kararı).
+    # Çakışma engeli: YÖNLÜ motoru aynı coin'de işlemdeyse AMM girmez.
+    from ui import motor_guard
+    conflict = motor_guard.conflict(symbol, "AMM")
+    if conflict:
+        return False, f"çakışma engeli: {conflict}"
+    # Ayrı kasa bütçesi
+    used = float(st_budget_used())
+    if used >= BUDGET_TRY:
+        return False, f"AMM kasası dolu ({used:.0f}/{BUDGET_TRY:.0f} TL)"
     return True, "OK"
+
+
+def st_budget_used() -> float:
+    s = _load()
+    inv = s.get("inventory") or {}
+    return float(inv.get("notional", 0) or 0) + sum(
+        float(q.get("notional", 0) or 0) for q in (s.get("quotes") or {}).values())
 
 
 def step() -> list[str]:
@@ -158,6 +170,8 @@ def step() -> list[str]:
                    f"{'OK' if ok else 'HATA'} · {'kârda' if float(inv.get('entry',0)) < float(t.price(inv['symbol']) or 0) else 'zararda'}")
             _log(msg); logs.append(msg)
             st["inventory"] = None
+            from ui import motor_guard
+            motor_guard.release(inv["symbol"], "AMM")
 
     # 2) bekleyen emirleri kontrol et / 5 sn TTL
     quotes = st.get("quotes", {}) if isinstance(st.get("quotes"), dict) else {}
@@ -169,7 +183,8 @@ def step() -> list[str]:
         if filled > 0:
             px = float(body.get("executedPrice") or q.get("price") or 0)
             inv = {"symbol": q["symbol"], "qty": filled, "entry": px,
-                   "entry_ts": time.time()}
+                   "entry_ts": time.time(), "notional": float(q.get("notional") or 0),
+                   "motor": "AMM"}
             st["inventory"] = inv
             quotes.pop(key, None)
             msg = (f"HSC-AMM DOLUM ID {q.get('order_id')} · {q['symbol']} "
@@ -206,7 +221,10 @@ def step() -> list[str]:
             sides.append("SELL")
         flt = t._filters(sym)
         stepq = flt.get("step") or 0.00000001
-        cap = float(st.get("budget_try", 500.0) or 500.0)
+        cap = min(BUDGET_TRY - st_budget_used(), TRADE_MAX_TRY)
+        if cap < TRADE_MIN_TRY:
+            logs.append(f"HSC-AMM {sym}: kasa limiti — işlem ₺{cap:.0f} < ₺{TRADE_MIN_TRY:.0f}")
+            continue
         for side in sides:
             px = (r - sp / 2) if side == "BUY" else (r + sp / 2)
             for existing in list(quotes.values()):
@@ -229,7 +247,10 @@ def step() -> list[str]:
                 if isinstance(res, dict) and res.get("ok"):
                     quotes[f"{sym}:{side}"] = {"order_id": oid, "symbol": sym,
                                                 "side": side, "price": px,
-                                                "qty": qty, "at": time.time()}
+                                                "qty": qty, "at": time.time(),
+                                                "notional": cap, "motor": "AMM"}
+                    from ui import motor_guard
+                    motor_guard.claim(sym, "AMM")
                     msg = (f"HSC-AMM {'ALIŞ' if side=='BUY' else 'SATIŞ'} emri ID {oid} · "
                            f"{sym} {qty} @ {px:.8f} · r={r:.8f} · spread=%{spread_pct:.3f}")
                     _log(msg); logs.append(msg)
@@ -242,4 +263,4 @@ def step() -> list[str]:
     dt = time.time() - t0
     logs.append(f"TUR: {dt:.1f} sn hesaplama / 5 sn periyot · "
                 f"mid/r/spread/envanter güncellendi · {fee_msg()}")
-    return logs
+    return ["HSC-AMM: " + x for x in logs]

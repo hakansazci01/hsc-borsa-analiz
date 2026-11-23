@@ -1,8 +1,8 @@
-GÜNLÜK SAĞLIK RAPORU — 2026-11-23 10:11
+GÜNLÜK SAĞLIK RAPORU — 2026-11-23 10:33
 1) Bugün işlem: 1
 2) Bugün K/Z: -11.55 TL
 3) Açık pozisyon: Yok
-4) Bugün yedek: 111 · Sağlam ✅
+4) Bugün yedek: 117 · Sağlam ✅
 5) Yeniden başlatma: 0
 6) Rejim: AYI
 7) Yarın planı: Rejim AYI, beklemeye devam

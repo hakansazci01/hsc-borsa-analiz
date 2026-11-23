@@ -150,6 +150,7 @@ MAX_LADDERS = 3
 # YENİ PORTFÖY MODU — sınırsız işlem, 5 eşzamanlı pozisyon, %5 boyut
 MAX_POSITIONS = 5
 POS_PCT = 0.05
+DIRECTIONAL_BUDGET = 2426.0   # Motor 2 — ayrı kasa (AMM ₺3000'den ayrı)
 MIN_SCORE = 30.0     # backtest'te kârlı bölgeyle uyumlu skor eşiği
 RESCUE_DROP = 0.02      # %2 düşüşte DCA kurtarma (yarı miktar)
 RESCUE_EXIT = 0.01      # ortalamanın %1 üstünde kara geçiş
@@ -529,8 +530,9 @@ def _scan_new() -> list[str]:
     logs.append(f"KADEMELİ FREN: {_tbs['msg']} (çarpan {_tbs['size_multiplier']:.2f})")
     if not _tbs["trade_allowed"]:
         return logs + [_tbs["msg"]]
-    cap = min(t.position_size_try(bal, sym), bal * _conf,
-              _tb.position_cap(bal, _day_dd, _conf))
+    cap = min(t.position_size_try(min(bal, DIRECTIONAL_BUDGET), sym),
+              min(bal, DIRECTIONAL_BUDGET) * _conf,
+              _tb.position_cap(min(bal, DIRECTIONAL_BUDGET), _day_dd, _conf))
     if cap <= 0:
         return logs + ["bakiye yetersiz"]
     if not _trend_ok:
@@ -557,6 +559,10 @@ def _scan_new() -> list[str]:
         return logs + [f"OBI+VWAP: {'emir atıldı ID ' + str(_er.get('order_id')) if _er.get('ok') else _er.get('reason')}"]
     if _grid_off:
         return logs + ["REJİM KAPISI: trendde mikro grid alımı yapılmadı"]
+    from ui import motor_guard
+    _cf = motor_guard.conflict(sym, "YONLU")
+    if _cf:
+        return logs + [f"YÖNLÜ çakışma engeli: {_cf} — emir atılmadı"]
     # R/R KAPISI — TP %0.6 + komisyon %0.25 ile mikro alımın matematiksel
     # beklentisi negatifse emir ATMA. (TP %1.5'e çıkarsa %1 stop geçerli olur.)
     from ui import risk_reward as _rr_gate
@@ -587,8 +593,11 @@ def _scan_new() -> list[str]:
         "micro_tp_stage": 0, "motor": _motor, "micro_stop_pct": 1.0,
         "atr_stop": market_regime.atr_stop(best["price"], sym)["stop"],
     })
+    _poss[-1]["motor"] = "YONLU"
     t._save({**_cur, "positions": _poss, "mode": MOD_ADI})
-    logs.append(f"PORTFÖY: {len(_poss)}/{MAX_POSITIONS} açık pozisyon")
+    motor_guard.claim(sym, "YONLU")
+    logs.append(f"YÖNLÜ PORTFÖY: {len(_poss)}/{MAX_POSITIONS} açık pozisyon · "
+                f"kasa ₺{DIRECTIONAL_BUDGET:.0f}")
     try:
         from ui import disaster_recovery
         disaster_recovery.backup("hızlı kâr alımı")
@@ -629,8 +638,8 @@ def cycle() -> list[str]:
     logs.append(f"REJİM: {_reg} — MOD: {sm.LABELS[_mode]}"
                 + (f" (AYI: %{POS_PCT*100:.0f} pozisyon, RSI<{_rsi_max:.0f})"
                    if _bear_cap else ""))
-    # 1) YENİ TARAMA — açık pozisyondan BAĞIMSIZ her turda çalışır
-    logs += _scan_new()
+    # 1) YÖNLÜ MOTOR — açık pozisyondan BAĞIMSIZ her turda çalışır
+    logs += ["YÖNLÜ: " + x for x in _scan_new()]
 
     st = t._load()
     # RECONCILIATION: state'deki pozisyonlar ile gerçek API bakiyesini doğrula.
