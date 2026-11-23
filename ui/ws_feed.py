@@ -302,17 +302,14 @@ def _user_stream_loop() -> None:
             _stop.wait(30)
 
 
-def _depth_loop() -> None:
-    """depth5@100ms — OBI (alis/satis hacmi) icin anlik L2. REST yedek kalir."""
+def _depth_loop(symbol: str) -> None:
+    """Tek sembol için depth5@100ms — her sembol ayrı thread'de çalışır."""
     import websocket
 
     from ui import micro_engine as me
 
-    symbols = ["BTC_TRY", "ETH_TRY", "XLM_TRY", "SHIB_TRY"]
+    sym = symbol
     while not _stop.is_set():
-        for sym in symbols:
-            if _stop.is_set():
-                break
             ws = None
             try:
                 plain = sym.replace("_", "").lower()
@@ -339,14 +336,15 @@ def _depth_loop() -> None:
                     # sinyal yaşını ölçüp 2 sn üzeri OBI'ları reddediyoruz.
                     srv_ms = d.get("T")
                     age_ms = (int(time.time() * 1000 - float(srv_ms))
-                              if srv_ms else None)
+                              if srv_ms else 0)
+                    recv_ts = time.time()
                     bids = d.get("bids") or []
                     asks = d.get("asks") or []
                     best_bid = float(bids[0][0]) if bids else 0.0
                     best_ask = float(asks[0][0]) if asks else 0.0
                     depth[sym] = {"ratio": obi["ratio"], "ok": obi["ok"],
                                   "best_bid": best_bid, "best_ask": best_ask,
-                                  "age_ms": age_ms,
+                                  "age_ms": age_ms, "recv_ts": recv_ts,
                                   "at": time.strftime("%Y-%m-%d %H:%M:%S")}
                     st["depth_obi"] = depth
                     _save(st)
@@ -362,7 +360,6 @@ def _depth_loop() -> None:
                 except Exception:
                     pass
                 _stop.wait(RECONNECT_SEC)
-        _stop.wait(RECONNECT_SEC)
 
 
 def start() -> None:
@@ -374,7 +371,9 @@ def start() -> None:
     _thread = threading.Thread(target=_mini_ticker_loop, name="hsc-ws-market", daemon=True)
     _thread.start()
     threading.Thread(target=_user_stream_loop, name="hsc-ws-user", daemon=True).start()
-    threading.Thread(target=_depth_loop, name="hsc-ws-depth", daemon=True).start()
+    for _s in ("BTC_TRY", "ETH_TRY", "XLM_TRY", "SHIB_TRY"):
+        threading.Thread(target=_depth_loop, args=(_s,),
+                         name=f"hsc-ws-depth-{_s}", daemon=True).start()
 
 
 def health_check() -> bool:

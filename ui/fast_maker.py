@@ -104,8 +104,9 @@ def preflight(symbol: str, cap_try: float) -> tuple[bool, str]:
     d = depth(symbol)
     if not d:
         return False, "depth verisi yok"
-    age = d.get("age_ms")
-    if not isinstance(age, (int, float)) or float(age) > 2000:
+    recv = d.get("recv_ts")
+    age_ms = ((time.time() - float(recv)) * 1000) if recv else float(d.get("age_ms") or 0)
+    if not isinstance(age_ms, (int, float)) or float(age_ms) > 2000:
         return False, "OBI depth verisi bayat (>2 sn)"
     # R/R kapısı (5 sn TTL ≈ 0.2% risk kabulü)
     from ui import risk_reward as rr
