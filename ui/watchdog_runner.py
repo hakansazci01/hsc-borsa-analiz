@@ -31,9 +31,35 @@ def _claim() -> bool:
     return True
 
 
+def _kill_other_runners() -> None:
+    """Kalıcı süreçleri TEK kopyaya indir — global/.venv ayrımı yok.
+
+    Watchdog her başladığında motor/scheduler/watchdog kopyalarını temizler,
+    sonra kendi kopyalarını kurar. Böylece sayı sürekli artmaz.
+    """
+    import os
+    import psutil
+
+    me = os.getpid()
+    targets = ("ui.watchdog_runner", "ui.tr_runner", "ui.autonomous_scheduler")
+    for p in psutil.process_iter(["pid", "cmdline", "exe"]):
+        if p.info["pid"] == me:
+            continue
+        cmd = " ".join(p.info.get("cmdline") or [])
+        exe = (p.info.get("exe") or "").lower()
+        if "python" not in exe:
+            continue
+        if any(t in cmd for t in targets):
+            try:
+                p.kill()
+            except Exception:
+                pass
+
+
 if __name__ == "__main__":
     # SADECE proje .venv python'u watchdog olabilir — global kopyalar kilitleri
     # ezip çift süreç yaratıyordu; onlar hemen çıkar.
     if ".venv" in sys.executable.lower() and _claim():
+        _kill_other_runners()
         watchdog(claim_fn=_claim)
 
