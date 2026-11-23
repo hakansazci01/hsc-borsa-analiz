@@ -348,6 +348,16 @@ def watchdog_once() -> dict[str, Any]:
     motor = process_state("ui.tr_runner")
     sched = process_state("ui.autonomous_scheduler")
     watch = process_state("ui.watchdog_runner")
+    # KRİTİK: process_state kendi PID'ini hariç tutar. Bu fonksiyon zaten
+    # watchdog sürecinin içinde çalışıyorsa kendisi "yok" sanılır ve her 60 sn
+    # yeni bir watchdog doğar (sonsuz çoğalma). Kendi PID'imizi say.
+    try:
+        _self_cmd = " ".join(__import__("psutil").Process(__import__("os").getpid()).cmdline() or [])
+        if "ui.watchdog_runner" in _self_cmd:
+            watch = (True, __import__("os").getpid(),
+                     time.strftime("%H:%M:%S"))
+    except Exception:
+        pass
     try:                       # WS sessizse 60 sn içinde yeniden bağlan
         from ui import ws_feed
         ws_feed.health_check()
