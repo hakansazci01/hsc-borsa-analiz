@@ -21,7 +21,7 @@ LIVE_STATE_FILES = [
     "trading_params.json", "risk_brakes_state.json", "auto_mode_state.json",
     "ws_state.json", "engine_state.json", "crash_bid.json",
     "tiered_brakes.json", "whale_guard_state.json", "live_feed_state.json",
-    "recovery_state.json",
+    "recovery_state.json", "tp_proof.json", "daily_report.json",
 ]
 
 
@@ -32,7 +32,8 @@ def _proof(msg: str) -> None:
         with PROOF_LOG.open("a", encoding="utf-8") as fh:
             fh.write(line + "\n")
         with (USERS / "autonomous_ops.log").open("a", encoding="utf-8") as fh:
-            fh.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] TEST İZOLE STATE — {msg}\n")
+            fh.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] TEST İZOLE STATE, "
+                     f"canlıya DOKUNULMADI — {msg}\n")
     except Exception:
         pass
 
@@ -96,6 +97,7 @@ def isolate_live_state(tmp_path, monkeypatch):
         "ui.engine": ["STATE"],
         "ui.crash_bid": ["STATE"],
         "ui.tiered_brakes": ["STATE"],
+        "ui.tp_proof": ["STATE"],
         "ui.whale_guard": ["STATE"],
         "ui.live_feed": ["STATE"],
         "ui.autonomous": ["STATE"],
@@ -104,6 +106,7 @@ def isolate_live_state(tmp_path, monkeypatch):
         "ui.performance_export": ["STATE"],
         "ui.disaster_recovery": ["STATE", "BACKUPS", "RECOVERY", "SOURCES"],
         "ui.check_gate": [],
+        "ui.autonomous_ops": ["DAILY_REPORT"],
     }
     sandbox = tmp_path / "isolated"
     sandbox.mkdir(exist_ok=True)

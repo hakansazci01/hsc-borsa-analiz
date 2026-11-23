@@ -388,6 +388,12 @@ def _scan_new() -> list[str]:
     logs: list[str] = ["YENİ TARAMA: başlatıldı"]
     _open = t._load().get("positions") or []
     open_syms = {str(p.get("symbol")) for p in _open if isinstance(p, dict)}
+    # GEÇİCİ KİLİT: ilk gerçek TP satışına kadar yeni pozisyon açma.
+    from ui import tp_proof
+    if _open and not tp_proof.unlocked():
+        return logs + [f"TP KİLİDİ: açık pozisyon var ve gerçek TP kanıtı yok "
+                       f"({tp_proof.count()} satış) — yeni pozisyon açılmadı, "
+                       f"sadece mevcut pozisyon yönetiliyor"]
     watch = dynamic_watchlist()
     logs.append(f"DİNAMİK TOP-10 (saatlik): {', '.join(watch)}")
     rows = [r for r in scan(list(watch)) if r["symbol"] not in open_syms]
@@ -618,6 +624,18 @@ def cycle() -> list[str]:
         if not ind:
             return [f"{sym}: 1s veri yok — pozisyon korunuyor"]
         entry = float(pos.get("entry", 0))
+        # HARD STOP — DCA ve TP'lerden ÖNCE, tam satış. Zarar durdurucu.
+        from ui import hard_stop
+        _hs, _hs_msg = hard_stop.decision(pos, ind["price"])
+        logs.append(f"HARD STOP hedefi: {sym} {hard_stop.stop_price(pos):.8f} "
+                    f"(%{hard_stop.stop_pct(pos)*100:.0f}, katman "
+                    f"{int(pos.get('grid_layers', 0) or 0)}/3) — şu an {ind['price']:.8f}")
+        if _hs:
+            _hsres = t.sell(sym, float(pos["qty"]), f"{MOD_ADI}: {_hs_msg}")
+            logs.append(f"HARD STOP {'OK' if _hsres.get('ok') else 'HATA'} · {_hs_msg}")
+            if _hsres.get("ok"):
+                sm.day_record(float(_hsres.get("net", 0) or 0))
+            return logs
         atr = market_regime.atr_stop(ind["price"], sym)
         # TP3 trailing zirvesini her turda yukarı güncelle
         if int(pos.get("tp_stage", 0)) >= 3 and ind["price"] > float(pos.get("peak_tp", 0) or 0):
@@ -640,6 +658,9 @@ def cycle() -> list[str]:
                     _np["grid_anchor"] = ind["price"]
                     _save_active_position(_np, _nl)
                 sm.day_record(float(_mres.get("net", 0) or 0))
+                from ui import tp_proof as _tpproof
+                _n = _tpproof.record_real_tp(sym, _mwhy, float(_mres.get("net", 0) or 0))
+                logs.append(f"GERÇEK TP KANITI {_n}: {_mwhy} · {_mqty} adet satıldı")
                 logs.append(f"{_mwhy} · {_mqty} adet satıldı")
             else:
                 logs.append(f"MİKRO TP emri reddedildi: {str(_mres.get('reason'))[:80]}")
@@ -680,6 +701,9 @@ def cycle() -> list[str]:
                 np["grid_anchor"] = ind["price"]
                 _save_active_position(np, np_in_list)
                 sm.day_record(float(res.get("net", 0) or 0))
+                from ui import tp_proof as _tpproof
+                _n = _tpproof.record_real_tp(sym, why, float(res.get("net", 0) or 0))
+                logs.append(f"GERÇEK TP KANITI {_n}: {why} · net {float(res.get('net', 0) or 0):+.2f} TL")
                 logs.append(f"GRID: TP satışı sonrası katman {int(pos.get('grid_layers',1))}→{_freed}, "
                             f"yeni referans {ind['price']:.8f}")
             logs.append(f"KDEMELİ SATIŞ {'TP1' if action == 'PARTIAL' else 'TP2'} {sym} "
@@ -701,6 +725,11 @@ def cycle() -> list[str]:
             res = t.sell(sym, float(pos["qty"]), f"{MOD_ADI}: {why}")
             if res.get("ok"):
                 sm.day_record(float(res.get("net", 0) or 0))
+                if "trailing" in str(why).lower() or "tp3" in str(why).lower():
+                    from ui import tp_proof as _tpproof
+                    _n = _tpproof.record_real_tp(sym, why, float(res.get("net", 0) or 0))
+                    logs.append(f"GERÇEK TP KANITI {_n}: TP3 trailing satışı · "
+                                f"net {float(res.get('net', 0) or 0):+.2f} TL")
             logs.append(f"SAT {sym} {'OK' if res.get('ok') else 'HATA'} — {why}")
             return logs
         # SÜREKLİ GRID — katman 2/3: fiyat referanstan %1 / %1.5 düştüğünde ek alım

@@ -503,6 +503,24 @@ def _panel():
         with st.expander("Son raporu oku", icon=":material/description:"):
             st.text(rp.read_text(encoding="utf-8"))
 
+    # GÜNLÜK RAPOR — 23:00, gerçek rakam
+    st.divider()
+    st.subheader("Günlük Rapor (23:00)", divider="gray")
+    from ui import autonomous_ops as _ao
+    _dr = _ao.daily_report_data()
+    g1, g2, g3, g4 = st.columns(4)
+    g1.metric("Bugün İşlem", f"{_dr['trades']}",
+              delta=f"{_dr['wins']} kârlı / {_dr['losses']} zararlı")
+    g2.metric("Bugün Net K/Z", f"{_dr['today_net']:+.2f} ₺")
+    g3.metric("Win Rate", f"%{_dr['win_rate']:.0f}")
+    g4.metric("Bakiye", f"₺{_dr['balance']:,.2f}")
+    st.caption(
+        f"Son 7 gün net: **{_dr['week_net']:+.2f} TL** · "
+        f"Açık pozisyon: **{_dr['open_position']}** · "
+        f"Gerçek TP kanıtı: **{_dr['tp_proof']}** · "
+        f"Rapor saati: {_dr['at']} — vaat değil, trades.csv'den gerçek rakam"
+    )
+
     # YEDEK + FELAKET KURTARMA
     st.divider()
     st.subheader("Yedek + Felaket Kurtarma", divider="gray")

@@ -156,24 +156,66 @@ def brake_notification(reason: str) -> bool:
 
 
 # --------------------------------------------------------- günlük özet
-def daily_summary() -> str:
-    from ui import tr_monitor, risk_brakes
+DAILY_REPORT = ROOT / "users" / "daily_report.json"
 
-    s = tr_monitor.summary()
-    br = risk_brakes.status()
+
+def daily_report_data() -> dict[str, Any]:
+    """23:00 net rakam — vaat değil, gerçek kayıtlar."""
+    import csv
+    from datetime import datetime
+    from ui import risk_brakes, trade_stats, tp_proof
+
     today = time.strftime("%Y-%m-%d")
-    rows = [h for h in tr_monitor.merged_history() if str(h.get("exit_time", "")).startswith(today)]
+    rows: list[dict[str, Any]] = []
+    p = ROOT / "trades.csv"
+    if p.exists():
+        with p.open(encoding="utf-8-sig", newline="") as fh:
+            rows = [r for r in csv.DictReader(fh)
+                    if str(r.get("tarih", "")).startswith(today)]
+    pnls = [float(r.get("net_kar_zarar", 0) or 0) for r in rows]
+    wins = sum(1 for x in pnls if x > 0)
+    losses = sum(1 for x in pnls if x < 0)
+    st = tr_scalper._load()
+    pos_list = st.get("positions") or []
+    pos = st.get("position") or (pos_list[0] if pos_list else None)
+    pos_txt = ("Yok" if not pos else
+               f"{pos.get('symbol')} · {pos.get('qty')} adet @ {float(pos.get('avg_entry', 0)):.8f} "
+               f"· ₺{float(pos.get('cost', 0)):.2f}")
+    br = risk_brakes.status()
+    stt = trade_stats.stats()
+    return {
+        "at": time.strftime("%Y-%m-%d %H:%M:%S"), "day": today,
+        "trades": len(pnls), "wins": wins, "losses": losses,
+        "win_rate": round(wins / len(pnls) * 100, 1) if pnls else 0.0,
+        "today_net": round(sum(pnls), 2),
+        "week_net": stt["week_net"],
+        "balance": br["balance"], "open_position": pos_txt,
+        "tp_proof": tp_proof.count(),
+        "bot": "AÇIK" if not tr_scalper.STOP_FILE.exists() else "KAPALI (STOP)",
+    }
+
+
+def daily_summary(notify: bool = True) -> str:
+    d = daily_report_data()
     msg = (
-        f"GÜNLÜK ÖZET — {today}\n"
-        f"Bugün işlem: {len(rows)}\n"
-        f"Toplam işlem (tüm zaman): {s['trades']}\n"
-        f"Toplam net K/Z: {s['net_pnl']:+.2f} TL\n"
-        f"Günlük net: {br['day_realized_pnl']:+.2f} TL\n"
-        f"Güncel kasa: {br['balance']:,.2f} TL\n"
-        f"Bot: {'AÇIK' if not tr_scalper.STOP_FILE.exists() else 'KAPALI (STOP)'}"
+        f"GÜNLÜK ÖZET / GÜNLÜK RAPOR — {d['day']}\n"
+        f"Bugün işlem: {d['trades']} (kârlı {d['wins']} / zararlı {d['losses']})\n"
+        f"Win rate: %{d['win_rate']}\n"
+        f"Bugün net K/Z: {d['today_net']:+.2f} TL\n"
+        f"Son 7 gün net: {d['week_net']:+.2f} TL\n"
+        f"Güncel kasa / Bakiye: ₺{d['balance']:,.2f}\n"
+        f"Açık pozisyon: {d['open_position']}\n"
+        f"Gerçek TP kanıtı: {d['tp_proof']}\n"
+        f"Bot: {d['bot']}"
     )
-    _send("HSC GÜNLÜK ÖZET", msg)
-    _log("günlük özet gönderildi")
+    try:
+        DAILY_REPORT.parent.mkdir(parents=True, exist_ok=True)
+        DAILY_REPORT.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+    _log(msg.replace("\n", " | "))
+    if notify:
+        _send("HSC GÜNLÜK RAPOR", msg)
     return msg
 
 
