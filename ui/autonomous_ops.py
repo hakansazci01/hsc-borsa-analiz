@@ -372,9 +372,9 @@ def watchdog_once() -> dict[str, Any]:
     except Exception:
         pass
     actions: list[str] = []
-    if not watch[0]:
-        pid = _start_module("ui.watchdog_runner")
-        actions.append(f"WATCHDOG yeniden başlatıldı (PID {pid})")
+    # Watchdog'u BURADA BAŞLATMA — bu fonksiyon zaten watchdog'un içinden
+    # çağrılıyor. Kendini başlatmaya çalışınca zincirleme kopyalar doğuyordu.
+    # Watchdog'u yalnızca launch_all.py başlatır (bkz. _start_module çağrısı).
     if not motor[0]:
         pid = _start_module("ui.tr_runner")
         actions.append(f"MOTOR yeniden başlatıldı (PID {pid})")

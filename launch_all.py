@@ -76,6 +76,10 @@ def main() -> None:
             watchdog_runner._kill_other_runners()
         except Exception:
             pass
+        # Watchdog'u SADECE burada, bir kez başlat. Tek kopya garantisi.
+        wd = ops.process_state("ui.watchdog_runner")
+        if not wd[0]:
+            ops._start_module("ui.watchdog_runner")
         states = ops.watchdog_once()
 
         # WS market + user data stream'i kalıcı motor (ui.tr_runner) başlatır.
