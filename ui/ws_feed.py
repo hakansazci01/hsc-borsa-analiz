@@ -141,6 +141,14 @@ def handle_user_message(msg: dict[str, Any]) -> str | None:
     _save(st)
     log(f"WS ExecutionReport: {status} · orderId={ev.get('i')} "
         f"· filled={ev.get('z')}/{ev.get('q')}")
+    # Gerçek dolumu AMM'ye yönlendir — ID ile DEĞİL, WS'in kendi verisiyle
+    # (sembol + yön + miktar + fiyat). REST/WS orderId alanları farklı.
+    if status == "FILLED":
+        try:
+            from ui import amm
+            amm.on_ws_fill(ev)
+        except Exception as exc:
+            log(f"AMM WS dolum kayıt hatası: {type(exc).__name__}: {exc}")
     return status
 
 

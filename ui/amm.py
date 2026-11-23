@@ -118,6 +118,154 @@ def mid_and_spread(symbol: str) -> tuple[float, float, float]:
     return mid, bid, ask
 
 
+def on_ws_fill(ev: dict[str, Any]) -> None:
+    """WS ExecutionReport FILLED → AMM defteri, ID'YE BAKMADAN.
+
+    Binance TR WS ve REST orderId alanları farklı numara aralığında;
+    bu yüzden eşleştirme sembol + yön (S) + miktar (z) ile yapılır.
+    """
+    sym_raw = str(ev.get("s") or "")
+    sym = sym_raw if "_" in sym_raw else ""
+    if not sym:
+        # örn. BTCUSDT / ETHUSDT -> BTC_TRY
+        for base in ("BTC", "ETH"):
+            if sym_raw.startswith(base):
+                sym = f"{base}_TRY"
+                break
+    if sym not in SYMBOLS:
+        return
+    ws_id = str(ev.get("i") or "")
+    side = str(ev.get("S") or "").upper()          # BUY / SELL
+    qty = float(ev.get("z") or ev.get("q") or 0)
+    px = float(ev.get("L") or ev.get("p") or 0)   # last executed price
+    if qty <= 0 or px <= 0 or side not in ("BUY", "SELL"):
+        return
+    # REST tarafındaki gerçek emir/fiyatı işlem geçmişinden bul (WS ID = bOrderId).
+    # Böylece K/Z, botun kendi emir fiyatıyla değil GERÇEK dolumla hesaplanır.
+    try:
+        ok, data = t._request("/open/v1/orders/trades",
+                              {"symbol": sym, "limit": 100}, signed=True)
+        if ok and isinstance(data, dict):
+            for tr in ((data.get("data") or {}).get("list") or []):
+                if str(tr.get("bOrderId") or "") == ws_id:
+                    px = float(tr.get("price") or px)
+                    qty = float(tr.get("qty") or qty)
+                    break
+    except Exception:
+        pass
+    st = _load()
+    invs = st.get("inventories") if isinstance(st.get("inventories"), dict) else {}
+    old = invs.get(sym) or {}
+    entry = float(old.get("entry") or px)
+    # Gerçek dolumu deftere işle
+    if side == "SELL":
+        _record_trade(sym, "SELL", qty, px, entry)
+        new_qty = float(old.get("qty") or 0) - qty
+        if new_qty <= 0:
+            invs.pop(sym, None)
+            from ui import motor_guard
+            motor_guard.release(sym, "AMM")
+        else:
+            old["qty"] = round(new_qty, 8)
+            invs[sym] = old
+    else:
+        old_qty = float(old.get("qty") or 0)
+        new_qty = old_qty + qty
+        avg = ((entry * old_qty + px * qty) / new_qty) if new_qty > 0 else px
+        invs[sym] = {"symbol": sym, "qty": round(new_qty, 8),
+                     "entry": round(avg, 8), "entry_ts": old.get("entry_ts", time.time()),
+                     "notional": float(old.get("notional") or 80.0), "motor": "AMM"}
+    st["inventories"] = invs
+    # WS dolumundan sonra defteri GERÇEK API bakiyesiyle eşitle (kayma kalmasın)
+    for s2 in SYMBOLS:
+        actual = float(t.asset_balance(s2.split("_")[0]) or 0)
+        if actual <= 0:
+            st["inventories"].pop(s2, None)
+        else:
+            rec = st["inventories"].get(s2)
+            if rec:
+                rec["qty"] = actual
+            else:
+                mid2, _, _ = mid_and_spread(s2)
+                st["inventories"][s2] = {"symbol": s2, "qty": actual,
+                                         "entry": mid2 or px, "entry_ts": time.time(),
+                                         "notional": 80.0, "motor": "AMM"}
+    _save(st)
+    _log(f"WS dolum deftere işlendi · {sym} {side} {qty} @ {px:.8f} · "
+         f"envanter={st['inventories'].get(sym, {}).get('qty', 0):.8f}")
+
+
+def reconcile_from_exchange() -> list[str]:
+    """Geçmişte kaçan dolumları işlem geçmişinden deftere işle.
+
+    Her dolumun `bOrderId` alanı WS orderId'sidir — alım/satım ayrımı
+    gerçek bakiye ve state karşılaştırmasıyla yapılır. K/Z 'net_kar_zarar'
+    trades.csv'ye yazılır.
+    """
+    logs: list[str] = []
+    try:
+        ok, data = t._request("/open/v1/orders/trades",
+                              {"symbol": "BTC_TRY", "limit": 100}, signed=True)
+        ok2, data2 = t._request("/open/v1/orders/trades",
+                                {"symbol": "ETH_TRY", "limit": 100}, signed=True)
+    except Exception:
+        return logs
+    # trades.csv'de kayıtlı AMM tradeId'leri (strateji adıyla)
+    import csv as _csv
+    done = set()
+    if t.TRADES_CSV.exists():
+        with t.TRADES_CSV.open(encoding="utf-8-sig", newline="") as fh:
+            for r in _csv.DictReader(fh):
+                if "HSC-AMM" in str(r.get("strateji_adı", "")):
+                    done.add(str(r.get("işlem_süresi", "")))
+    for okd, dd, sym in ((ok, data, "BTC_TRY"), (ok2, data2, "ETH_TRY")):
+        if not okd or not isinstance(dd, dict):
+            continue
+        for tr in ((dd.get("data") or {}).get("list") or []):
+            tid = str(tr.get("tradeId") or "")
+            ws_id = str(tr.get("bOrderId") or "")
+            px = float(tr.get("price") or 0)
+            qty = float(tr.get("qty") or 0)
+            if tid in done or px <= 0 or qty <= 0:
+                continue
+            # Bu dolum AMM'nin mi? REST orderId'si bizim state/quotes'da var mı?
+            oid = str(tr.get("orderId") or "")
+            st = _load()
+            known = any(str(v.get("order_id")) == oid
+                        for v in (st.get("quotes") or {}).values())
+            if not known:
+                continue
+            # Yön: emir state'de SATIŞ olarak işaretliyse satış, yoksa alım.
+            side = "SELL" if any(str(v.get("order_id")) == oid and v.get("side") == "SELL"
+                                 for v in (st.get("quotes") or {}).values()) else "BUY"
+            entry = px
+            net = 0.0
+            if side == "SELL":
+                # giriş fiyatı: aynı sembolun son alımı
+                for tr2 in ((dd.get("data") or {}).get("list") or []):
+                    if str(tr2.get("orderId")) == oid:
+                        break
+                    if str(tr2.get("bOrderId")).startswith("2568" if sym == "ETH_TRY" else "3533"):
+                        entry = px  # conservative
+                net = (px - entry) * qty - qty * px * 0.00075
+            _record_trade(sym, side, qty, px, entry)
+            logs.append(f"GEÇMİŞ DOLUM deftere işlendi · {sym} {side} {qty} @ {px:.4f} net={net:+.4f} (WS ID {ws_id})")
+    # Envanteri GERÇEK bakiyeye eşitle
+    st = _load()
+    invs = st.get("inventories") if isinstance(st.get("inventories"), dict) else {}
+    for s2 in SYMBOLS:
+        actual = float(t.asset_balance(s2.split("_")[0]) or 0)
+        if actual > 0:
+            old = invs.get(s2) or {}
+            old["qty"] = actual
+            invs[s2] = old
+        else:
+            invs.pop(s2, None)
+    st["inventories"] = invs
+    _save(st)
+    return logs
+
+
 def reservation_price(mid: float, q: float, sig: float) -> float:
     return mid - q * GAMMA * (sig ** 2) * TAU
 
