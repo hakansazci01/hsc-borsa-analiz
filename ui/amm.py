@@ -240,5 +240,6 @@ def step() -> list[str]:
     st["quotes"] = quotes
     _save(st)
     dt = time.time() - t0
-    logs.append(f"TUR: {dt:.1f} sn · mid/r/spread/envanter güncellendi · {fee_msg()}")
+    logs.append(f"TUR: {dt:.1f} sn hesaplama / 5 sn periyot · "
+                f"mid/r/spread/envanter güncellendi · {fee_msg()}")
     return logs
