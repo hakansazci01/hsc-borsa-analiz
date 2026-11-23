@@ -342,6 +342,9 @@ def _start_module(module: str) -> int | None:
     exe = str(ROOT / ".venv" / "Scripts" / "python.exe")
     if not Path(exe).exists():
         raise RuntimeError("proje .venv python'u yok — global python ile kalıcı süreç başlatılamaz")
+    # Global python'dan çağrılsa bile ÇALIŞAN executable'ı .venv'e çevir.
+    # (Kilit dosyasını global süreç tutarsa zincirleme kopyalar doğuyordu.)
+    sys.executable = exe
     proc = subprocess.Popen(
         [exe, "-m", module], cwd=str(ROOT),
         creationflags=0x00000008 | 0x00000200,
