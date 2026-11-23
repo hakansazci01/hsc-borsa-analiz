@@ -557,6 +557,14 @@ def _scan_new() -> list[str]:
         return logs + [f"OBI+VWAP: {'emir atıldı ID ' + str(_er.get('order_id')) if _er.get('ok') else _er.get('reason')}"]
     if _grid_off:
         return logs + ["REJİM KAPISI: trendde mikro grid alımı yapılmadı"]
+    # R/R KAPISI — TP %0.6 + komisyon %0.25 ile mikro alımın matematiksel
+    # beklentisi negatifse emir ATMA. (TP %1.5'e çıkarsa %1 stop geçerli olur.)
+    from ui import risk_reward as _rr_gate
+    _rr_g = _rr_gate.check(1.0, tp=_econ.MICRO_TP_PCT, fee=_econ.ROUND_TRIP_MAKER)
+    logs.append("R/R KAPISI: " + _rr_g["msg"])
+    if not _rr_g["ok"]:
+        return logs + ["R/R KAPISI: mikro alımın net beklentisi negatif — "
+                       "emir atılmadı (TP ≥ %1.5 gerekir)"]
     _flt = t._filters(sym)
     qty = max(_qty(cap, best["price"], _flt["step"] or 0.00000001), _flt["min_qty"])
     res = _eng.place_buy(sym, _chosen or _motor, cap, price_limit=None)
@@ -663,7 +671,10 @@ def cycle() -> list[str]:
                     f"(%{hard_stop.stop_pct(pos)*100:.0f}, katman "
                     f"{int(pos.get('grid_layers', 0) or 0)}/3) — şu an {ind['price']:.8f}")
         from ui import risk_reward as _rr
-        logs.append("R/R KAPISI: " + _rr.check(hard_stop.stop_pct(pos))["msg"])
+        _rrv = _rr.check(hard_stop.stop_pct(pos) * 100.0)
+        logs.append("R/R KAPISI: " + _rrv["msg"]
+                    + (" (mevcut pozisyon: felaket stop'u, yeni giriş değil)"
+                       if not pos.get("micro_stop_pct") else ""))
         if _hs:
             _hsres = t.sell(sym, float(pos["qty"]), f"{MOD_ADI}: {_hs_msg}")
             logs.append(f"HARD STOP {'OK' if _hsres.get('ok') else 'HATA'} · {_hs_msg}")

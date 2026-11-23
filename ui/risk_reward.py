@@ -25,8 +25,10 @@ def net_win_pct(tp: float = TP_PCT, fee: float = FEE_PCT) -> float:
 
 def max_stop_pct(win_rate: float, tp: float = TP_PCT,
                  fee: float = FEE_PCT) -> float:
+    """p*net_win > (1-p)*(stop + fee) → stop < p*net_win/(1-p) - fee."""
     p = min(0.99, max(0.01, float(win_rate)))
-    return round(p / (1 - p) * net_win_pct(tp, fee), 4)
+    raw = p / (1 - p) * net_win_pct(tp, fee) - float(fee)
+    return round(max(0.0, raw), 4)
 
 
 def check(stop_pct: float, win_rate: float = MIN_WIN_RATE,
