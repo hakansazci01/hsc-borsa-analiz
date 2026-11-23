@@ -109,7 +109,7 @@ def test_tr_scalper_bounds() -> None:
     assert t.STRATEGY_NAME.startswith("günlük EMA50")
     assert t.ATR_MULT if hasattr(t, "ATR_MULT") else True  # ATR stop (market_regime)
     assert t.MAX_HOLD_DAYS == 90
-    assert t.COMMISSION == 0.001
+    assert t.COMMISSION == 0.0015   # Binance TR TRY taker %0.15 tek yön
     assert "quant_lab.signals" in str(t.signal.__doc__ or "")
     assert len(t.SYMBOLS) == 30 and all(s.endswith("_TRY") for s in t.SYMBOLS)
 

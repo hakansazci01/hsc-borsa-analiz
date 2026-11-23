@@ -17,9 +17,14 @@ MOTOR1_PCT = 0.70
 MOTOR2_PCT = 0.30
 
 # Motor 1 — mikro grid + mikro TP
-MICRO_LAYERS = (0.004, 0.008, 0.012)
-MICRO_TP = ((0.004, 0.50), (0.008, 0.50))
-COMMISSION = 0.001          # Binance TR gerçek taker komisyonu (çift yön)
+# KOMİSYON GERÇEĞİ: TRY taker %0.15 TEK YÖN → gidiş dönüş %0.30.
+# Grid aralığı ≥ 3x gidiş dönüş = %0.90 (taker). TP asla %0.60 altına inmez.
+COMMISSION = 0.0015
+ROUND_TRIP_PCT = 0.30
+MIN_GRID_PCT = 0.009        # %0.90 — 3x %0.30
+MIN_TP_PCT = 0.006          # %0.60 — komisyonun 2 katı
+MICRO_LAYERS = (0.009, 0.018, 0.027)
+MICRO_TP = ((0.006, 0.50),)  # TP1 %0.8 değişmez; mikro TP onun altında %0.60
 
 # Motor 2 — fırsat
 OPP_RSI_MAX = 25.0
@@ -29,6 +34,17 @@ OPB_RATIO = 2.0             # OBI 2:1
 OPP_TARGET_MIN = 0.008
 OPP_TARGET_MAX = 0.015
 OPP_MAX_HOLD_SEC = 3600     # 1 saat
+
+
+def overfit_check(backtest_pct: float, live_pnl: float) -> dict[str, Any]:
+    """Backtest iyi, canlı kötüyse parametreleri büyüt — canlıya güven."""
+    bt = float(backtest_pct)
+    live = float(live_pnl)
+    bad = bt > 10.0 and live < 0
+    return {"ok": not bad,
+            "msg": ("OVERFİTTİNG UYARISI: backtest %{:.1f} ama canlı {:+.2f} TL — "
+                    "backtest'e güvenme, parametreleri büyüt".format(bt, live)
+                    if bad else f"backtest %{bt:.1f} / canlı {live:+.2f} TL — tutarlı")}
 
 
 def capital_split(balance: float) -> dict[str, float]:
@@ -56,6 +72,8 @@ def micro_grid_decision(pos: dict[str, Any], price: float) -> tuple[str, str]:
     if layers >= len(MICRO_LAYERS):
         return "HOLD", "3 mikro katman dolu — TP bekleniyor"
     threshold = MICRO_LAYERS[layers]
+    if threshold < MIN_GRID_PCT:
+        return "HOLD", f"GRID aralığı %{threshold*100:.2f} < %{MIN_GRID_PCT*100:.2f} — komisyonu yenemez, iptal"
     drop = (anchor - float(price)) / anchor
     if drop >= threshold:
         return ("ADD", f"MİKRO KATMAN {layers+1}/3: %{drop*100:.2f} ≥ %{threshold*100:.1f}")
@@ -72,6 +90,8 @@ def micro_tp_decision(pos: dict[str, Any], price: float,
         return "HOLD", 0.0, ""
     gain = (float(price) - entry) / entry
     threshold, ratio = MICRO_TP[stage]
+    if threshold < MIN_TP_PCT:
+        return "HOLD", f"TP %{threshold*100:.2f} < %{MIN_TP_PCT*100:.2f} — taker komisyonu yer, iptal"
     if gain + 1e-9 < threshold:
         return "HOLD", 0.0, ""
     chk = net_profit_pct(gain * 100, fee_rate)

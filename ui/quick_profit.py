@@ -615,6 +615,29 @@ def cycle() -> list[str]:
         f"+hacim {r['hacim_puan']}+BB {r['bb_puan']}) ATR%{r['atr_pct']}"
         for r in rows[:8]))
     best = rows[0]
+    # YENİ TAKTİKLER — karar modülleri sinyal üretir, skor tablosunu BOZMAZ
+    from ui import connors as _cn, crash_bid as _cb, vwap_obi as _vo
+    try:
+        _k = t.klines(best["symbol"], "1m", 3)
+        if _k is not None and len(_k) >= 2:
+            _prev, _cur = float(_k["Close"].iloc[-2]), float(_k["Close"].iloc[-1])
+            _cr = _cb.detect_drop(_prev, _cur)
+            if _cr["ok"]:
+                _pl = _cb.plan(_cur)
+                logs.append(f"CRASH BID SİNYALİ: {_cr['reason']} · limit alış {_pl['bid_px']:.4f} "
+                            f"· hedef +%2 · 4 sa · %5-7 tek seferlik (skor bypass)")
+    except Exception:
+        pass
+    if _vo.is_deep(best["symbol"]):
+        _bpf = float(best.get("bb_puan", 0) or 0)
+        logs.append(f"OBI+VWAP: derin tahta {best['symbol']} · VWAP mesafesi "
+                    f"%{best.get('vwap_dist', 0):.2f} · skor BB bileşeni {_bpf:.0f} "
+                    "(reclaim kuralları vwap_obi modülünde)")
+    try:
+        _cok, _cwhy = _cn.entry(t.klines(best["symbol"], "15m", 210)["Close"].tolist())
+        logs.append(f"CONNORS RSI(2): {'AL sinyali' if _cok else 'sinyal yok'} · {_cwhy}")
+    except Exception:
+        pass
     logs.append(f"VOLATİLİTE FİLTRESİ: {best['symbol']} — ATR %{best['atr_pct']:.2f} "
                 f"— kademe: {best['vol_not']}")
     if best["pozisyon_pct"] <= 0:
@@ -690,7 +713,18 @@ def cycle() -> list[str]:
             pass
     bal = t.available_try()
     _conf = confidence_pct(best["score"])
-    cap = min(t.position_size_try(bal, sym), bal * _conf)   # üst sınır %7
+    # KADEMELİ FREN — %3/%6 drawdown veya 3 ardışık zararda erken yavaşla
+    from ui import risk_brakes as _rb, tiered_brakes as _tb
+    _brs = _rb.status()
+    _open_bal = float(_brs.get("day_open_balance", 0) or 0)
+    _day_dd = (abs(float(_brs.get("day_realized_pnl", 0) or 0)) / _open_bal * 100
+               if _open_bal > 0 else 0.0)
+    _tbs = _tb.status(_day_dd)
+    logs.append(f"KADEMELİ FREN: {_tbs['msg']} (çarpan {_tbs['size_multiplier']:.2f})")
+    if not _tbs["trade_allowed"]:
+        return logs + [_tbs["msg"]]
+    cap = min(t.position_size_try(bal, sym), bal * _conf,
+              _tb.position_cap(bal, _day_dd, _conf))   # üst sınır %7, işlem riski %0.5
     logs.append(f"POZİSYON: %{_conf*100:.0f} · ₺{cap:.2f} "
                 f"(skor {best['score']:.1f}, üst limit %7)")
     if cap <= 0:

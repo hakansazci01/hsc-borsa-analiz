@@ -43,7 +43,7 @@ SYMBOLS = (
 )
 MAX_HOLD_DAYS = 90
 # Sabit %3 stop KALDIRILDI — stop mesafesi = 1.5 * ATR(14) (market_regime.atr_stop)
-COMMISSION = 0.001            # Binance TR spot VIP0, her yön
+COMMISSION = 0.0015           # Binance TR TRY taker: %0.15 tek yön → %0.30 gidiş dönüş
 TAKE_PROFIT_EXPECTED = 0.008  # beklenen işlem getirisi (%0,8) — komisyon filtresi için
 
 
@@ -105,6 +105,10 @@ def config_gate() -> list[str]:
 
 POSITION_PCT = 0.10       # tek işlem = güncel bakiyenin %10'u (bileşik büyüme)
 PROFIT_LOCK_TRY = 50.0    # toplam kâr +50 TL'yi geçince stop giriş üstüne çekilir
+# Binance TR TRY çiftleri: taker %0.15 TEK YÖN → gidiş dönüş %0.30 (doğrulanmış)
+ROUND_TRIP_PCT = 0.30
+MIN_TP_PCT = 0.60         # asgari TP — komisyonun 2 katı
+MIN_GRID_TAKER_PCT = 0.90 # taker grid aralığı — 3x gidiş dönüş komisyon
 
 
 def position_size_try(balance: float | None = None, symbol: str | None = None) -> float:
@@ -551,6 +555,12 @@ def sell(symbol: str, qty: float, reason: str, partial: bool = False) -> dict[st
             "duration_sec": duration_sec, "reason": reason, "strategy": STRATEGY_NAME,
         }])[-50:]
         st["realized_pnl"] = round(sum(float(h.get("net_pnl", 0)) for h in st["history"]), 4)
+        # KADEMELİ FREN — her gerçek satışta seri sayacını güncelle
+        try:
+            from ui import tiered_brakes
+            tiered_brakes.record_trade(net)
+        except Exception:
+            pass
         # ARDIŞIK ZARAR SAYACI
         st["loss_streak"] = (int(st.get("loss_streak", 0) or 0) + 1) if net <= 0 else 0
         if partial:
