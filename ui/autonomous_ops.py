@@ -323,7 +323,10 @@ def process_state(pattern: str) -> tuple[bool, int | None, str]:
         if ("-m" not in args or args[args.index("-m") + 1] not in
                 (pattern, pattern.split(".")[-1])):
             continue
-        if p.info["pid"] != me and pattern in cmd and "python" in pexe:
+        # SADECE proje .venv python'unu say — global Python kopyaları
+        # .venv'leri göremeyip sürekli yeni süreç doğuruyordu.
+        _venv = ".venv" in pexe.replace("/", "\\").lower()
+        if p.info["pid"] != me and pattern in cmd and "python" in pexe and _venv:
             module = args[args.index("-m") + 1]
             if True:
                 start = datetime.fromtimestamp(p.info["create_time"]).strftime("%H:%M:%S")
