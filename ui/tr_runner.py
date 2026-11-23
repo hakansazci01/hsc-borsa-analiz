@@ -114,10 +114,10 @@ def run_forever() -> None:
                 except Exception:
                     pass
                 try:
-                    from ui import amm
-                    lines += amm.step()
+                    from ui import net_profit_engine
+                    lines += net_profit_engine.step()   # net kâr garantili, reversal bazlı
                 except Exception as exc:
-                    lines.append(f"HSC-AMM hata: {type(exc).__name__}: {exc}")
+                    lines.append(f"NET_KAR hata: {type(exc).__name__}: {exc}")
                 _fast_tick = globals().get("_fast_tick", 0) + 1
                 globals()["_fast_tick"] = _fast_tick
                 if _fast_tick % 12 == 0:
