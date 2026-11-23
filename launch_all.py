@@ -68,15 +68,9 @@ def main() -> None:
         from ui import disaster_recovery
 
         disaster_recovery.recover()
-        # watchdog_once() motor + scheduler + watchdog'u kontrol edip başlatır.
-        # Watchdog kendi kopyalarını kurduktan sonra tek kopya güvenliğini sağla:
-        # global/.venv karışık başlatmalarda çift watchdog/scheduler kalmasın.
-        try:
-            from ui import watchdog_runner
-            watchdog_runner._kill_other_runners()
-        except Exception:
-            pass
         # Watchdog'u SADECE burada, bir kez başlat. Tek kopya garantisi.
+        # (_kill_other_runners ÇAĞRILMAZ — watchdog'u öldürüp yerine yenisini
+        #  başlatmak zincirleme kopya döngüsünü besliyordu.)
         wd = ops.process_state("ui.watchdog_runner")
         if not wd[0]:
             ops._start_module("ui.watchdog_runner")
